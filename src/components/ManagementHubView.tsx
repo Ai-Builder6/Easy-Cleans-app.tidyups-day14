@@ -39,6 +39,7 @@ interface ManagementHubViewProps {
   onOpenJobberSync: () => void;
   onOpenQuoModal: () => void;
   onOpenSpamShield?: () => void;
+  onNavigateToSpamShield?: () => void;
   onNavigateToLegal: (tab: 'SUPPORT' | 'TERMS' | 'PRIVACY') => void;
   onNavigateToCustomerPortal: () => void;
   intakesCount?: number;
@@ -62,6 +63,7 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
   onOpenJobberSync,
   onOpenQuoModal,
   onOpenSpamShield,
+  onNavigateToSpamShield,
   onNavigateToLegal,
   onNavigateToCustomerPortal,
   intakesCount = 0,
@@ -322,16 +324,28 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              if (onOpenSpamShield) onOpenSpamShield();
-              else onOpenQuoModal();
-            }}
-            className="w-full py-2.5 px-4 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md group-hover:translate-x-0.5"
-          >
-            <span>Open Twilio Spam Shield</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={() => {
+                if (onNavigateToSpamShield) onNavigateToSpamShield();
+                else if (onOpenSpamShield) onOpenSpamShield();
+              }}
+              className="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <span>Full Spam Console</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                if (onOpenSpamShield) onOpenSpamShield();
+                else if (onNavigateToSpamShield) onNavigateToSpamShield();
+              }}
+              className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-rose-300 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              title="Open quick 1-click blocker modal"
+            >
+              <span>Quick Modal</span>
+            </button>
+          </div>
         </div>
 
         {/* 5. Support & Dispatch Policies */}

@@ -41,6 +41,7 @@ import { QuickQuoteView } from './components/QuickQuoteView';
 import { QuickQuoteModal } from './components/QuickQuoteModal';
 import { QuoteDetailModal } from './components/QuoteDetailModal';
 import { TwilioSpamShieldModal } from './components/TwilioSpamShieldModal';
+import { SpamShieldView } from './components/SpamShieldView';
 import { AdLeadItem } from './types/lead';
 import { INITIAL_AD_LEADS } from './data/adLeadsData';
 import { LegalPagesView, LegalPageType } from './components/LegalPagesView';
@@ -221,6 +222,8 @@ export function App() {
   );
   const [mapsAuthError, setMapsAuthError] = useState<boolean>(false);
   const [refererErrorUrl, setRefererErrorUrl] = useState<string | null>(null);
+  const [dismissedMapsBanner, setDismissedMapsBanner] = useState<boolean>(false);
+  const [copiedReferrer, setCopiedReferrer] = useState<boolean>(false);
   const [quotaExceeded, setQuotaExceeded] = useState<boolean>(false);
   const [technicians, setTechnicians] = useState<Technician[]>(INITIAL_TECHNICIANS);
 
@@ -283,22 +286,22 @@ export function App() {
 
   const permissions = getRolePermissions(currentUser.role);
 
-  // Dedicated Top Bar Navigation Tabs: 'QUICK_QUOTE' | 'MAP' | 'SCHEDULED_JOBS' | 'MANAGEMENT' | 'INTAKES' | 'CUSTOMER_PORTAL' | 'CLIENTS' | 'ADDRESS_SEARCH' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'LEADS'
-  const [activeTopView, setActiveTopView] = useState<'MAP' | 'CUSTOMER_PORTAL' | 'SCHEDULED_JOBS' | 'CLIENTS' | 'ADDRESS_SEARCH' | 'MANAGEMENT' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'LEADS' | 'QUICK_QUOTE' | 'INTAKES'>(() => {
+  // Dedicated Top Bar Navigation Tabs: 'QUICK_QUOTE' | 'MAP' | 'SCHEDULED_JOBS' | 'MANAGEMENT' | 'INTAKES' | 'CUSTOMER_PORTAL' | 'CLIENTS' | 'ADDRESS_SEARCH' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'LEADS' | 'SPAM_SHIELD'
+  const [activeTopView, setActiveTopView] = useState<'MAP' | 'CUSTOMER_PORTAL' | 'SCHEDULED_JOBS' | 'CLIENTS' | 'ADDRESS_SEARCH' | 'MANAGEMENT' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'LEADS' | 'QUICK_QUOTE' | 'INTAKES' | 'SPAM_SHIELD'>(() => {
     if (typeof window !== 'undefined') {
       try {
         const isAuth = localStorage.getItem('tidyups_staff_authenticated') !== 'false';
         if (!isAuth) return 'CUSTOMER_PORTAL';
         const savedTab = localStorage.getItem('tidyups_active_tab');
-        if (savedTab && ['MAP', 'CUSTOMER_PORTAL', 'SCHEDULED_JOBS', 'CLIENTS', 'ADDRESS_SEARCH', 'MANAGEMENT', 'QUOTES', 'INVOICES', 'LEGAL', 'LEADS', 'QUICK_QUOTE', 'INTAKES'].includes(savedTab)) {
+        if (savedTab && ['MAP', 'CUSTOMER_PORTAL', 'SCHEDULED_JOBS', 'CLIENTS', 'ADDRESS_SEARCH', 'MANAGEMENT', 'QUOTES', 'INVOICES', 'LEGAL', 'LEADS', 'QUICK_QUOTE', 'INTAKES', 'SPAM_SHIELD'].includes(savedTab)) {
           return savedTab as any;
         }
-        return 'QUICK_QUOTE';
+        return 'MAP';
       } catch {
-        return 'QUICK_QUOTE';
+        return 'MAP';
       }
     }
-    return 'QUICK_QUOTE';
+    return 'MAP';
   });
   const [radarPreFillTicket, setRadarPreFillTicket] = useState<{
     address: string;
@@ -856,6 +859,10 @@ export function App() {
       const hash = window.location.hash.toLowerCase();
       if (path === '/book' || hash === '#book' || path.startsWith('/book/')) {
         setActiveTopView('CUSTOMER_PORTAL');
+      } else if (path === '/spam' || hash === '#spam' || path === '/spam-shield' || hash === '#spam-shield' || path === '/block' || hash === '#block') {
+        setActiveTopView('SPAM_SHIELD');
+      } else if (path === '/map' || hash === '#map') {
+        setActiveTopView('MAP');
       } else if (path === '/voice' || hash === '#voice' || path === '/quote' || hash === '#quote' || path === '/intake' || hash === '#intake') {
         setActiveTopView('QUICK_QUOTE');
       } else if (path === '/intakes' || hash === '#intakes') {
@@ -1466,6 +1473,50 @@ export function App() {
           </div>
         )}
 
+        {/* Google Maps API Referrer / Domain Notice Banner */}
+        {mapsAuthError && !dismissedMapsBanner && (
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 border-b border-blue-500/40 text-white px-4 py-2 text-xs flex items-center justify-between gap-3 sticky top-0 z-50 shadow-md flex-shrink-0 animate-fadeIn">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+              <span className="font-extrabold text-blue-300 shrink-0">Interactive Dispatch Map Engine Active</span>
+              <span className="text-slate-300 hidden md:inline truncate">
+                {refererErrorUrl ? `Live domain (${refererErrorUrl})` : 'Custom domain'} is using the high-resolution vector/satellite engine with real-time routing. To enable Google Maps JS vector tiles, add <code className="text-pink-300 font-mono px-1 py-0.5 bg-black/30 rounded">{typeof window !== 'undefined' ? `${window.location.origin}/*` : 'https://app.tidyupscleaning.com/*'}</code> to your Google Cloud Console API Key Referrers.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.tidyupscleaning.com';
+                  navigator.clipboard.writeText(`${origin}/*\n${origin.replace('app.', '*.')}/*`);
+                  setCopiedReferrer(true);
+                  setTimeout(() => setCopiedReferrer(false), 2000);
+                }}
+                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                title="Copy recommended referrer patterns for Google Cloud Console"
+              >
+                <span>{copiedReferrer ? '✓ Copied' : 'Copy Domain Referrer'}</span>
+              </button>
+              <a
+                href="https://console.cloud.google.com/apis/credentials"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[11px] transition-colors flex items-center gap-1"
+              >
+                <span>GCP Console ↗</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setDismissedMapsBanner(true)}
+                className="p-1 text-slate-400 hover:text-white rounded-md cursor-pointer ml-1"
+                title="Dismiss notice"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Full-Screen Zen Mode Exit Pill */}
         {isZenMode && (
           <div className="absolute top-4 left-4 z-50 animate-fadeIn pointer-events-auto">
@@ -1768,6 +1819,21 @@ export function App() {
                     <span>Intakes</span>
                   </button>
 
+                  {/* 6. Dedicated Twilio Spam Shield & Call Blocker Tab */}
+                  <button
+                    id="nav-tab-spam-shield"
+                    onClick={() => setActiveTopView('SPAM_SHIELD')}
+                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      activeTopView === 'SPAM_SHIELD'
+                        ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-xs font-extrabold ring-2 ring-rose-500/30'
+                        : 'text-rose-700 bg-rose-50/70 hover:text-rose-900 hover:bg-rose-100 border border-rose-200/60'
+                    }`}
+                    title="Twilio Spam Shield: Block nuisance callers, rotating numbers & area codes (/spam, /shield)"
+                  >
+                    <ShieldAlert className={`w-3.5 h-3.5 ${activeTopView === 'SPAM_SHIELD' ? 'text-white' : 'text-rose-600'}`} />
+                    <span>Spam Shield</span>
+                  </button>
+
                   {/* Address Distance Radar Tab */}
                   <button
                     id="nav-tab-address-radar"
@@ -2065,8 +2131,8 @@ export function App() {
           </header>
         )}
 
-        {/* Unauthenticated public visitors are strictly restricted to the Customer Booking Portal or Support/Legal */}
-        {!isStaffAuthenticated && activeTopView !== 'LEGAL' ? (
+        {/* Unauthenticated public visitors are restricted to the Customer Booking Portal, Support/Legal, or Spam Shield */}
+        {!isStaffAuthenticated && activeTopView !== 'LEGAL' && activeTopView !== 'SPAM_SHIELD' ? (
           <CustomerPortalView
             projectId={activeBrandId}
             onBookingSubmitted={(ticket) => {
@@ -2206,6 +2272,7 @@ export function App() {
             onOpenJobberSync={() => setIsJobberModalOpen(true)}
             onOpenQuoModal={() => setIsQuoModalOpen(true)}
             onOpenSpamShield={handleOpenSpamShield}
+            onNavigateToSpamShield={() => setActiveTopView('SPAM_SHIELD')}
             onNavigateToLegal={(tab) => {
               setActiveLegalTab(tab);
               setActiveTopView('LEGAL');
@@ -2336,6 +2403,14 @@ export function App() {
             quotes={quotesList}
             projectId={activeProjectId}
             onOpenSpamShield={handleOpenSpamShield}
+          />
+        ) : activeTopView === 'SPAM_SHIELD' ? (
+          <SpamShieldView
+            projectId={activeProjectId}
+            preFillNumber={spamShieldNumber}
+            onNavigateToVoiceIntake={() => setActiveTopView('QUICK_QUOTE')}
+            onNavigateToMap={() => setActiveTopView('MAP')}
+            onNavigateToManagement={() => setActiveTopView('MANAGEMENT')}
           />
         ) : currentUser.role === 'CLEANER' && !cleanerShowMap ? (
           <CleanerPortalView

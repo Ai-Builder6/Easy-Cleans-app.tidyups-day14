@@ -113,13 +113,33 @@ function getActiveMapsApiKey(): string {
 
 const AUTHORIZED_PREVIEW_REFERER = "https://ais-pre-2jvzwakvityygyeyjp5ysi-460696821435.us-east5.run.app/";
 
+// Dynamic referer helper: returns primary authorized referer for backend server-to-server Google API calls
+// so Places API, Geocoding, and Routes API calls succeed across all domains (app.tidyupscleaning.com, dispatchgeeni.com, preview)
+function getRequestReferer(_req?: express.Request): string {
+  return AUTHORIZED_PREVIEW_REFERER;
+}
+
 // Google Maps API Key configuration endpoint (safely provides public client key only)
 app.get("/api/config", (req, res) => {
   const activeKey = getActiveMapsApiKey();
   res.json({
     mapsApiKey: activeKey,
     hasGeminiKey: Boolean(geminiApiKey),
+    previewReferer: AUTHORIZED_PREVIEW_REFERER,
   });
+});
+
+// Update or set custom Google Maps API key in persistent store
+app.post("/api/maps/config", (req, res) => {
+  const { mapsApiKey } = req.body || {};
+  if (!mapsApiKey || typeof mapsApiKey !== "string") {
+    return res.status(400).json({ error: "mapsApiKey string is required" });
+  }
+  const cleanKey = mapsApiKey.trim();
+  const store = loadStore();
+  (store as any).customMapsApiKey = cleanKey;
+  saveStore(store);
+  res.json({ success: true, mapsApiKey: cleanKey });
 });
 
 // Unified 3-Site Google Cloud Run & Firestore Mirror Status Endpoint
@@ -354,7 +374,7 @@ app.get("/api/geocode/forward", async (req, res) => {
           "Content-Type": "application/json",
           "X-Goog-Api-Key": mapsKey,
           "X-Goog-FieldMask": "places.id,places.formattedAddress,places.location,places.displayName",
-          "Referer": AUTHORIZED_PREVIEW_REFERER,
+          "Referer": getRequestReferer(req),
         },
         body: JSON.stringify({
           textQuery: address.toLowerCase().includes("ab") || address.toLowerCase().includes("alberta") ? address : `${address}, Edmonton, AB, Canada`,
@@ -466,7 +486,7 @@ app.get("/api/places/autocomplete", async (req, res) => {
         headers: {
           "Content-Type": "application/json",
           "X-Goog-Api-Key": mapsKey,
-          "Referer": AUTHORIZED_PREVIEW_REFERER,
+          "Referer": getRequestReferer(req),
         },
         body: JSON.stringify({
           input,
@@ -628,7 +648,7 @@ app.post("/api/routes/compute", async (req, res) => {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": mapsKey,
         "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs.distanceMeters,routes.legs.duration",
-        "Referer": AUTHORIZED_PREVIEW_REFERER,
+        "Referer": getRequestReferer(req),
       },
       body: JSON.stringify(payload),
     });
@@ -721,7 +741,7 @@ app.post("/api/routes/matrix", async (req, res) => {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": mapsKey,
         "X-Goog-FieldMask": "originIndex,destinationIndex,status,condition,distanceMeters,duration",
-        "Referer": AUTHORIZED_PREVIEW_REFERER,
+        "Referer": getRequestReferer(req),
       },
       body: JSON.stringify(payload),
     });

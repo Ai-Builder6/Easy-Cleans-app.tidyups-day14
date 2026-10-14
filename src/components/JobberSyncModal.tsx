@@ -50,13 +50,13 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     setActiveProjectTab(projectId);
   }, [projectId]);
 
-  const DOMAIN_REDIRECT_URI = activeProjectTab === 'tidyups'
-    ? 'https://app.tidyupscleaning.com/api/jobber/oauth/callback'
-    : 'https://dispatchgeeni.com/api/jobber/oauth/callback';
+  // Canonical Registered Callback in Jobber Developer Center
+  const CANONICAL_JOBBER_CALLBACK = 'https://dispatchgeeni.com/api/jobber/oauth/callback';
+  const ALTERNATE_JOBBER_CALLBACK = 'https://app.tidyupscleaning.com/api/jobber/oauth/callback';
 
   const previewRedirectUri = typeof window !== 'undefined'
     ? `${window.location.origin.replace(/^http:\/\//i, 'https://')}/api/jobber/oauth/callback`
-    : DOMAIN_REDIRECT_URI;
+    : CANONICAL_JOBBER_CALLBACK;
 
   const [config, setConfig] = useState<JobberConfig>({
     isConnected: false,
@@ -69,7 +69,8 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
   const [clientIdInput, setClientIdInput] = useState('27966135-e33e-4c2e-8dc3-ad7ba06dabb8');
   const [clientSecretInput, setClientSecretInput] = useState('');
   const [accessTokenInput, setAccessTokenInput] = useState('');
-  const [redirectUri, setRedirectUri] = useState(DOMAIN_REDIRECT_URI);
+  // By default, use the single canonical callback registered in Jobber Dev (works for ALL domains)
+  const [redirectUri, setRedirectUri] = useState<string>(CANONICAL_JOBBER_CALLBACK);
   const [copiedRedirectUri, setCopiedRedirectUri] = useState(false);
   const [copiedAuthLink, setCopiedAuthLink] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
@@ -98,11 +99,23 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     push: { pushedCount: 14, ready: true },
   });
 
-  // Calculate instant authorization URL (never requires async roundtrip before opening)
+  // Calculate instant authorization URL (Universal 3-Domain Relay with base64url state)
   const computedAuthUrl = React.useMemo(() => {
     const cId = (clientIdInput || config.clientId || '27966135-e33e-4c2e-8dc3-ad7ba06dabb8').trim();
-    const rUri = redirectUri || DOMAIN_REDIRECT_URI;
-    return `https://api.getjobber.com/api/oauth/authorize?response_type=code&client_id=${encodeURIComponent(cId)}&redirect_uri=${encodeURIComponent(rUri)}&state=tidyups_auth`;
+    const rUri = (redirectUri || CANONICAL_JOBBER_CALLBACK).trim();
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://app.tidyupscleaning.com';
+    const statePayload = {
+      redirectUri: rUri,
+      sourceOrigin: currentOrigin,
+      returnUrl: typeof window !== 'undefined' ? window.location.href : currentOrigin,
+      nonce: Math.random().toString(36).substring(2, 10),
+      timestamp: Date.now(),
+    };
+    let stateParam = 'tidyups_auth';
+    try {
+      stateParam = btoa(JSON.stringify(statePayload));
+    } catch {}
+    return `https://api.getjobber.com/api/oauth/authorize?response_type=code&client_id=${encodeURIComponent(cId)}&redirect_uri=${encodeURIComponent(rUri)}&state=${encodeURIComponent(stateParam)}`;
   }, [clientIdInput, config.clientId, redirectUri]);
 
   const fetchConfig = () => {
@@ -606,103 +619,85 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                   </p>
                 </div>
 
-                {/* Step 1: Redirect URI */}
-                <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2.5">
+                {/* Step 1: Universal 3-Domain OAuth Relay */}
+                <div className="p-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-purple-50/70 border-2 border-blue-300 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
                       <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center font-bold">1</span>
-                      <span>Jobber Developer Center Redirect URI</span>
+                      <span>Single Jobber Dev Callback (Works for All 3 Domains)</span>
                     </span>
                     <button
                       onClick={() => handleCopyRedirectUri()}
-                      className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                      className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                     >
                       <Copy className="w-3 h-3" />
-                      <span>{copiedRedirectUri ? 'Copied!' : 'Copy Active URI'}</span>
+                      <span>{copiedRedirectUri ? 'Copied!' : 'Copy Registered URI'}</span>
                     </button>
                   </div>
 
-                  {/* Quick Selectors for Production Domains vs Preview */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveProjectTab('dispatchgeeni');
-                        setRedirectUri('https://dispatchgeeni.com/api/jobber/oauth/callback');
-                      }}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        redirectUri === 'https://dispatchgeeni.com/api/jobber/oauth/callback'
-                          ? 'bg-purple-700 text-white border-purple-800 shadow-2xs font-semibold'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold flex items-center gap-1">
-                          <Globe className="w-3 h-3" />
-                          <span>dispatchgeeni.com</span>
-                        </span>
-                        {redirectUri === 'https://dispatchgeeni.com/api/jobber/oauth/callback' && (
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">ACTIVE</span>
-                        )}
-                      </div>
-                      <div className="font-mono text-[10px] break-all mt-1 opacity-90">
-                        https://dispatchgeeni.com/api/jobber/oauth/callback
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveProjectTab('tidyups');
-                        setRedirectUri('https://app.tidyupscleaning.com/api/jobber/oauth/callback');
-                      }}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        redirectUri === 'https://app.tidyupscleaning.com/api/jobber/oauth/callback'
-                          ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs font-semibold'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold flex items-center gap-1">
-                          <Globe className="w-3 h-3" />
-                          <span>app.tidyupscleaning.com</span>
-                        </span>
-                        {redirectUri === 'https://app.tidyupscleaning.com/api/jobber/oauth/callback' && (
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">ACTIVE</span>
-                        )}
-                      </div>
-                      <div className="font-mono text-[10px] break-all mt-1 opacity-90">
-                        https://app.tidyupscleaning.com/api/jobber/oauth/callback
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRedirectUri(previewRedirectUri)}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        redirectUri === previewRedirectUri
-                          ? 'bg-blue-600 text-white border-blue-700 shadow-2xs font-semibold'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold flex items-center gap-1">
-                          <ExternalLink className="w-3 h-3" />
-                          <span>Preview Container</span>
-                        </span>
-                        {redirectUri === previewRedirectUri && (
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">ACTIVE</span>
-                        )}
-                      </div>
-                      <div className="font-mono text-[10px] break-all mt-1 opacity-90">
-                        {previewRedirectUri}
-                      </div>
-                    </button>
+                  <div className="p-2.5 bg-white/90 border border-blue-200 rounded-lg text-[11px] text-slate-800 space-y-1">
+                    <div className="font-extrabold text-blue-950 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span>Why You Only Need ONE Callback URI in Jobber Developer Center:</span>
+                    </div>
+                    <p className="text-slate-600 leading-relaxed">
+                      Jobber Developer Center only allows 1 callback URI. By setting your Jobber app's Callback URL to <code className="bg-blue-100 text-blue-950 px-1 py-0.5 rounded font-mono font-bold">https://dispatchgeeni.com/api/jobber/oauth/callback</code>, our built-in <strong>Universal OAuth Relay</strong> automatically handles authorization from <strong className="text-emerald-700">app.tidyupscleaning.com</strong>, <strong className="text-purple-700">dispatchgeeni.com</strong>, and preview instances without you ever having to change your Jobber Dev settings again!
+                    </p>
                   </div>
 
-                  <p className="text-[11px] text-blue-800 leading-relaxed">
-                    In your <strong>Jobber Developer Center App Settings</strong>, paste the active URL into the <strong>OAuth Callback URLs / Redirect URIs</strong> list.
-                  </p>
+                  {/* Registered Callback Selector */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                      Registered Callback in your Jobber Dev App (Select whichever you have in Jobber):
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setRedirectUri(CANONICAL_JOBBER_CALLBACK)}
+                        className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          redirectUri === CANONICAL_JOBBER_CALLBACK
+                            ? 'bg-purple-700 text-white border-purple-800 shadow-2xs font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold flex items-center gap-1">
+                            <Globe className="w-3 h-3" />
+                            <span>dispatchgeeni.com (Recommended)</span>
+                          </span>
+                          {redirectUri === CANONICAL_JOBBER_CALLBACK && (
+                            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">PRIMARY</span>
+                          )}
+                        </div>
+                        <div className="font-mono text-[10px] break-all mt-1 opacity-90">
+                          https://dispatchgeeni.com/api/jobber/oauth/callback
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRedirectUri(ALTERNATE_JOBBER_CALLBACK)}
+                        className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          redirectUri === ALTERNATE_JOBBER_CALLBACK
+                            ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold flex items-center gap-1">
+                            <Globe className="w-3 h-3" />
+                            <span>app.tidyupscleaning.com (Alternate)</span>
+                          </span>
+                          {redirectUri === ALTERNATE_JOBBER_CALLBACK && (
+                            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">PRIMARY</span>
+                          )}
+                        </div>
+                        <div className="font-mono text-[10px] break-all mt-1 opacity-90">
+                          https://app.tidyupscleaning.com/api/jobber/oauth/callback
+                        </div>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Step 2: Client ID & Secret Inputs */}

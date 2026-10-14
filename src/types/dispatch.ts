@@ -155,3 +155,25 @@ export interface RouteCalculationRequest {
   intermediates?: Array<{ lat: number; lng: number }>;
   travelMode?: string;
 }
+
+export interface SpamShieldConfig {
+  enabled: boolean;
+  blockAllNonNorthAmerica: boolean;
+  blockedCountryCodes: string[];
+  blockedPrefixes: string[];
+  blockedNumbers: string[];
+  blockRobocallFloods?: boolean;
+  rejectionAction?: 'busy' | 'rejected';
+  forwardDestinationNumber?: string;
+  callerIdMode?: 'caller' | 'line';
+  lineMappings?: Record<string, string>;
+}
+
+export interface BlockedCallHistoryItem {
+  id: string;
+  timestamp: string;
+  callerNumber: string;
+  callerName?: string;
+  countryCode?: string;
+  reason: string;
+}

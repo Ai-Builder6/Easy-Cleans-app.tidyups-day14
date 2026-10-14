@@ -29,7 +29,7 @@ import { JOBBER_TEAM_MEMBERS } from '../data/jobberCalendarData';
 interface QuickLinksModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigateTo: (view: 'MAP' | 'CUSTOMER_PORTAL' | 'SCHEDULED_JOBS' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'ADDRESS_SEARCH' | 'LEADS' | 'QUICK_QUOTE', subTab?: string) => void;
+  onNavigateTo: (view: 'MAP' | 'CUSTOMER_PORTAL' | 'SCHEDULED_JOBS' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'ADDRESS_SEARCH' | 'LEADS' | 'QUICK_QUOTE' | 'SPAM_SHIELD', subTab?: string) => void;
   onOpenNewTicket?: () => void;
   onOpenTeamChat?: () => void;
   onOpenQuoPhone?: () => void;
@@ -279,8 +279,7 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
               {/* Twilio Spam Shield & Call Blocker */}
               <button
                 onClick={() => {
-                  if (onOpenSpamShield) onOpenSpamShield();
-                  else if (onOpenQuoPhone) onOpenQuoPhone();
+                  onNavigateTo('SPAM_SHIELD');
                   onClose();
                 }}
                 className="p-3.5 rounded-2xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-all text-left flex items-start justify-between gap-3 group cursor-pointer"
