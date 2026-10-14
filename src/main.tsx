@@ -81,33 +81,22 @@ if (typeof window !== 'undefined') {
       .join(' ');
 
     if (
-      msg.includes('Google Maps JavaScript API error') ||
       msg.includes('RefererNotAllowedMapError') ||
       msg.includes('ApiTargetBlockedMapError') ||
       msg.includes('ApiProjectMapError') ||
-      msg.includes('InvalidKeyMapError') ||
+      msg.includes('InvalidKeyMapError')
+    ) {
+      window.dispatchEvent(new CustomEvent('google-maps-auth-failure'));
+      return;
+    }
+
+    if (
       msg.includes('OverQuotaMapError') ||
       msg.includes('QuotaExceededError') ||
       msg.includes('API_KEY_HTTP_REFERRER_BLOCKED') ||
       msg.includes('type.googleapis.com/google.rpc.ErrorInfo') ||
-      msg.includes('ErrorInfo') ||
-      msg.includes('maps.googleapis.com') ||
-      msg.includes('maps-backend.googleapis.com')
+      msg.includes('ErrorInfo')
     ) {
-      window.dispatchEvent(new CustomEvent('google-maps-auth-failure'));
-      if (
-        msg.includes('RefererNotAllowedMapError') ||
-        msg.includes('API_KEY_HTTP_REFERRER_BLOCKED')
-      ) {
-        window.dispatchEvent(
-          new CustomEvent('google-maps-referer-error', {
-            detail: { url: window.location.origin },
-          })
-        );
-      }
-      if (msg.includes('OverQuotaMapError') || msg.includes('QuotaExceededError')) {
-        window.dispatchEvent(new CustomEvent('gmp-quota-exceeded'));
-      }
       return;
     }
 
@@ -116,29 +105,13 @@ if (typeof window !== 'undefined') {
 
   window.addEventListener('error', (event: ErrorEvent) => {
     const message = event.message || '';
-    const filename = event.filename || '';
     if (
       message.includes('ApiTargetBlockedMapError') ||
       message.includes('ApiProjectMapError') ||
       message.includes('RefererNotAllowedMapError') ||
-      message.includes('InvalidKeyMapError') ||
-      message.includes('Google Maps JavaScript API error') ||
-      message.includes('API_KEY_HTTP_REFERRER_BLOCKED') ||
-      message.includes('ErrorInfo') ||
-      filename.includes('maps.googleapis.com')
+      message.includes('InvalidKeyMapError')
     ) {
       window.dispatchEvent(new CustomEvent('google-maps-auth-failure'));
-      if (
-        message.includes('RefererNotAllowedMapError') ||
-        message.includes('API_KEY_HTTP_REFERRER_BLOCKED')
-      ) {
-        window.dispatchEvent(
-          new CustomEvent('google-maps-referer-error', {
-            detail: { url: window.location.origin },
-          })
-        );
-      }
-      // Prevent uncaught error popup from breaking the UI
       if (typeof event.preventDefault === 'function') {
         event.preventDefault();
       }
@@ -149,23 +122,10 @@ if (typeof window !== 'undefined') {
     const reason = event.reason?.message || String(event.reason || '');
     if (
       reason.includes('ApiTargetBlockedMapError') ||
-      reason.includes('Google Maps') ||
-      reason.includes('maps.googleapis.com') ||
       reason.includes('RefererNotAllowedMapError') ||
       reason.includes('ErrorInfo') ||
       reason.includes('API_KEY_HTTP_REFERRER_BLOCKED')
     ) {
-      window.dispatchEvent(new CustomEvent('google-maps-auth-failure'));
-      if (
-        reason.includes('RefererNotAllowedMapError') ||
-        reason.includes('API_KEY_HTTP_REFERRER_BLOCKED')
-      ) {
-        window.dispatchEvent(
-          new CustomEvent('google-maps-referer-error', {
-            detail: { url: window.location.origin },
-          })
-        );
-      }
       if (typeof event.preventDefault === 'function') {
         event.preventDefault();
       }

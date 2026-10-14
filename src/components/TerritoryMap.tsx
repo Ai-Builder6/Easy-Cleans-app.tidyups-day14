@@ -32,7 +32,8 @@ import {
   CalendarDays,
   PhoneCall,
   UserCheck,
-  Edit2
+  Edit2,
+  Route
 } from 'lucide-react';
 import { 
   ScheduledJobItem, 
@@ -457,6 +458,101 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
   // Van & Hub Editor modal state
   const [editingVanHubTech, setEditingVanHubTech] = useState<Technician | null>(null);
   const [isVanHubModalOpen, setIsVanHubModalOpen] = useState<boolean>(false);
+
+  // Schedule Horizon Filter (Today / Week Forward / Month Forward / All) & Schedule Drawer
+  const [scheduleHorizon, setScheduleHorizon] = useState<'TODAY' | 'WEEK' | 'MONTH' | 'ALL'>('WEEK');
+  const [showScheduleDrawer, setShowScheduleDrawer] = useState<boolean>(false);
+
+  // 2-Address Route & Distance Comparison Tool on Map
+  const [showTwoAddressPanel, setShowTwoAddressPanel] = useState<boolean>(false);
+  const [addressAInput, setAddressAInput] = useState<string>('10420 103 Ave NW, Edmonton, AB');
+  const [addressBInput, setAddressBInput] = useState<string>('5230 Windermere Blvd SW, Edmonton, AB');
+
+  const resolveEdmontonAddressCoords = (addr: string, fallbackLat: number, fallbackLng: number) => {
+    const clean = (addr || '').trim();
+    if (!clean) return { lat: fallbackLat, lng: fallbackLng };
+    const lower = clean.toLowerCase();
+    const matchedJob = scheduledJobs.find(
+      (j) =>
+        j.serviceAddress.toLowerCase().includes(lower) ||
+        lower.includes(j.serviceAddress.toLowerCase().split(',')[0]) ||
+        j.clientName.toLowerCase() === lower
+    );
+    if (matchedJob) return { lat: matchedJob.lat, lng: matchedJob.lng };
+
+    const matchedTicket = tickets.find(
+      (t) =>
+        t.location.address.toLowerCase().includes(lower) ||
+        lower.includes(t.location.address.toLowerCase().split(',')[0])
+    );
+    if (matchedTicket) return { lat: matchedTicket.location.lat, lng: matchedTicket.location.lng };
+
+    if (lower.includes('windermere') || lower.includes('amblesside')) return { lat: 53.4312, lng: -113.6054 };
+    if (lower.includes('summerside')) return { lat: 53.4148, lng: -113.4625 };
+    if (lower.includes('st. albert') || lower.includes('st albert')) return { lat: 53.6305, lng: -113.6256 };
+    if (lower.includes('sherwood')) return { lat: 53.5168, lng: -113.3187 };
+    if (lower.includes('whyte') || lower.includes('82 ave')) return { lat: 53.5181, lng: -113.4982 };
+    if (lower.includes('103 ave') || lower.includes('downtown') || lower.includes('jasper')) return { lat: 53.5461, lng: -113.4938 };
+    if (lower.includes('glenora') || lower.includes('142 st')) return { lat: 53.5442, lng: -113.5621 };
+    if (lower.includes('terwillegar')) return { lat: 53.4581, lng: -113.5812 };
+
+    let hash = 0;
+    for (let i = 0; i < clean.length; i++) {
+      hash = (hash * 31 + clean.charCodeAt(i)) % 10000;
+    }
+    const latOffset = ((hash % 100) / 100) * 0.14 - 0.07;
+    const lngOffset = ((Math.floor(hash / 100) % 100) / 100) * 0.22 - 0.11;
+    return {
+      lat: Number((53.535 + latOffset).toFixed(5)),
+      lng: Number((-113.495 + lngOffset).toFixed(5)),
+    };
+  };
+
+  const coordsA = resolveEdmontonAddressCoords(addressAInput, 53.5461, -113.4938);
+  const coordsB = resolveEdmontonAddressCoords(addressBInput, 53.4312, -113.6054);
+
+  const twoAddrDistanceKm = (() => {
+    const R = 6371;
+    const dLat = ((coordsB.lat - coordsA.lat) * Math.PI) / 180;
+    const dLng = ((coordsB.lng - coordsA.lng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((coordsA.lat * Math.PI) / 180) *
+        Math.cos((coordsB.lat * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.max(0.8, Math.round(R * c * 1.28 * 10) / 10);
+  })();
+
+  const twoAddrDriveMins = Math.max(4, Math.round(twoAddrDistanceKm * 1.65 + 4));
+
+  // Filter scheduled jobs by Schedule Horizon (Today / Week Forward / Month Forward / All)
+  const horizonFilteredScheduledJobs = (() => {
+    if (!scheduledJobs || scheduledJobs.length === 0) return [];
+    if (scheduleHorizon === 'ALL') return scheduledJobs;
+
+    const allDates = scheduledJobs.map((j) => j.startAt.split('T')[0]).sort();
+    const todayIso = new Date().toISOString().split('T')[0];
+    const anchorDateStr = allDates.includes(todayIso)
+      ? todayIso
+      : allDates.find((d) => d >= todayIso) || allDates[0];
+
+    const anchorMs = new Date(`${anchorDateStr}T00:00:00`).getTime();
+    const maxDays = scheduleHorizon === 'TODAY' ? 1 : scheduleHorizon === 'WEEK' ? 7 : 31;
+
+    const filtered = scheduledJobs.filter((j) => {
+      const jobDateStr = j.startAt.split('T')[0];
+      if (scheduleHorizon === 'TODAY') {
+        return jobDateStr === anchorDateStr;
+      }
+      const jobMs = new Date(`${jobDateStr}T00:00:00`).getTime();
+      const diffDays = (jobMs - anchorMs) / (1000 * 60 * 60 * 24);
+      return diffDays >= -0.5 && diffDays <= maxDays;
+    });
+
+    return filtered.length > 0 ? filtered : scheduledJobs;
+  })();
 
   // Auto-focus and open info window when selectedScheduledJobId is set
   useEffect(() => {
@@ -902,6 +998,276 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
           </div>
         )}
 
+        {/* Schedule Horizon & 2-Address Picker Interactive Bar */}
+        <div className="pointer-events-auto flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md rounded-xl border border-slate-200 px-2.5 py-1.5 shadow-md self-start max-w-full">
+          <div className="flex items-center gap-1 pr-1.5 border-r border-slate-200">
+            <CalendarDays className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 hidden sm:inline">Schedule:</span>
+            {([
+              { id: 'TODAY', label: 'Today' },
+              { id: 'WEEK', label: 'Week Forward' },
+              { id: 'MONTH', label: 'Month' },
+              { id: 'ALL', label: 'All' },
+            ] as const).map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => {
+                  setScheduleHorizon(h.id);
+                  setShowScheduledJobs(true);
+                }}
+                className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                  scheduleHorizon === h.id
+                    ? 'bg-purple-600 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {h.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setShowScheduleDrawer(!showScheduleDrawer)}
+              className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-all cursor-pointer flex items-center gap-1 ${
+                showScheduleDrawer
+                  ? 'bg-purple-50 text-purple-800 border-purple-300'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <span>{horizonFilteredScheduledJobs.length} Jobs</span>
+              {showScheduleDrawer ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
+
+          {/* 2-Address Picker Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowTwoAddressPanel(!showTwoAddressPanel)}
+            className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 transition-all cursor-pointer border ${
+              showTwoAddressPanel
+                ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
+                : 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100'
+            }`}
+          >
+            <Route className="w-3.5 h-3.5" />
+            <span>Pick 2 Addresses ({twoAddrDistanceKm} km • ~{twoAddrDriveMins}m)</span>
+          </button>
+        </div>
+
+        {/* Expandable 2-Address Route & Distance Comparison Panel */}
+        {showTwoAddressPanel && (
+          <div className="pointer-events-auto bg-white/95 backdrop-blur-md border border-indigo-200 rounded-xl p-3 shadow-xl max-w-2xl w-full animate-fadeIn space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-indigo-600 text-white">
+                  <Route className="w-3.5 h-3.5" />
+                </span>
+                <div>
+                  <h4 className="text-xs font-black text-slate-900">Compare Two Addresses &amp; Route Distance</h4>
+                  <p className="text-[10px] text-slate-500">Type any 2 addresses or select directly from scheduled jobs</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(addressAInput)}&destination=${encodeURIComponent(addressBInput)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-extrabold flex items-center gap-1 shadow-xs"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Google Directions</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowTwoAddressPanel(false)}
+                  className="text-slate-400 hover:text-slate-700 font-bold text-xs px-1.5 py-0.5 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-lg p-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-emerald-900 flex items-center gap-1">
+                    <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px]">A</span>
+                    Address 1 (Origin)
+                  </span>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) setAddressAInput(e.target.value);
+                    }}
+                    value=""
+                    className="text-[10px] bg-white border border-emerald-300 rounded px-1.5 py-0.5 font-semibold text-emerald-900 max-w-[140px]"
+                  >
+                    <option value="">Pick Scheduled Job...</option>
+                    {scheduledJobs.map((j) => (
+                      <option key={`a-${j.id}`} value={j.serviceAddress}>
+                        {j.clientName} ({j.serviceAddress.split(',')[0]})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={addressAInput}
+                  onChange={(e) => setAddressAInput(e.target.value)}
+                  placeholder="Enter first address..."
+                  className="w-full px-2 py-1.5 text-xs bg-white border border-emerald-300 rounded-md font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="bg-rose-50/70 border border-rose-200 rounded-lg p-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-rose-900 flex items-center gap-1">
+                    <span className="w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center text-[9px]">B</span>
+                    Address 2 (Destination)
+                  </span>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) setAddressBInput(e.target.value);
+                    }}
+                    value=""
+                    className="text-[10px] bg-white border border-rose-300 rounded px-1.5 py-0.5 font-semibold text-rose-900 max-w-[140px]"
+                  >
+                    <option value="">Pick Scheduled Job...</option>
+                    {scheduledJobs.map((j) => (
+                      <option key={`b-${j.id}`} value={j.serviceAddress}>
+                        {j.clientName} ({j.serviceAddress.split(',')[0]})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={addressBInput}
+                  onChange={(e) => setAddressBInput(e.target.value)}
+                  placeholder="Enter second address..."
+                  className="w-full px-2 py-1.5 text-xs bg-white border border-rose-300 rounded-md font-semibold text-slate-900 focus:outline-none focus:border-rose-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5 text-xs">
+              <div className="flex items-center gap-3">
+                <span className="font-black text-indigo-950">
+                  Est. Route Distance: <span className="font-mono text-indigo-700">{twoAddrDistanceKm} km</span>
+                </span>
+                <span className="text-indigo-400">•</span>
+                <span className="font-black text-indigo-950">
+                  Drive Time: <span className="font-mono text-indigo-700">~{twoAddrDriveMins} mins</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const temp = addressAInput;
+                  setAddressAInput(addressBInput);
+                  setAddressBInput(temp);
+                }}
+                className="text-[10px] font-extrabold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+              >
+                Swap A ↔ B
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Expandable Schedule Horizon Drawer (Today / Week Forward / Month Forward) */}
+        {showScheduleDrawer && (
+          <div className="pointer-events-auto bg-white/95 backdrop-blur-md border border-purple-200 rounded-xl p-3 shadow-xl max-w-2xl w-full max-h-60 overflow-y-auto animate-fadeIn space-y-2">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+              <span className="text-xs font-black text-purple-950 flex items-center gap-1.5">
+                <CalendarDays className="w-4 h-4 text-purple-600" />
+                <span>
+                  {scheduleHorizon === 'TODAY'
+                    ? "Today's Schedule"
+                    : scheduleHorizon === 'WEEK'
+                    ? 'Week Forward Schedule (7 Days)'
+                    : scheduleHorizon === 'MONTH'
+                    ? 'Month Forward Schedule (30 Days)'
+                    : 'All Scheduled Jobs'}{' '}
+                  ({horizonFilteredScheduledJobs.length})
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowScheduleDrawer(false)}
+                className="text-slate-400 hover:text-slate-700 text-xs font-bold px-1.5 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {horizonFilteredScheduledJobs.map((job) => {
+                const dt = formatDateTime(job.startAt);
+                const cleaner = job.assignedCleaners[0] || 'Unassigned';
+                const color = getCleanerColor(cleaner);
+                return (
+                  <div
+                    key={`sched-drawer-${job.id}`}
+                    className="p-2 rounded-lg border border-slate-200 hover:border-purple-300 bg-slate-50/70 flex flex-col justify-between gap-1 text-[11px]"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectScheduledJob?.(job.id);
+                          setActiveInfoWindow({
+                            type: 'JOB',
+                            id: job.id,
+                            position: { lat: job.lat, lng: job.lng },
+                          });
+                        }}
+                        className="font-black text-slate-900 hover:text-purple-700 truncate text-left cursor-pointer"
+                      >
+                        {job.clientName}
+                      </button>
+                      <span
+                        className="px-1.5 py-0.5 rounded text-[9px] font-bold text-white shrink-0"
+                        style={{ backgroundColor: color }}
+                      >
+                        {cleaner}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-600 truncate">📍 {job.serviceAddress}</div>
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/70">
+                      <span className="font-mono text-[10px] font-bold text-purple-700">
+                        {dt.dateStr} • {dt.timeStr}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddressAInput(job.serviceAddress);
+                            setShowTwoAddressPanel(true);
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-black text-[9px] cursor-pointer"
+                          title="Set as Address A"
+                        >
+                          Set A
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddressBInput(job.serviceAddress);
+                            setShowTwoAddressPanel(true);
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-900 font-black text-[9px] cursor-pointer"
+                          title="Set as Address B"
+                        >
+                          Set B
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Selected Technician Floating Route Status Bar (Shown cleanly below filters when active) */}
         {selectedTech && (
           <div className="pointer-events-auto self-start flex items-center justify-between gap-2 px-3 py-1.5 bg-white/95 border border-blue-200 rounded-xl backdrop-blur-md text-xs text-slate-800 shadow-md max-w-full animate-fadeIn">
@@ -1195,7 +1561,7 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
 
             {/* Scheduled Calendar Cleaner Jobs with Individual Cleaner Colors & Done Lighter Shading */}
             {showScheduledJobs &&
-              scheduledJobs.map((job) => {
+              horizonFilteredScheduledJobs.map((job) => {
                 const isSelected = selectedScheduledJobId === job.id;
                 const primaryCleaner = job.assignedCleaners[0] || 'Unassigned';
                 const cleanerColor = getCleanerColor(primaryCleaner);
@@ -1930,9 +2296,52 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
                 );
               })}
 
+              {/* Two-Address Comparison Route Line & Pins on Vector Map */}
+              {showTwoAddressPanel && (() => {
+                const posA = projectCoords(coordsA.lat, coordsA.lng);
+                const posB = projectCoords(coordsB.lat, coordsB.lng);
+                return (
+                  <>
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-30" viewBox="0 0 100 100" preserveAspectRatio="none">
+                      <line
+                        x1={posA.x}
+                        y1={posA.y}
+                        x2={posB.x}
+                        y2={posB.y}
+                        stroke="#4F46E5"
+                        strokeWidth="0.9"
+                        strokeDasharray="1.5,0.8"
+                      />
+                    </svg>
+                    <div
+                      style={{ left: `${posA.x}%`, top: `${posA.y}%` }}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 z-45 flex flex-col items-center pointer-events-none"
+                    >
+                      <div className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-black shadow-md border border-white whitespace-nowrap mb-0.5">
+                        Address A • {addressAInput.split(',')[0]}
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-emerald-600 border-2 border-white text-white font-black text-xs flex items-center justify-center shadow-xl">
+                        A
+                      </div>
+                    </div>
+                    <div
+                      style={{ left: `${posB.x}%`, top: `${posB.y}%` }}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 z-45 flex flex-col items-center pointer-events-none"
+                    >
+                      <div className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-black shadow-md border border-white whitespace-nowrap mb-0.5">
+                        Address B • {addressBInput.split(',')[0]} ({twoAddrDistanceKm} km)
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-rose-600 border-2 border-white text-white font-black text-xs flex items-center justify-center shadow-xl">
+                        B
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
               {/* Scheduled Calendar Cleaner Jobs on Vector Map */}
               {showScheduledJobs &&
-                scheduledJobs.map((job) => {
+                horizonFilteredScheduledJobs.map((job) => {
                   const pos = projectCoords(job.lat, job.lng);
                   const isSelected = selectedScheduledJobId === job.id;
                   const primaryCleaner = job.assignedCleaners[0] || 'Unassigned';

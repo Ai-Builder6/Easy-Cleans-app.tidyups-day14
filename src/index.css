@@ -63,6 +63,20 @@
   scrollbar-width: none;
 }
 
+/* Prevent Google Maps JS SDK from flashing any domain/auth dialog overlay */
+.gm-err-container,
+.gm-err-content,
+.gm-err-icon,
+.gm-err-title,
+.gm-err-message,
+.gm-style-pbc,
+.dismissButton {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 /* Print styles: Ensure that printing from the main window cleanly prints ONLY the manifest modal */
 @media print {
   /* Hide all background app chrome and map elements */

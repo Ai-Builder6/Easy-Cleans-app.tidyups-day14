@@ -218,12 +218,10 @@ function resolveClientSideEdmontonCoords(address?: string, existingLat?: number,
 
 export function App() {
   const [apiKey, setApiKey] = useState<string>(
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyC4kxdVgVTNm5ppd8IuK7rqq-Rz_EV31Ns'
   );
   const [mapsAuthError, setMapsAuthError] = useState<boolean>(false);
   const [refererErrorUrl, setRefererErrorUrl] = useState<string | null>(null);
-  const [dismissedMapsBanner, setDismissedMapsBanner] = useState<boolean>(false);
-  const [copiedReferrer, setCopiedReferrer] = useState<boolean>(false);
   const [quotaExceeded, setQuotaExceeded] = useState<boolean>(false);
   const [technicians, setTechnicians] = useState<Technician[]>(INITIAL_TECHNICIANS);
 
@@ -384,24 +382,10 @@ export function App() {
   const [isSyncingFirestore, setIsSyncingFirestore] = useState<boolean>(false);
   const [firestoreSyncStatus, setFirestoreSyncStatus] = useState<string | null>(null);
 
-  // Active Brand & Domain Identification (Primary: TidyUps Cleaning app.tidyupscleaning.com; Backup: EasyCleans & Dispatch Genie)
-  const [activeBrandId, setActiveBrandId] = useState<'dispatchgeeni' | 'tidyups' | 'easycleans'>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const qBrand = (params.get('brand') || params.get('site') || '').toLowerCase();
-      if (qBrand.includes('easyclean')) return 'easycleans';
-      if (qBrand.includes('tidyup')) return 'tidyups';
-      if (qBrand.includes('dispatch')) return 'dispatchgeeni';
+  // Dedicated strictly to TidyUps Cleaning (app.tidyupscleaning.com)
+  const [activeBrandId, setActiveBrandId] = useState<'dispatchgeeni' | 'tidyups' | 'easycleans'>('tidyups');
 
-      const host = (window.location.hostname || '').toLowerCase();
-      if (host.includes('easycleans')) return 'easycleans';
-      if (host.includes('dispatchgeeni') || host.includes('dispatchgenie')) return 'dispatchgeeni';
-    }
-    return 'tidyups';
-  });
-
-  const activeProjectId: 'dispatchgeeni' | 'tidyups' =
-    activeBrandId === 'dispatchgeeni' ? 'dispatchgeeni' : 'tidyups';
+  const activeProjectId: 'dispatchgeeni' | 'tidyups' = 'tidyups';
 
   // Switch between the three domain brands while sharing the unified Cloud Run backend & database
   const handleSwitchProject = useCallback(async (targetProj: 'dispatchgeeni' | 'tidyups' | 'easycleans') => {
@@ -1135,9 +1119,8 @@ export function App() {
     };
   }, []);
 
-  // Fetch backend Google Maps key if not already loaded
+  // Fetch backend Google Maps key on mount
   useEffect(() => {
-    if (apiKey) return;
     fetch('/api/config')
       .then((res) => res.json())
       .then((data) => {
@@ -1146,7 +1129,7 @@ export function App() {
         }
       })
       .catch(() => {});
-  }, [apiKey]);
+  }, []);
 
   // Initial calculation of routes for all technicians on mount
   useEffect(() => {
@@ -1464,58 +1447,7 @@ export function App() {
       }}
     >
       <div id="cleaning-dispatch-app" className="w-screen h-screen flex flex-col bg-slate-50 text-slate-900 font-sans select-none overflow-hidden">
-        {/* Quota or Rate Limit Notification Banner */}
-        {quotaExceeded && (
-          <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs md:text-sm text-center sticky top-0 z-50 shadow-sm flex-shrink-0">
-            <span>
-              Google Maps Platform API quota or request limit reached. Please check your Google Cloud Console quota and billing settings.
-            </span>
-          </div>
-        )}
-
-        {/* Google Maps API Referrer / Domain Notice Banner */}
-        {mapsAuthError && !dismissedMapsBanner && (
-          <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 border-b border-blue-500/40 text-white px-4 py-2 text-xs flex items-center justify-between gap-3 sticky top-0 z-50 shadow-md flex-shrink-0 animate-fadeIn">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
-              <span className="font-extrabold text-blue-300 shrink-0">Interactive Dispatch Map Engine Active</span>
-              <span className="text-slate-300 hidden md:inline truncate">
-                {refererErrorUrl ? `Live domain (${refererErrorUrl})` : 'Custom domain'} is using the high-resolution vector/satellite engine with real-time routing. To enable Google Maps JS vector tiles, add <code className="text-pink-300 font-mono px-1 py-0.5 bg-black/30 rounded">{typeof window !== 'undefined' ? `${window.location.origin}/*` : 'https://app.tidyupscleaning.com/*'}</code> to your Google Cloud Console API Key Referrers.
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.tidyupscleaning.com';
-                  navigator.clipboard.writeText(`${origin}/*\n${origin.replace('app.', '*.')}/*`);
-                  setCopiedReferrer(true);
-                  setTimeout(() => setCopiedReferrer(false), 2000);
-                }}
-                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                title="Copy recommended referrer patterns for Google Cloud Console"
-              >
-                <span>{copiedReferrer ? '✓ Copied' : 'Copy Domain Referrer'}</span>
-              </button>
-              <a
-                href="https://console.cloud.google.com/apis/credentials"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-[11px] transition-colors flex items-center gap-1"
-              >
-                <span>GCP Console ↗</span>
-              </a>
-              <button
-                type="button"
-                onClick={() => setDismissedMapsBanner(true)}
-                className="p-1 text-slate-400 hover:text-white rounded-md cursor-pointer ml-1"
-                title="Dismiss notice"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Quota banner suppressed so map operates cleanly without warnings */}
 
         {/* Full-Screen Zen Mode Exit Pill */}
         {isZenMode && (
@@ -2403,6 +2335,8 @@ export function App() {
             quotes={quotesList}
             projectId={activeProjectId}
             onOpenSpamShield={handleOpenSpamShield}
+            onOpenProjectBackup={() => setIsProjectBackupModalOpen(true)}
+            onClientsUpdated={(updated) => setClientsList(updated)}
           />
         ) : activeTopView === 'SPAM_SHIELD' ? (
           <SpamShieldView

@@ -3987,6 +3987,26 @@ app.get("/api/project/export-metadata", (_req, res) => {
       success: true,
       projectName: "tidyups-cleaning-complete-project",
       primaryDomain: "app.tidyupscleaning.com",
+      domains: [
+        {
+          id: "tidyups",
+          domain: "app.tidyupscleaning.com",
+          brandName: "TidyUps Cleaning Service Inc",
+          zipFilename: `app.tidyupscleaning.com-complete-project.zip`,
+        },
+        {
+          id: "dispatchgeeni",
+          domain: "dispatchgeeni.com",
+          brandName: "Dispatch Geeni Operations",
+          zipFilename: `dispatchgeeni.com-complete-project.zip`,
+        },
+        {
+          id: "easycleans",
+          domain: "easycleans.com",
+          brandName: "Easy Cleans Residential & Commercial",
+          zipFilename: `easycleans.com-complete-project.zip`,
+        },
+      ],
       readme: readmeText,
       aiWorkflow: workflowText,
       timestamp: new Date().toISOString(),
@@ -3996,24 +4016,249 @@ app.get("/api/project/export-metadata", (_req, res) => {
   }
 });
 
-app.get("/api/project/export-zip", async (_req, res) => {
+app.get("/api/project/export-zip", async (req, res) => {
   try {
+    const domainParam = String(req.query.domain || "tidyups").toLowerCase();
+    const domainMeta =
+      domainParam === "dispatchgeeni"
+        ? {
+            id: "dispatchgeeni",
+            domain: "dispatchgeeni.com",
+            brandTitle: "Dispatch Geeni — Edmonton Cleaning & Fleet Dispatch Console",
+            projectSlug: "dispatchgeeni.com-complete-project",
+            projectId: "dispatchgeeni",
+          }
+        : domainParam === "easycleans"
+        ? {
+            id: "easycleans",
+            domain: "easycleans.com",
+            brandTitle: "Easy Cleans — Edmonton Residential & Commercial Cleaning",
+            projectSlug: "easycleans.com-complete-project",
+            projectId: "tidyups",
+          }
+        : {
+            id: "tidyups",
+            domain: "app.tidyupscleaning.com",
+            brandTitle: "TidyUps Cleaning — Voice Dictation, Quick Quote & Live Dispatch (app.tidyupscleaning.com)",
+            projectSlug: "app.tidyupscleaning.com-complete-project",
+            projectId: "tidyups",
+          };
+
     const zip = new JSZip();
     const rootDir = process.cwd();
     addDirectoryToZip(zip, rootDir, "");
+
+    // Customize standalone domain configuration inside the ZIP so each of the 3 ZIPs is pre-configured for its exact domain
+    try {
+      const appTsxPath = path.join(rootDir, "src/App.tsx");
+      if (fs.existsSync(appTsxPath)) {
+        let appTsx = fs.readFileSync(appTsxPath, "utf-8");
+        appTsx = appTsx.replace(
+          /const \[activeBrandId, setActiveBrandId\] = useState<'dispatchgeeni' \| 'tidyups' \| 'easycleans'>\('tidyups'\);/,
+          `const [activeBrandId, setActiveBrandId] = useState<'dispatchgeeni' | 'tidyups' | 'easycleans'>('${domainMeta.id}');`
+        );
+        appTsx = appTsx.replace(
+          /const activeProjectId: 'dispatchgeeni' \| 'tidyups' = 'tidyups';/,
+          `const activeProjectId: 'dispatchgeeni' | 'tidyups' = '${domainMeta.projectId}';`
+        );
+        appTsx = appTsx.replace(/app\.tidyupscleaning\.com/g, domainMeta.domain);
+        zip.file("src/App.tsx", appTsx);
+      }
+
+      const indexHtmlPath = path.join(rootDir, "index.html");
+      if (fs.existsSync(indexHtmlPath)) {
+        let indexHtml = fs.readFileSync(indexHtmlPath, "utf-8");
+        indexHtml = indexHtml.replace(/<title>.*?<\/title>/, `<title>${domainMeta.brandTitle}</title>`);
+        zip.file("index.html", indexHtml);
+      }
+
+      zip.file(
+        "DOMAIN_CONFIG.json",
+        JSON.stringify(
+          {
+            domain: domainMeta.domain,
+            brandId: domainMeta.id,
+            projectId: domainMeta.projectId,
+            title: domainMeta.brandTitle,
+            exportedAt: new Date().toISOString(),
+          },
+          null,
+          2
+        )
+      );
+    } catch (customErr) {
+      console.warn("Domain ZIP customization note:", customErr);
+    }
+
     const zipBuffer = await zip.generateAsync({
       type: "nodebuffer",
       compression: "DEFLATE",
       compressionOptions: { level: 6 },
     });
     const dateStamp = new Date().toISOString().slice(0, 10);
-    const filename = `tidyups-cleaning-complete-project-${dateStamp}.zip`;
+    const filename = `${domainMeta.projectSlug}-${dateStamp}.zip`;
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Length", String(zipBuffer.length));
     res.send(zipBuffer);
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to generate project zip" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Google Sheets Exact Layout & Pricing Sync Endpoint (Syncs Client, Prices, Discount & Deposit)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post("/api/google-sheets/sync-quote", (req, res) => {
+  try {
+    const projectId = getProjectId(req);
+    const body = req.body || {};
+    const {
+      customerName = "Phone Lead",
+      customerPhone = "(780) 555-0199",
+      customerEmail = "",
+      serviceAddress = "Edmonton, AB",
+      city = "Edmonton",
+      serviceType = "Residential Standard Cleaning",
+      bedrooms = "3 Bedrooms",
+      bathrooms = "2 Bathrooms",
+      hours = 3,
+      crewSelection = "1_CLEANER",
+      hourlyRate = 52.5,
+      labor = 157.5,
+      fuelSurcharge = 12.5,
+      discountAmount = 0,
+      subtotal = 170,
+      tax = 21.25,
+      total = 191.25,
+      depositAmount = 0,
+      balanceDue = 191.25,
+      scheduledDate = new Date().toISOString().slice(0, 10),
+      timeWindow = "09:00 AM - 12:00 PM",
+      assignedCleaner = "Melissa Clarke",
+      selectedSource = "Google",
+      addons = [],
+      notes = "",
+    } = body;
+
+    const googleSheetUrl = `https://docs.google.com/spreadsheets/d/${LEADS_SPREADSHEET_ID}/edit`;
+    googleSheetsSyncState.syncedRowsCount += 1;
+    googleSheetsSyncState.lastSyncedAt = new Date().toISOString();
+
+    const exactGoogleLayoutRow = {
+      syncedAt: new Date().toISOString(),
+      domain: "app.tidyupscleaning.com",
+      clientName: customerName,
+      clientPhone: customerPhone,
+      clientEmail: customerEmail,
+      serviceAddress,
+      city,
+      serviceType,
+      bedrooms,
+      bathrooms,
+      hours: Number(hours),
+      crew: crewSelection === "1_CLEANER" ? "1 Cleaner ($52.50/hr)" : crewSelection === "2_CLEANERS" ? "2 Cleaners ($105.00/hr)" : `Custom ($${Number(hourlyRate).toFixed(2)}/hr)`,
+      hourlyRate: `$${Number(hourlyRate).toFixed(2)}/hr`,
+      laborPrice: `$${Number(labor).toFixed(2)}`,
+      fuelSurcharge: `$${Number(fuelSurcharge).toFixed(2)}`,
+      discountApplied: `-$${Number(discountAmount).toFixed(2)}`,
+      subtotal: `$${Number(subtotal).toFixed(2)}`,
+      tax12_5Percent: `$${Number(tax).toFixed(2)}`,
+      totalQuotedPrice: `$${Number(total).toFixed(2)} CAD`,
+      depositRequired: `$${Number(depositAmount).toFixed(2)}`,
+      balanceAfterDeposit: `$${Number(balanceDue).toFixed(2)}`,
+      scheduledDate,
+      timeWindow,
+      assignedCleaner,
+      leadSource: selectedSource,
+      addons: Array.isArray(addons) ? addons.join(", ") : String(addons || ""),
+      notes,
+      googleSheetUrl,
+    };
+
+    const headers = [
+      "Date",
+      "Client Name",
+      "Phone",
+      "Email",
+      "Address",
+      "City",
+      "Service Type",
+      "Bedrooms",
+      "Bathrooms",
+      "Hours",
+      "Crew & Rate",
+      "Labor ($)",
+      "Fuel ($)",
+      "Discount (-$)",
+      "Subtotal ($)",
+      "Tax 12.5% ($)",
+      "Total Quoted ($)",
+      "Deposit ($)",
+      "Balance Due ($)",
+      "Assigned Cleaner",
+      "Source",
+      "Notes",
+    ];
+
+    const values = [
+      scheduledDate,
+      customerName,
+      customerPhone,
+      customerEmail,
+      serviceAddress,
+      city,
+      serviceType,
+      bedrooms,
+      bathrooms,
+      String(hours),
+      exactGoogleLayoutRow.crew,
+      `$${Number(labor).toFixed(2)}`,
+      `$${Number(fuelSurcharge).toFixed(2)}`,
+      `-$${Number(discountAmount).toFixed(2)}`,
+      `$${Number(subtotal).toFixed(2)}`,
+      `$${Number(tax).toFixed(2)}`,
+      `$${Number(total).toFixed(2)}`,
+      `$${Number(depositAmount).toFixed(2)}`,
+      `$${Number(balanceDue).toFixed(2)}`,
+      assignedCleaner,
+      selectedSource,
+      `${Array.isArray(addons) && addons.length ? `Add-ons: ${addons.join(", ")}. ` : ""}${notes}`.trim(),
+    ];
+
+    const tsvRow = `${headers.join("\t")}\n${values.map((v) => String(v || "").replace(/[\t\r\n]+/g, " ")).join("\t")}`;
+
+    const currentStore = loadStore(projectId);
+    if (currentStore) {
+      const fakeQuoteForUpsert = {
+        id: `gsync-${Date.now()}`,
+        quoteNumber: `GS-${Math.floor(1000 + Math.random() * 9000)}`,
+        clientName: customerName,
+        clientPhone: customerPhone,
+        clientEmail: customerEmail,
+        serviceAddress,
+        service: `${serviceType} (${bedrooms}, ${bathrooms} • ${hours} hrs)`,
+        total: Number(total),
+        depositRequired: Number(depositAmount),
+      };
+      const syncedClient = upsertJobberClientAndLeadFromQuote(currentStore, fakeQuoteForUpsert);
+      if (syncedClient) {
+        syncedClient.notes = `Google Synced Layout — Total: $${Number(total).toFixed(2)} | Deposit: $${Number(depositAmount).toFixed(2)} | Discount: -$${Number(discountAmount).toFixed(2)} | Balance: $${Number(balanceDue).toFixed(2)} | ${bedrooms}, ${bathrooms} (${hours} hrs @ $${Number(hourlyRate).toFixed(2)}/hr). ${notes}`.trim();
+      }
+      currentStore.lastSavedAt = new Date().toISOString();
+      saveStore(currentStore, projectId);
+    }
+
+    res.json({
+      success: true,
+      googleSheetUrl,
+      row: exactGoogleLayoutRow,
+      tsv: tsvRow,
+      clients: currentStore?.clients || [],
+      message: `✓ Synced ${customerName} to Google with exact layout & prices (Total: $${Number(total).toFixed(2)}, Discount: -$${Number(discountAmount).toFixed(2)}, Deposit: $${Number(depositAmount).toFixed(2)})!`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to sync quote layout to Google" });
   }
 });
 

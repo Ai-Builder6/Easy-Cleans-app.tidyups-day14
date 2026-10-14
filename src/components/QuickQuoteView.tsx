@@ -30,6 +30,11 @@ import {
   Bath,
   ClipboardList,
   ShieldAlert,
+  FileArchive,
+  FileSpreadsheet,
+  DollarSign,
+  ExternalLink,
+  Route,
 } from 'lucide-react';
 import { getCustomerIntelligence } from '../services/customerIntelligenceService';
 import { CustomerIntelligenceBadge } from './CustomerIntelligenceBadge';
@@ -39,6 +44,37 @@ import { AdLeadItem } from '../types/lead';
 import { JobberQuote } from '../services/jobberSyncModules';
 import { Technician, ServiceTicket } from '../types/dispatch';
 import { INITIAL_TECHNICIANS } from '../data/cleaningData';
+
+function resolveQuickEdmontonCoords(address?: string): { lat: number; lng: number } {
+  const norm = (address || '').toLowerCase();
+  if (norm.includes('st. albert') || norm.includes('st albert') || norm.includes('boudreau')) return { lat: 53.6385, lng: -113.6268 };
+  if (norm.includes('sherwood park') || norm.includes('premier way')) return { lat: 53.5320, lng: -113.3150 };
+  if (norm.includes('spruce grove') || norm.includes('greenbury')) return { lat: 53.5465, lng: -113.8980 };
+  if (norm.includes('beaumont')) return { lat: 53.3572, lng: -113.4146 };
+  if (norm.includes('windermere') || norm.includes('ambleside')) return { lat: 53.4342, lng: -113.6045 };
+  if (norm.includes('terwillegar')) return { lat: 53.4418, lng: -113.5882 };
+  if (norm.includes('summerside') || norm.includes('ellingson')) return { lat: 53.4150, lng: -113.4650 };
+  if (norm.includes('whyte') || norm.includes('82 ave')) return { lat: 53.5215, lng: -113.5040 };
+  if (norm.includes('jasper')) return { lat: 53.5412, lng: -113.4988 };
+
+  const isSW = /\bsw\b|southwest/i.test(norm);
+  const aveMatch = norm.match(/(\d{1,3})[a-z]?\s*(?:ave|avenue)/i);
+  const stMatch = norm.match(/(\d{1,3})[a-z]?\s*(?:st|street)/i);
+  let lat = isSW ? 53.4350 : 53.5412;
+  let lng = isSW ? -113.5650 : -113.4988;
+  if (aveMatch) {
+    const ave = parseInt(aveMatch[1], 10);
+    lat = isSW && ave < 50 ? 53.4350 - ave * 0.0011 : 53.5412 + (ave - 100) * 0.00115;
+  }
+  if (stMatch) {
+    const st = parseInt(stMatch[1], 10);
+    lng = -113.4988 - (st - 100) * 0.00175;
+  }
+  return {
+    lat: Math.max(53.30, Math.min(53.67, lat)),
+    lng: Math.max(-113.70, Math.min(-113.28, lng)),
+  };
+}
 
 interface QuickQuoteViewProps {
   initialLead?: AdLeadItem | null;
@@ -55,6 +91,8 @@ interface QuickQuoteViewProps {
   quotes?: any[];
   projectId?: 'dispatchgeeni' | 'tidyups';
   onOpenSpamShield?: (num?: string) => void;
+  onOpenProjectBackup?: () => void;
+  onClientsUpdated?: (clients: any[]) => void;
 }
 
 const QUICK_ADDON_TAGS = [
@@ -134,6 +172,8 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   quotes = [],
   projectId = 'tidyups',
   onOpenSpamShield,
+  onOpenProjectBackup,
+  onClientsUpdated,
 }) => {
   // 1. Live Voice Dictation state
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -143,16 +183,22 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   const [voiceStatusMsg, setVoiceStatusMsg] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
-  // 2. Hours & Crew Calculator
+  // 2. Hours & Crew Calculator + Custom Discount + Deposit Link
   const [hours, setHours] = useState<number>(3);
   const [crewSelection, setCrewSelection] = useState<'1_CLEANER' | '2_CLEANERS' | 'CUSTOM'>('1_CLEANER');
   const [customHourlyRate, setCustomHourlyRate] = useState<number>(55);
   const [selectedSource, setSelectedSource] = useState<string>(initialLead?.source || 'Phone / Voice Intake');
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [fuelSurcharge, setFuelSurcharge] = useState<number>(12.50);
-  const [depositAmount, setDepositAmount] = useState<number>(0);
+  const [depositAmount, setDepositAmount] = useState<number>(50);
+  const [showDepositPanel, setShowDepositPanel] = useState<boolean>(true);
   const [applyTax, setApplyTax] = useState<boolean>(true);
   const taxRate = 0.125; // 12.5% tax
+
+  // Google Exact Layout Sync State
+  const [googleSyncedRow, setGoogleSyncedRow] = useState<any | null>(null);
+  const [googleSyncedTsv, setGoogleSyncedTsv] = useState<string>('');
+  const [copiedGoogleRow, setCopiedGoogleRow] = useState<boolean>(false);
 
   // 3. Customer Request & Intake Form Fields (Matches Customer Booking Page + Bedrooms & Bathrooms & Specific Info)
   const [customerName, setCustomerName] = useState<string>(initialLead?.customerName || '');
@@ -172,11 +218,18 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
   const [quoteNotes, setQuoteNotes] = useState<string>(initialLead?.notes || '');
 
-  // 4. Quick Map & Geocoded Coordinates State
+  // 4. Quick Map, Two-Address Picker & Weekly/Monthly Schedule State
   const [targetCoords, setTargetCoords] = useState<{ lat: number; lng: number }>({
     lat: 53.5412,
     lng: -113.4988,
   });
+  const [secondAddress, setSecondAddress] = useState<string>('9620 144 Ave NW, St. Albert, AB');
+  const [secondCoords, setSecondCoords] = useState<{ lat: number; lng: number }>({
+    lat: 53.6385,
+    lng: -113.6268,
+  });
+  const [showTwoAddressCompare, setShowTwoAddressCompare] = useState<boolean>(true);
+  const [scheduleHorizon, setScheduleHorizon] = useState<'TODAY' | 'WEEK' | 'MONTH' | 'ALL'>('WEEK');
   const [isGeocodingMap, setIsGeocodingMap] = useState<boolean>(false);
   const [quickMapType, setQuickMapType] = useState<'roadmap' | 'hybrid'>('roadmap');
   const [quickMapZoom, setQuickMapZoom] = useState<number>(1.2);
@@ -206,15 +259,25 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   }, [initialLead]);
 
   // Geocode address to update the Quick Map & Closest Cleaners
-  const geocodeAddressOnQuickMap = useCallback(async (addr: string) => {
+  const geocodeAddressOnQuickMap = useCallback(async (addr: string, isSecond = false) => {
     if (!addr || addr.trim().length < 4) return;
+    const instant = resolveQuickEdmontonCoords(addr);
+    if (isSecond) {
+      setSecondCoords(instant);
+    } else {
+      setTargetCoords(instant);
+    }
     setIsGeocodingMap(true);
     try {
       const res = await fetch(`/api/geocode/forward?address=${encodeURIComponent(addr.trim())}`);
       const data = await res.json();
       if (data && typeof data.lat === 'number' && typeof data.lng === 'number') {
-        setTargetCoords({ lat: data.lat, lng: data.lng });
-        setQuickMapPan({ x: 0, y: 0 });
+        if (isSecond) {
+          setSecondCoords({ lat: data.lat, lng: data.lng });
+        } else {
+          setTargetCoords({ lat: data.lat, lng: data.lng });
+          setQuickMapPan({ x: 0, y: 0 });
+        }
       }
     } catch {} finally {
       setIsGeocodingMap(false);
@@ -293,6 +356,17 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
         if (lower.includes('lockbox') || lower.includes('code') || lower.includes('keypad')) matchedTags.push('Lockbox Entry');
         if (matchedTags.length > 0) {
           setSelectedAddons(matchedTags);
+        }
+
+        // Detect deposit ($50 or $100) and custom discount ($40 etc.) from voice dictation
+        const depMatch = lower.match(/\$?\s*(\d+)\s*(?:dollar\s*)?deposit/i) || lower.match(/deposit\s*(?:of\s*)?\$?\s*(\d+)/i);
+        if (depMatch) {
+          setDepositAmount(Number(depMatch[1]) || 50);
+          setShowDepositPanel(true);
+        }
+        const discMatch = lower.match(/\$?\s*(\d+)\s*(?:dollar\s*)?(?:discount|off)/i) || lower.match(/discount\s*(?:of\s*)?\$?\s*(\d+)/i);
+        if (discMatch) {
+          setDiscountAmount(Number(discMatch[1]) || 0);
         }
 
         setVoiceStatusMsg(
@@ -419,21 +493,23 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
     return customHourlyRate;
   }, [crewSelection, customHourlyRate]);
 
-  // Calculations: Labor, Fuel, Discount, Tax, Total
+  // Calculations: Labor, Fuel, Discount, Tax, Total, Balance Due after Deposit
   const calculations = useMemo(() => {
     const labor = Math.round(hours * hourlyRate * 100) / 100;
     const subtotalBeforeDiscount = labor + Number(fuelSurcharge);
     const subtotal = Math.max(0, subtotalBeforeDiscount - Number(discountAmount));
     const tax = applyTax ? Math.round(subtotal * taxRate * 100) / 100 : 0;
     const total = Math.round((subtotal + tax) * 100) / 100;
+    const balanceDue = Math.max(0, Math.round((total - Number(depositAmount || 0)) * 100) / 100);
 
     return {
       labor,
       subtotal,
       tax,
       total,
+      balanceDue,
     };
-  }, [hours, hourlyRate, fuelSurcharge, discountAmount, applyTax, taxRate]);
+  }, [hours, hourlyRate, fuelSurcharge, discountAmount, applyTax, taxRate, depositAmount]);
 
   // Real-time Customer Intelligence lookup as dispatcher types phone/name
   const intelligence = useMemo(() => {
@@ -459,6 +535,34 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
     return list.sort((a, b) => a.drivingKm - b.drivingKm);
   }, [technicians, targetCoords]);
 
+  // Two-Address Route & Distance Comparison Metrics (Address A ↔ Address B)
+  const twoAddressMetrics = useMemo(() => {
+    const straightKm = haversineKm(targetCoords.lat, targetCoords.lng, secondCoords.lat, secondCoords.lng);
+    const drivingKm = Math.round(straightKm * 1.28 * 10) / 10;
+    const driveMins = Math.max(4, Math.round((drivingKm / 42) * 60));
+    return { straightKm, drivingKm, driveMins };
+  }, [targetCoords, secondCoords]);
+
+  // Filtered Scheduled Jobs for Today, Week Forward (7 Days), Month Forward (30 Days), or All
+  const filteredScheduleVisits = useMemo(() => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayMs = new Date(`${todayStr}T00:00:00`).getTime();
+    const weekEndMs = todayMs + 7 * 24 * 60 * 60 * 1000;
+    const monthEndMs = todayMs + 30 * 24 * 60 * 60 * 1000;
+
+    return (visits || [])
+      .filter((v: any) => {
+        const datePart = String(v.startAt || '').slice(0, 10);
+        if (!datePart) return true;
+        if (scheduleHorizon === 'TODAY') return datePart === todayStr;
+        const vMs = new Date(`${datePart}T00:00:00`).getTime();
+        if (scheduleHorizon === 'WEEK') return vMs >= todayMs && vMs <= weekEndMs;
+        if (scheduleHorizon === 'MONTH') return vMs >= todayMs && vMs <= monthEndMs;
+        return true;
+      })
+      .sort((a: any, b: any) => String(a.startAt || '').localeCompare(String(b.startAt || '')));
+  }, [visits, scheduleHorizon]);
+
   // Auto-apply loyalty discount
   const handleApplyLoyaltyDiscount = (percent: number) => {
     const labor = hours * hourlyRate;
@@ -467,7 +571,7 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
     setQuoteNotes((prev) => `${prev ? prev + ' ' : ''}[Applied ${percent}% Repeat Customer Loyalty Discount (-$${val})]`);
   };
 
-  // Copy SMS / Phone ready breakdown (with Bedrooms, Bathrooms & Specific Info)
+  // Copy SMS / Phone ready breakdown (with Bedrooms, Bathrooms, Custom Discount & Deposit)
   const handleCopyBreakdown = () => {
     const text = `TidyUps Cleaning Estimate for ${customerName || 'Customer'}:
 • Service: ${serviceType}
@@ -476,22 +580,74 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
 • Time: ${hours} hours (${crewSelection === '1_CLEANER' ? '1 Cleaner @ $52.50/hr' : crewSelection === '2_CLEANERS' ? '2 Cleaners @ $105/hr' : `Custom @ $${hourlyRate}/hr`})
 • Labor: $${calculations.labor.toFixed(2)}
 • Fuel Surcharge: $${Number(fuelSurcharge).toFixed(2)}
-${discountAmount > 0 ? `• Discount: -$${Number(discountAmount).toFixed(2)}\n` : ''}• Subtotal: $${calculations.subtotal.toFixed(2)}
+${discountAmount > 0 ? `• Discount Applied: -$${Number(discountAmount).toFixed(2)}\n` : ''}• Subtotal: $${calculations.subtotal.toFixed(2)}
 • Tax (12.5%): $${calculations.tax.toFixed(2)}
 • TOTAL QUOTED: $${calculations.total.toFixed(2)} CAD
-${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''}${quoteNotes ? `• Specific Notes: ${quoteNotes}` : ''}`;
+${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)} (Balance Due After Cleaning: $${calculations.balanceDue.toFixed(2)})\n` : ''}${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''}${quoteNotes ? `• Specific Notes: ${quoteNotes}` : ''}`;
 
     navigator.clipboard.writeText(text);
     setCopiedBreakdown(true);
     setTimeout(() => setCopiedBreakdown(false), 2500);
   };
 
-  // 1-Click Send to Booking System & Dispatch Job (Saves Bedrooms, Bathrooms & Specific Notes)
+  // Sync Client, Exact Layout, Custom Discount & Deposit Amount to Google
+  const syncClientAndQuoteToGoogle = async () => {
+    try {
+      const gRes = await fetch(`/api/google-sheets/sync-quote?project=${projectId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
+        body: JSON.stringify({
+          customerName: customerName.trim() || 'Phone Lead',
+          customerPhone: customerPhone.trim() || '(780) 555-0199',
+          customerEmail: customerEmail.trim(),
+          serviceAddress: serviceAddress.trim() || `${city}, AB`,
+          city,
+          serviceType,
+          bedrooms,
+          bathrooms,
+          hours,
+          crewSelection,
+          hourlyRate,
+          labor: calculations.labor,
+          fuelSurcharge: Number(fuelSurcharge),
+          discountAmount: Number(discountAmount),
+          subtotal: calculations.subtotal,
+          tax: calculations.tax,
+          total: calculations.total,
+          depositAmount: Number(depositAmount),
+          balanceDue: calculations.balanceDue,
+          scheduledDate,
+          timeWindow,
+          assignedCleaner,
+          selectedSource,
+          addons: selectedAddons,
+          notes: quoteNotes,
+        }),
+      });
+      const gData = await gRes.json();
+      if (gData?.success) {
+        setGoogleSyncedRow(gData.row);
+        setGoogleSyncedTsv(gData.tsv || '');
+        if (gData.clients && onClientsUpdated) {
+          onClientsUpdated(gData.clients);
+        }
+      }
+      return gData;
+    } catch (e) {
+      console.warn('Google layout sync note:', e);
+      return null;
+    }
+  };
+
+  // 1-Click Send to Booking System & Dispatch Job (Saves Bedrooms, Bathrooms, Custom Discount & Deposit + Google Sync)
   const handleSendToBookingAndDispatch = async () => {
     setIsSubmitting(true);
     setFeedbackNotice(null);
     try {
-      // 1. Send to Booking System (/api/public/book) with bedrooms, bathrooms & specific instructions
+      // 1. Sync exact layout & prices to Google
+      await syncClientAndQuoteToGoogle();
+
+      // 2. Send to Booking System (/api/public/book) with bedrooms, bathrooms, discount & deposit
       const bookRes = await fetch('/api/public/book', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -507,7 +663,7 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
           bathrooms,
           preferredDate: scheduledDate,
           preferredTime: timeWindow,
-          specialInstructions: `${combinedPropertyAndNotesSummary} | Quoted: $${calculations.total.toFixed(2)} CAD (${hours} hrs)`,
+          specialInstructions: `${combinedPropertyAndNotesSummary} | Quoted: $${calculations.total.toFixed(2)} CAD (${hours} hrs) | Discount: -$${Number(discountAmount).toFixed(2)} | Deposit: $${Number(depositAmount).toFixed(2)} (Balance: $${calculations.balanceDue.toFixed(2)})`,
           estimatedPrice: `$${calculations.total.toFixed(2)}`,
         }),
       });
@@ -516,7 +672,7 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
         onBookingSubmitted(bookData.ticket);
       }
 
-      // 2. Also create Scheduled Visit in Jobber Calendar
+      // 3. Also create Scheduled Visit in Jobber Calendar
       const res = await fetch(`/api/quo/calls/convert-to-job?project=${projectId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
@@ -529,17 +685,17 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
           scheduledTime,
           assignedCleaners: [assignedCleaner],
           totalAmount: calculations.total,
-          notes: `${combinedPropertyAndNotesSummary} | Quick Quoted: ${hours} hrs @ $${hourlyRate}/hr + $${fuelSurcharge} fuel. Source: ${selectedSource}.`,
+          notes: `${combinedPropertyAndNotesSummary} | Quick Quoted: ${hours} hrs @ $${hourlyRate}/hr + $${fuelSurcharge} fuel - $${discountAmount} discount = $${calculations.total.toFixed(2)} (Deposit: $${depositAmount}, Balance: $${calculations.balanceDue.toFixed(2)}). Source: ${selectedSource}.`,
         }),
       });
       const data = await res.json();
       if (data.success && data.newVisit) {
         setFeedbackNotice(
-          `✓ Sent to Booking System (${bedrooms}, ${bathrooms}) & Dispatched Job #${data.newVisit.visitNumber || 'VISIT'} to ${assignedCleaner}!`
+          `✓ Synced to Google (Total $${calculations.total.toFixed(2)}, Deposit $${depositAmount}, Discount -$${discountAmount}) & Dispatched Job #${data.newVisit.visitNumber || 'VISIT'} to ${assignedCleaner}!`
         );
         if (onVisitCreated) onVisitCreated(data.newVisit);
       } else {
-        setFeedbackNotice(data.error || 'Saved to booking system.');
+        setFeedbackNotice(data.error || 'Saved to booking system & synced to Google.');
       }
     } catch (err: any) {
       setFeedbackNotice(`Error: ${err.message}`);
@@ -548,11 +704,13 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
     }
   };
 
-  // Create official Jobber Quote & Sync Client + Google Sheet (Includes Bedrooms, Bathrooms & Specific Info)
+  // Create official Jobber Quote & Sync Client + Google Sheet (Includes Bedrooms, Bathrooms, Custom Discount & Deposit)
   const handleSaveJobberQuote = async () => {
     setIsSubmitting(true);
     setFeedbackNotice(null);
     try {
+      await syncClientAndQuoteToGoogle();
+
       const lineItems = [
         {
           name: `${serviceType} — ${bedrooms}, ${bathrooms} (${hours} hrs)`,
@@ -583,7 +741,7 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
         ...(Number(discountAmount) > 0
           ? [
               {
-                name: 'Promotional / Loyalty Discount',
+                name: `Custom / Promotional Discount (-$${Number(discountAmount).toFixed(2)})`,
                 description: 'Applied customer discount',
                 quantity: 1,
                 unitPrice: -Number(discountAmount),
@@ -605,13 +763,16 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
           total: calculations.total,
           depositRequired: depositAmount,
           lineItems,
-          notes: `${combinedPropertyAndNotesSummary} | Quick Quoted: ${hours} hrs @ $${hourlyRate}/hr + $${fuelSurcharge} fuel. Source: ${selectedSource}.`,
+          notes: `${combinedPropertyAndNotesSummary} | Quick Quoted: ${hours} hrs @ $${hourlyRate}/hr + $${fuelSurcharge} fuel - $${discountAmount} discount = $${calculations.total.toFixed(2)} CAD | Deposit Required: $${depositAmount} (Balance Due: $${calculations.balanceDue.toFixed(2)}). Source: ${selectedSource}.`,
         }),
       });
       const data = await res.json();
       if (data.success && data.quote) {
+        if (data.clients && onClientsUpdated) {
+          onClientsUpdated(data.clients);
+        }
         setFeedbackNotice(
-          data.message || `✓ Jobber Quote ${data.quote.quoteNumber} (${bedrooms}, ${bathrooms}) synced to Jobber Client + Google Sheets!`
+          `✓ Synced ${customerName || 'Client'} & Quote ${data.quote.quoteNumber} to Jobber + Google (Exact Layout: Total $${calculations.total.toFixed(2)}, Discount -$${discountAmount}, Deposit $${depositAmount})!`
         );
         if (onQuoteCreated) onQuoteCreated(data.quote);
         setCreatedQuoteModalItem(data.quote);
@@ -636,7 +797,7 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
     setQuoteNotes('');
     setVoiceTranscript('');
     setDiscountAmount(0);
-    setDepositAmount(0);
+    setDepositAmount(50);
     setFeedbackNotice(null);
     setVoiceStatusMsg(null);
   };
@@ -648,6 +809,7 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
     y: Math.max(3, Math.min(97, ((MAP_BOUNDS.maxLat - lat) / (MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat)) * 100)),
   });
   const targetPinPos = projectMapCoord(targetCoords.lat, targetCoords.lng);
+  const secondPinPos = projectMapCoord(secondCoords.lat, secondCoords.lng);
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0d0f17] text-slate-100 font-sans p-4 sm:p-6 lg:p-8 space-y-6 animate-fadeIn min-h-[calc(100vh-4rem)]">
@@ -668,6 +830,17 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+          {onOpenProjectBackup && (
+            <button
+              type="button"
+              onClick={onOpenProjectBackup}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+              title="Download the 3 Separate Domain ZIPs (app.tidyupscleaning.com, dispatchgeeni.com, easycleans.com)"
+            >
+              <FileArchive className="w-3.5 h-3.5 text-white" />
+              <span>3 Domain ZIPs</span>
+            </button>
+          )}
           {onOpenSpamShield && (
             <button
               type="button"
@@ -1265,21 +1438,33 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
             </div>
           </div>
 
-          {/* 3. Big Calculated Price Box */}
-          <div className="p-4 bg-gradient-to-b from-[#1b1724] to-[#16131d] border border-[#322c3e] rounded-2xl shadow-xl">
+          {/* 3. Big Calculated Price Box (Includes Deposit & Balance Due) */}
+          <div className="p-4 bg-gradient-to-b from-[#1b1724] to-[#16131d] border border-[#322c3e] rounded-2xl shadow-xl space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-pink-400 uppercase tracking-widest font-black">
-                Total Quoted Price
+                Total Quoted Price (Synced with Google)
               </span>
               <span className="text-[11px] font-bold text-slate-300">
                 {bedrooms} • {bathrooms}
               </span>
             </div>
-            <div className="flex items-baseline justify-between mt-1">
-              <div className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight flex items-baseline gap-1">
-                <span className="text-pink-500 text-2xl">$</span>
-                <span>{calculations.total.toFixed(2)}</span>
-                <span className="text-xs text-slate-400 font-sans font-medium ml-1">CAD</span>
+            <div className="flex items-baseline justify-between">
+              <div>
+                <div className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight flex items-baseline gap-1">
+                  <span className="text-pink-500 text-2xl">$</span>
+                  <span>{calculations.total.toFixed(2)}</span>
+                  <span className="text-xs text-slate-400 font-sans font-medium ml-1">CAD</span>
+                </div>
+                {depositAmount > 0 && (
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono text-[11px] font-extrabold">
+                      Deposit: ${Number(depositAmount).toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-slate-300 font-mono">
+                      Balance Due: <strong className="text-emerald-400">${calculations.balanceDue.toFixed(2)}</strong>
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="text-right text-xs text-slate-400 font-mono space-y-0.5">
                 <div>Labor: <span className="text-slate-200 font-bold">${calculations.labor.toFixed(2)}</span></div>
@@ -1292,35 +1477,17 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
             </div>
           </div>
 
-          {/* 4. Quick Discounts */}
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setDiscountAmount(discountAmount === 10 ? 0 : 10)}
-                className={`py-1 px-2.5 rounded-lg text-xs font-bold border cursor-pointer ${
-                  discountAmount === 10
-                    ? 'bg-emerald-600 text-white border-emerald-500'
-                    : 'bg-[#221d2b] text-slate-300 border-[#322c3e]'
-                }`}
-              >
-                -$10 off
-              </button>
-              <button
-                type="button"
-                onClick={() => setDiscountAmount(discountAmount === 20 ? 0 : 20)}
-                className={`py-1 px-2.5 rounded-lg text-xs font-bold border cursor-pointer ${
-                  discountAmount === 20
-                    ? 'bg-emerald-600 text-white border-emerald-500'
-                    : 'bg-[#221d2b] text-slate-300 border-[#322c3e]'
-                }`}
-              >
-                -$20 off
-              </button>
+          {/* 4. Customizable Discount Price ($10, $20, $40, $50 or Custom $) */}
+          <div className="p-3.5 bg-[#1b1724] border border-[#322c3e] rounded-2xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-emerald-400 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" />
+                <span>Customize Discount Price</span>
+              </span>
               <button
                 type="button"
                 onClick={() => setApplyTax(!applyTax)}
-                className={`py-1 px-2.5 rounded-lg text-xs font-bold border cursor-pointer ${
+                className={`py-0.5 px-2.5 rounded-lg text-[11px] font-bold border cursor-pointer ${
                   applyTax
                     ? 'bg-pink-600/20 text-pink-300 border-pink-500/40'
                     : 'bg-slate-800 text-slate-400 border-slate-700'
@@ -1329,9 +1496,126 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
                 {applyTax ? '12.5% Tax ON' : 'Tax Exempt'}
               </button>
             </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[10, 20, 40, 50].map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => setDiscountAmount(discountAmount === amt ? 0 : amt)}
+                  className={`py-1.5 px-3 rounded-xl text-xs font-extrabold border cursor-pointer transition-all ${
+                    discountAmount === amt
+                      ? 'bg-emerald-600 text-white border-emerald-400 shadow-md'
+                      : 'bg-[#221d2b] text-slate-300 border-[#322c3e] hover:bg-[#2b2537]'
+                  }`}
+                >
+                  -${amt} off
+                </button>
+              ))}
+              {discountAmount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setDiscountAmount(0)}
+                  className="py-1 px-2 text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            {/* Direct Custom Discount Dollar Input (e.g., $40 or any custom amount) */}
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs text-slate-300 font-semibold whitespace-nowrap">Custom Discount -$</span>
+              <input
+                type="number"
+                min="0"
+                step="5"
+                placeholder="40"
+                value={discountAmount || ''}
+                onChange={(e) => setDiscountAmount(Math.max(0, Number(e.target.value) || 0))}
+                className="w-28 px-3 py-1.5 bg-[#120f18] border border-emerald-500/40 rounded-xl text-emerald-300 font-mono font-bold text-xs focus:outline-none focus:border-emerald-400"
+              />
+              <span className="text-[11px] text-slate-400">Type $40 or any custom discount</span>
+            </div>
           </div>
 
-          {/* 5. Primary Action Buttons: Jobber Quote Sync + Booking System Dispatch */}
+          {/* 5. Add Deposit Amount Link & Selector ($50 / $100 / Custom — Syncs with Google) */}
+          <div className="p-3.5 bg-[#1b1724] border border-amber-500/30 rounded-2xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowDepositPanel(!showDepositPanel)}
+                className="text-xs font-extrabold text-amber-300 hover:text-amber-200 flex items-center gap-1.5 cursor-pointer underline decoration-amber-500/60 underline-offset-4"
+              >
+                <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                <span>
+                  {depositAmount > 0
+                    ? `Deposit Added: $${Number(depositAmount).toFixed(2)} (Click to Edit)`
+                    : '+ Add a Deposit Amount ($50 or $100)'}
+                </span>
+              </button>
+              <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-md">
+                Syncs to Google
+              </span>
+            </div>
+
+            {showDepositPanel && (
+              <div className="space-y-2 pt-1 animate-fadeIn">
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDepositAmount(50)}
+                    className={`py-2 px-3 rounded-xl text-xs font-black border cursor-pointer transition-all ${
+                      depositAmount === 50
+                        ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md'
+                        : 'bg-[#221d2b] text-slate-200 border-[#322c3e] hover:bg-[#2b2537]'
+                    }`}
+                  >
+                    $50 Deposit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDepositAmount(100)}
+                    className={`py-2 px-3 rounded-xl text-xs font-black border cursor-pointer transition-all ${
+                      depositAmount === 100
+                        ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md'
+                        : 'bg-[#221d2b] text-slate-200 border-[#322c3e] hover:bg-[#2b2537]'
+                    }`}
+                  >
+                    $100 Deposit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDepositAmount(0)}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border cursor-pointer transition-all ${
+                      depositAmount === 0
+                        ? 'bg-slate-700 text-white border-slate-500'
+                        : 'bg-[#221d2b] text-slate-400 border-[#322c3e] hover:bg-[#2b2537]'
+                    }`}
+                  >
+                    No Deposit ($0)
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-300 font-semibold whitespace-nowrap">Custom Deposit $</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-28 px-3 py-1.5 bg-[#120f18] border border-amber-500/40 rounded-xl text-amber-300 font-mono font-bold text-xs focus:outline-none focus:border-amber-400"
+                  />
+                  <span className="text-[11px] text-slate-400">
+                    Remaining balance: <strong className="text-white font-mono">${calculations.balanceDue.toFixed(2)}</strong>
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 6. Primary Action Buttons: Jobber + Google Sync + Booking System Dispatch */}
           <div className="space-y-2.5 pt-1">
             <button
               type="button"
@@ -1339,8 +1623,8 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
               onClick={handleSaveJobberQuote}
               className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-xs sm:text-sm font-black shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
             >
-              <FileText className="w-4 h-4" />
-              <span>Sync Client &amp; Create Jobber Quote (+ Google Sheet)</span>
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Sync Client, Prices &amp; ${depositAmount} Deposit to Google + Jobber Quote</span>
             </button>
 
             <button
@@ -1350,35 +1634,146 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
               className="w-full py-3.5 px-4 bg-gradient-to-r from-pink-600 via-fuchsia-600 to-purple-600 hover:opacity-95 text-white rounded-2xl text-xs sm:text-sm font-black shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
-              <span>Send to Booking System &amp; Dispatch Job (${calculations.total.toFixed(2)})</span>
+              <span>Send to Booking System, Google &amp; Dispatch (${calculations.total.toFixed(2)})</span>
             </button>
+          </div>
+
+          {/* Live Google Exact Layout & Prices Preview Box */}
+          <div className="p-3.5 bg-[#121521] border border-blue-500/30 rounded-2xl space-y-2 text-xs">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 font-extrabold text-blue-300">
+                <FileSpreadsheet className="w-4 h-4 text-blue-400" />
+                <span>Google Synced Layout &amp; Prices</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const data = await syncClientAndQuoteToGoogle();
+                    const tsvToCopy = data?.tsv || googleSyncedTsv;
+                    if (tsvToCopy) {
+                      navigator.clipboard?.writeText(tsvToCopy);
+                      setCopiedGoogleRow(true);
+                      setTimeout(() => setCopiedGoogleRow(false), 2500);
+                    }
+                    setFeedbackNotice(
+                      `✓ Synced ${customerName || 'Client'} to Google with exact layout & prices (Total $${calculations.total.toFixed(2)}, Discount -$${discountAmount}, Deposit $${depositAmount})!`
+                    );
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+                >
+                  {copiedGoogleRow ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedGoogleRow ? 'Synced & Copied!' : 'Sync & Copy Google Row'}</span>
+                </button>
+                <a
+                  href="https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-300 border border-blue-500/30 font-bold text-[11px] flex items-center gap-1"
+                >
+                  <span>Open Google Sheet</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 pt-1 text-[10px] font-mono">
+              <div className="p-1.5 rounded-lg bg-[#191d2d] border border-slate-800">
+                <span className="text-slate-400 block">Labor</span>
+                <span className="text-white font-bold">${calculations.labor.toFixed(2)}</span>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#191d2d] border border-slate-800">
+                <span className="text-slate-400 block">Fuel</span>
+                <span className="text-white font-bold">+${Number(fuelSurcharge).toFixed(2)}</span>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#191d2d] border border-slate-800">
+                <span className="text-slate-400 block">Discount</span>
+                <span className="text-emerald-400 font-bold">-${Number(discountAmount).toFixed(2)}</span>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#191d2d] border border-slate-800">
+                <span className="text-slate-400 block">Tax 12.5%</span>
+                <span className="text-white font-bold">${calculations.tax.toFixed(2)}</span>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#191d2d] border border-pink-500/40">
+                <span className="text-pink-300 block">Total</span>
+                <span className="text-pink-400 font-black">${calculations.total.toFixed(2)}</span>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#191d2d] border border-amber-500/40">
+                <span className="text-amber-300 block">Deposit</span>
+                <span className="text-amber-400 font-black">${Number(depositAmount).toFixed(2)}</span>
+              </div>
+            </div>
+            {googleSyncedRow && (
+              <div className="text-[11px] text-emerald-400 font-bold flex items-center gap-1.5 pt-0.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Last synced to Google: {googleSyncedRow.clientName} ({googleSyncedRow.totalQuotedPrice}, Deposit {googleSyncedRow.depositRequired})</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────────────
-          SECTION 3: EMBEDDED QUICK MAP & CLOSEST CLEANERS RADAR
+          SECTION 3: EMBEDDED QUICK MAP, 2-ADDRESS PICKER & WEEKLY/MONTHLY SCHEDULE
          ───────────────────────────────────────────────────────────────────────────── */}
-      <div className="bg-[#121520] border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="bg-[#121520] border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-800">
           <div>
             <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">
-              Step 4 • Live Property Quick Map &amp; Closest Cleaners
+              Step 4 • Live Two-Address Route Picker &amp; Weekly / Monthly Schedule Map
             </span>
             <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
               <Compass className="w-5 h-5 text-purple-400" />
-              <span>Quick Map: {serviceAddress || 'Edmonton, AB'}</span>
+              <span>Quick Map: Pick 2 Addresses &amp; View Schedule ({filteredScheduleVisits.length} Visits)</span>
             </h2>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Schedule Horizon Filter Buttons: Today, Week Forward, Month Forward, All */}
+            <div className="flex items-center bg-[#191d2c] p-1 rounded-xl border border-slate-700/80 gap-1">
+              {(
+                [
+                  { id: 'TODAY', label: "Today's Schedule" },
+                  { id: 'WEEK', label: 'Week Forward (7d)' },
+                  { id: 'MONTH', label: 'Month Forward (30d)' },
+                  { id: 'ALL', label: 'All Scheduled' },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setScheduleHorizon(tab.id)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
+                    scheduleHorizon === tab.id
+                      ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-sm'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowTwoAddressCompare(!showTwoAddressCompare)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
+                showTwoAddressCompare
+                  ? 'bg-emerald-600 text-white border-emerald-500'
+                  : 'bg-slate-800 text-slate-200 border-slate-700'
+              }`}
+            >
+              <Route className="w-3.5 h-3.5" />
+              <span>Pick 2 Addresses</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setQuickMapType(quickMapType === 'roadmap' ? 'hybrid' : 'roadmap')}
               className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
             >
               <Layers className="w-3.5 h-3.5 text-purple-400" />
-              <span>{quickMapType === 'roadmap' ? 'Switch to Satellite' : 'Switch to Street Map'}</span>
+              <span>{quickMapType === 'roadmap' ? 'Satellite' : 'Streets'}</span>
             </button>
             {onNavigateToMap && (
               <button
@@ -1393,9 +1788,105 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
           </div>
         </div>
 
+        {/* Two-Address Picker Bar (Address A ↔ Address B Distance & Drive Time Calculator) */}
+        {showTwoAddressCompare && (
+          <div className="p-4 rounded-2xl bg-[#181c2b] border border-emerald-500/30 grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+            <div className="lg:col-span-4 space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-extrabold text-pink-400 uppercase tracking-wider">📍 Address A (First Address)</span>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    setServiceAddress(e.target.value);
+                    geocodeAddressOnQuickMap(e.target.value, false);
+                  }}
+                  className="bg-[#111420] border border-slate-700 rounded-lg px-2 py-0.5 text-[10px] text-slate-300"
+                >
+                  <option value="">Pick from scheduled jobs...</option>
+                  {filteredScheduleVisits.slice(0, 20).map((v: any) => (
+                    <option key={`a-${v.id}`} value={v.serviceAddress}>
+                      {v.clientName} — {v.serviceAddress}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={serviceAddress}
+                  onChange={(e) => {
+                    setServiceAddress(e.target.value);
+                    geocodeAddressOnQuickMap(e.target.value, false);
+                  }}
+                  placeholder="Enter first address in Edmonton..."
+                  className="w-full px-3 py-2 rounded-xl bg-[#111420] border border-pink-500/40 text-xs text-white font-semibold focus:outline-none focus:border-pink-500"
+                />
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-extrabold text-cyan-400 uppercase tracking-wider">🏁 Address B (Second Address)</span>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    setSecondAddress(e.target.value);
+                    geocodeAddressOnQuickMap(e.target.value, true);
+                  }}
+                  className="bg-[#111420] border border-slate-700 rounded-lg px-2 py-0.5 text-[10px] text-slate-300"
+                >
+                  <option value="">Pick from scheduled jobs...</option>
+                  {filteredScheduleVisits.slice(0, 20).map((v: any) => (
+                    <option key={`b-${v.id}`} value={v.serviceAddress}>
+                      {v.clientName} — {v.serviceAddress}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={secondAddress}
+                  onChange={(e) => {
+                    setSecondAddress(e.target.value);
+                    geocodeAddressOnQuickMap(e.target.value, true);
+                  }}
+                  placeholder="Enter second address to compare..."
+                  className="w-full px-3 py-2 rounded-xl bg-[#111420] border border-cyan-500/40 text-xs text-white font-semibold focus:outline-none focus:border-cyan-400"
+                />
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 flex items-center justify-between gap-3 bg-[#111420] p-3 rounded-xl border border-slate-800">
+              <div>
+                <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                  Route A ↔ B Distance &amp; Drive Time
+                </div>
+                <div className="text-base font-black text-white font-mono mt-0.5">
+                  {twoAddressMetrics.drivingKm} km • ~{twoAddressMetrics.driveMins} mins drive
+                </div>
+                <div className="text-[10px] text-slate-400 truncate max-w-[210px]">
+                  {serviceAddress.split(',')[0]} → {secondAddress.split(',')[0]}
+                </div>
+              </div>
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(serviceAddress)}&destination=${encodeURIComponent(secondAddress)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-1 shrink-0 shadow-md"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                <span>Directions</span>
+              </a>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
           {/* Interactive Street & Satellite Quick Map (7 Cols) */}
-          <div className="lg:col-span-7 h-[360px] sm:h-[400px] rounded-2xl overflow-hidden border border-slate-700/80 relative bg-slate-200 select-none">
+          <div className="lg:col-span-7 h-[420px] sm:h-[460px] rounded-2xl overflow-hidden border border-slate-700/80 relative bg-slate-200 select-none">
             <div
               onMouseDown={(e) => {
                 if (e.button !== 0) return;
@@ -1459,8 +1950,17 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
                   )}
                 </div>
 
-                {/* Connector Lines from Top 3 Closest Cleaners to Caller Address */}
+                {/* Connector Lines: Address A ↔ Address B + Top 3 Closest Cleaners */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  {showTwoAddressCompare && (
+                    <path
+                      d={`M ${targetPinPos.x} ${targetPinPos.y} L ${secondPinPos.x} ${secondPinPos.y}`}
+                      fill="none"
+                      stroke="#06B6D4"
+                      strokeWidth="0.9"
+                      strokeDasharray="1.5,0.8"
+                    />
+                  )}
                   {closestCleaners.slice(0, 3).map((c, idx) => {
                     const cPos = projectMapCoord(c.lat, c.lng);
                     return (
@@ -1476,18 +1976,58 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
                   })}
                 </svg>
 
-                {/* Caller Property Pin */}
+                {/* Scheduled Jobs Pins for Selected Schedule Horizon (Today / Week Forward / Month Forward) */}
+                {filteredScheduleVisits.slice(0, 28).map((v: any) => {
+                  const vCoords = v.lat && v.lng ? { lat: v.lat, lng: v.lng } : resolveQuickEdmontonCoords(v.serviceAddress);
+                  const pos = projectMapCoord(vCoords.lat, vCoords.lng);
+                  const dateShort = String(v.startAt || '').slice(5, 10);
+                  return (
+                    <div
+                      key={`qm-visit-${v.id}`}
+                      onClick={() => {
+                        setSecondAddress(v.serviceAddress);
+                        setSecondCoords(vCoords);
+                        setShowTwoAddressCompare(true);
+                      }}
+                      style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 z-15 flex flex-col items-center cursor-pointer group"
+                      title={`${v.clientName} (${dateShort}) — Click to set as Address B`}
+                    >
+                      <div className="px-1.5 py-0.5 rounded bg-purple-900/90 text-purple-100 border border-purple-400/60 text-[8.5px] font-bold whitespace-nowrap mb-0.5 shadow-sm">
+                        📅 {dateShort} • {v.clientName.split(' ')[0]}
+                      </div>
+                      <div className="w-4 h-4 rounded-full bg-purple-600 border border-white shadow-md" />
+                    </div>
+                  );
+                })}
+
+                {/* Pin A: Caller Property Pin */}
                 <div
                   style={{ left: `${targetPinPos.x}%`, top: `${targetPinPos.y}%` }}
                   className="absolute -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center"
                 >
                   <div className="px-2.5 py-1 bg-pink-600 text-white rounded-lg text-[10px] font-black shadow-xl whitespace-nowrap mb-1 border border-white">
-                    📍 {customerName || 'Caller'}: {bedrooms.split(' ')[0]}B/{bathrooms.split(' ')[0]}Ba (${calculations.total.toFixed(0)})
+                    📍 A: {customerName || serviceAddress.split(',')[0]} (${calculations.total.toFixed(0)})
                   </div>
-                  <div className="w-7 h-7 rounded-full bg-pink-600 border-2 border-white shadow-xl flex items-center justify-center text-white">
-                    <MapPin className="w-4 h-4" />
+                  <div className="w-7 h-7 rounded-full bg-pink-600 border-2 border-white shadow-xl flex items-center justify-center text-white font-black text-xs">
+                    A
                   </div>
                 </div>
+
+                {/* Pin B: Second Comparison Address Pin */}
+                {showTwoAddressCompare && (
+                  <div
+                    style={{ left: `${secondPinPos.x}%`, top: `${secondPinPos.y}%` }}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center"
+                  >
+                    <div className="px-2.5 py-1 bg-cyan-600 text-white rounded-lg text-[10px] font-black shadow-xl whitespace-nowrap mb-1 border border-white">
+                      🏁 B: {secondAddress.split(',')[0]} ({twoAddressMetrics.drivingKm} km)
+                    </div>
+                    <div className="w-7 h-7 rounded-full bg-cyan-600 border-2 border-white shadow-xl flex items-center justify-center text-white font-black text-xs">
+                      B
+                    </div>
+                  </div>
+                )}
 
                 {/* Top 6 Closest Cleaners Pins */}
                 {closestCleaners.slice(0, 6).map((c, idx) => {
@@ -1553,22 +2093,23 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
             </div>
           </div>
 
-          {/* Closest Cleaners Ranking List (5 Cols) */}
-          <div className="lg:col-span-5 flex flex-col justify-between space-y-3">
+          {/* Right Column (5 Cols): Closest Cleaners + Live Today / Week / Month Schedule List */}
+          <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
+            {/* Closest Cleaners */}
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-extrabold text-white">Closest Cleaners to Property</span>
+                <span className="font-extrabold text-white">Closest Cleaners to Address A</span>
                 <span className="text-slate-400">Click cleaner to assign</span>
               </div>
 
-              <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
-                {closestCleaners.slice(0, 5).map((c, idx) => {
+              <div className="space-y-1.5 max-h-[195px] overflow-y-auto pr-1">
+                {closestCleaners.slice(0, 4).map((c, idx) => {
                   const isAssigned = assignedCleaner === c.tech.name;
                   return (
                     <div
                       key={c.tech.id}
                       onClick={() => setAssignedCleaner(c.tech.name)}
-                      className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                      className={`p-2.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                         isAssigned
                           ? 'bg-emerald-950/60 border-emerald-500/80 shadow-md'
                           : 'bg-[#171b29] border-slate-800 hover:border-slate-700'
@@ -1576,7 +2117,7 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div
-                          className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-xs shrink-0"
+                          className="w-7 h-7 rounded-xl flex items-center justify-center text-white font-black text-xs shrink-0"
                           style={{ backgroundColor: c.tech.color || '#7C3AED' }}
                         >
                           #{idx + 1}
@@ -1590,7 +2131,7 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-400 truncate">
+                          <p className="text-[10px] text-slate-400 truncate">
                             {c.tech.depotLocation?.address || c.tech.homeAddress}
                           </p>
                         </div>
@@ -1600,11 +2141,95 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
                         <div className="font-mono font-black text-xs text-emerald-400">
                           {c.drivingKm} km
                         </div>
-                        <div className="text-[10px] text-slate-400">~{c.driveMins} mins drive</div>
+                        <div className="text-[10px] text-slate-400">~{c.driveMins} mins</div>
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Schedule of the Day / Week Forward / Month Forward */}
+            <div className="p-3.5 rounded-2xl bg-[#171b29] border border-purple-500/30 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs font-extrabold text-white">
+                    {scheduleHorizon === 'TODAY'
+                      ? "Today's Schedule"
+                      : scheduleHorizon === 'WEEK'
+                      ? 'Week Forward Schedule (7 Days)'
+                      : scheduleHorizon === 'MONTH'
+                      ? 'Month Forward Schedule (30 Days)'
+                      : 'All Scheduled Visits'}{' '}
+                    ({filteredScheduleVisits.length})
+                  </span>
+                </div>
+                {onNavigateToSchedule && (
+                  <button
+                    type="button"
+                    onClick={onNavigateToSchedule}
+                    className="text-[11px] font-bold text-purple-300 hover:text-white cursor-pointer"
+                  >
+                    Full Calendar →
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-1.5 max-h-[210px] overflow-y-auto pr-1">
+                {filteredScheduleVisits.length === 0 ? (
+                  <div className="p-3 rounded-xl bg-[#111420] text-slate-400 text-xs text-center">
+                    No scheduled visits in this window. Switch to "Week Forward" or "Month Forward" above.
+                  </div>
+                ) : (
+                  filteredScheduleVisits.slice(0, 15).map((v: any) => {
+                    const dateStr = String(v.startAt || '').slice(0, 10);
+                    const timeStr = String(v.startAt || '').slice(11, 16) || '09:00';
+                    return (
+                      <div
+                        key={v.id}
+                        className="p-2.5 rounded-xl bg-[#111420] border border-slate-800 hover:border-purple-500/50 flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono text-[10px] font-bold">
+                              {dateStr} {timeStr}
+                            </span>
+                            <span className="font-bold text-white truncate">{v.clientName}</span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                            📍 {v.serviceAddress} • {(v.assignedCleaners && v.assignedCleaners[0]) || 'Assigned'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setServiceAddress(v.serviceAddress);
+                              geocodeAddressOnQuickMap(v.serviceAddress, false);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-pink-600/20 hover:bg-pink-600 text-pink-300 hover:text-white border border-pink-500/40 text-[10px] font-black cursor-pointer"
+                            title="Set as Address A"
+                          >
+                            Set A
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSecondAddress(v.serviceAddress);
+                              geocodeAddressOnQuickMap(v.serviceAddress, true);
+                              setShowTwoAddressCompare(true);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-cyan-600/20 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-cyan-500/40 text-[10px] font-black cursor-pointer"
+                            title="Set as Address B to compare distance"
+                          >
+                            Set B
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
