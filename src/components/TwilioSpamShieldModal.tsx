@@ -340,7 +340,7 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-fadeIn">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fadeIn pointer-events-auto">
       <div className="bg-[#10131d] border border-slate-700/80 rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden font-sans">
         {/* Header */}
         <div className="p-5 sm:p-6 bg-[#161a28] border-b border-slate-800 flex items-start justify-between gap-4">
@@ -464,6 +464,10 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
                 {recentCalls.slice(0, 6).map((call) => {
                   const callArea = call.areaCode || extractAreaCode(call.callerNumber || '');
                   const isAlreadyBlocked = call.status === 'BLOCKED';
+                  const dateObj = new Date(call.timestamp);
+                  const formattedTime = !isNaN(dateObj.getTime())
+                    ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : (call.timestamp || 'Just now');
                   return (
                     <div
                       key={call.id}
@@ -478,7 +482,7 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
                           {call.callerNumber}
                         </span>
                         <span className="text-[9px] text-slate-400">
-                          {new Date(call.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formattedTime}
                           {' • '}
                           {isAlreadyBlocked ? '🚫 Blocked' : '✅ Rang Line'}
                         </span>

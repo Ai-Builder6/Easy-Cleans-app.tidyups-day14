@@ -36,7 +36,7 @@ SCOPES.forEach((scope) => {
   googleAuthProvider.addScope(scope);
 });
 
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || '(default)');
 
 // In-memory access token cache (never stored in localStorage/sessionStorage per security guidelines)
 let isSigningIn = false;

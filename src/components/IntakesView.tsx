@@ -18,6 +18,7 @@ import {
   User,
   Clock,
   Plus,
+  ShieldAlert,
 } from 'lucide-react';
 import { ServiceTicket } from '../types/dispatch';
 import { JobberQuote } from '../services/jobberSyncModules';
@@ -51,6 +52,7 @@ interface IntakesViewProps {
   onNavigateToSchedule?: () => void;
   onBackToManagement?: () => void;
   onBookingSubmitted?: (ticket: ServiceTicket) => void;
+  onOpenSpamShield?: (num?: string) => void;
 }
 
 function extractBedBathFromText(text: string): { bedrooms: string; bathrooms: string; cleanNotes: string } {
@@ -86,6 +88,7 @@ export const IntakesView: React.FC<IntakesViewProps> = ({
   onNavigateToSchedule,
   onBackToManagement,
   onBookingSubmitted,
+  onOpenSpamShield,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSource, setFilterSource] = useState<string>('ALL');
@@ -102,7 +105,7 @@ export const IntakesView: React.FC<IntakesViewProps> = ({
       list.push({
         id: `intake-ticket-${t.id}`,
         customerName: t.customerName || 'Residential Caller',
-        phone: t.phone || '(780) 555-0199',
+        phone: (t as any).phone || t.customerPhone || '(780) 555-0199',
         address: t.location?.address || 'Edmonton, AB',
         city: 'Edmonton',
         serviceType: t.equipmentType || 'Residential Standard Cleaning',
@@ -131,7 +134,7 @@ export const IntakesView: React.FC<IntakesViewProps> = ({
         bathrooms: parsed.bathrooms,
         specificInfo: q.notes || 'Quick quote generated from phone intake.',
         quotedPrice: q.total,
-        createdAt: q.createdDate || 'Today',
+        createdAt: (q as any).createdDate || q.createdAt || 'Today',
         source: 'Quick Quote',
         status: 'JOBBER_SYNCED',
         jobberRef: q.quoteNumber,
@@ -157,7 +160,7 @@ export const IntakesView: React.FC<IntakesViewProps> = ({
           bathrooms: parsed.bathrooms,
           specificInfo: l.notes || 'Caller requested quick quote and availability.',
           quotedPrice: l.quotedAmount,
-          createdAt: l.timestamp || 'Recent',
+          createdAt: (l as any).timestamp || (l as any).createdAt || 'Recent',
           source: 'Voice Dictation',
           status: l.isJobberSynced ? 'JOBBER_SYNCED' : 'NEW_INTAKE',
           jobberRef: l.quoteNumber || 'INTAKE',
@@ -337,13 +340,26 @@ export const IntakesView: React.FC<IntakesViewProps> = ({
                     <User className="w-4 h-4 text-pink-400 shrink-0" />
                     <span>{item.customerName}</span>
                   </h3>
-                  <a
-                    href={`tel:${item.phone}`}
-                    className="text-xs font-mono font-bold text-slate-300 hover:text-pink-400 flex items-center gap-1 mt-0.5"
-                  >
-                    <Phone className="w-3 h-3 text-slate-400" />
-                    <span>{item.phone}</span>
-                  </a>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <a
+                      href={`tel:${item.phone}`}
+                      className="text-xs font-mono font-bold text-slate-300 hover:text-pink-400 flex items-center gap-1"
+                    >
+                      <Phone className="w-3 h-3 text-slate-400" />
+                      <span>{item.phone}</span>
+                    </a>
+                    {onOpenSpamShield && item.phone && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenSpamShield(item.phone)}
+                        className="px-2 py-0.5 rounded-md bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Block this caller or area code in Twilio Spam Shield"
+                      >
+                        <ShieldAlert className="w-3 h-3 text-rose-400" />
+                        <span>Block</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {item.quotedPrice && (
                   <div className="text-right">
@@ -403,9 +419,10 @@ export const IntakesView: React.FC<IntakesViewProps> = ({
                     address: item.address,
                     serviceRequested: item.serviceType,
                     notes: `${item.bedrooms}, ${item.bathrooms}. ${item.specificInfo}`,
-                    source: item.source,
-                    timestamp: item.createdAt,
-                    status: 'NEW',
+                    source: (item.source as any) || 'Phone call',
+                    dateReceived: item.createdAt,
+                    city: item.city || 'Edmonton',
+                    status: 'New',
                   })
                 }
                 className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"

@@ -150,9 +150,12 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
         fetchDriveBackupFiles(result.accessToken);
       }
     } catch (err: any) {
+      const isDomainError = err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain');
       setStatusBanner({
         type: 'error',
-        message: err?.message || 'Google Sign-In was cancelled or blocked by popup settings.',
+        message: isDomainError
+          ? 'Firebase Authorized Domain required: Please add "app.tidyupscleaning.com" to your Authorized Domains in Firebase Console (Authentication → Settings → Authorized domains). In the meantime, you can download the complete project .ZIP directly using the button below!'
+          : (err?.message || 'Google Sign-In was cancelled or blocked by popup settings.'),
       });
     } finally {
       setIsLoggingIn(false);

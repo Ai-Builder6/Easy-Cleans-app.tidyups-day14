@@ -29,6 +29,7 @@ import {
   BedDouble,
   Bath,
   ClipboardList,
+  ShieldAlert,
 } from 'lucide-react';
 import { getCustomerIntelligence } from '../services/customerIntelligenceService';
 import { CustomerIntelligenceBadge } from './CustomerIntelligenceBadge';
@@ -53,6 +54,7 @@ interface QuickQuoteViewProps {
   clients?: any[];
   quotes?: any[];
   projectId?: 'dispatchgeeni' | 'tidyups';
+  onOpenSpamShield?: (num?: string) => void;
 }
 
 const QUICK_ADDON_TAGS = [
@@ -131,6 +133,7 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   clients = [],
   quotes = [],
   projectId = 'tidyups',
+  onOpenSpamShield,
 }) => {
   // 1. Live Voice Dictation state
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -665,6 +668,17 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+          {onOpenSpamShield && (
+            <button
+              type="button"
+              onClick={() => onOpenSpamShield(customerPhone || '')}
+              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
+              title="Block this caller or entire area code in Twilio Spam Shield"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-white" />
+              <span>Block Spam Caller</span>
+            </button>
+          )}
           {onNavigateToIntakes && (
             <button
               onClick={onNavigateToIntakes}
@@ -891,9 +905,22 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                Phone Number (SMS Quotes) <span className="text-pink-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-300">
+                  Phone Number (SMS Quotes) <span className="text-pink-500">*</span>
+                </label>
+                {onOpenSpamShield && customerPhone.trim().length >= 3 && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenSpamShield(customerPhone)}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 font-extrabold flex items-center gap-1 cursor-pointer"
+                    title="Block this caller in Twilio Spam Shield"
+                  >
+                    <ShieldAlert className="w-3 h-3 text-rose-400" />
+                    <span>Block Caller</span>
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
@@ -1587,6 +1614,7 @@ ${selectedAddons.length > 0 ? `• Add-ons: ${selectedAddons.join(', ')}\n` : ''
       {/* Interactive Quote Detail & "This is your quote" SMS Modal */}
       {createdQuoteModalItem && (
         <QuoteDetailModal
+          isOpen={Boolean(createdQuoteModalItem)}
           quote={createdQuoteModalItem}
           projectId={projectId}
           onClose={() => setCreatedQuoteModalItem(null)}

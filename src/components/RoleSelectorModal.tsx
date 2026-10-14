@@ -171,8 +171,11 @@ export const RoleSelectorModal: React.FC<RoleSelectorModalProps> = ({
       }
     } catch (err: any) {
       console.warn('Google sign-in error:', err);
+      const isDomainError = err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain');
       setErrorMessage(
-        err?.message?.includes('popup-closed-by-user')
+        isDomainError
+          ? 'Firebase Authorized Domain Required: Please add "app.tidyupscleaning.com" in Firebase Console (Authentication → Settings → Authorized domains). In the meantime, click your Owner Profile below for instant 1-click password-free access!'
+          : err?.message?.includes('popup-closed-by-user')
           ? 'Sign-in popup was closed. You can also use the Owner 1-Click Login below.'
           : 'Firebase Google Sign-In note: popup blocked or cancelled. You can select your staff profile directly below.'
       );

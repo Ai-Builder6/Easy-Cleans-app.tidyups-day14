@@ -219,17 +219,7 @@ export function App() {
   const [apiKey, setApiKey] = useState<string>(
     import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
   );
-  const [mapsAuthError, setMapsAuthError] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const host = (window.location.hostname || '').toLowerCase();
-      const isPreviewOrLocal = host.endsWith('.run.app') || host === 'localhost' || host === '127.0.0.1';
-      const initialKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-      if (!isPreviewOrLocal && (!initialKey || initialKey.startsWith('AIzaSyC4'))) {
-        return true;
-      }
-    }
-    return false;
-  });
+  const [mapsAuthError, setMapsAuthError] = useState<boolean>(false);
   const [refererErrorUrl, setRefererErrorUrl] = useState<string | null>(null);
   const [quotaExceeded, setQuotaExceeded] = useState<boolean>(false);
   const [technicians, setTechnicians] = useState<Technician[]>(INITIAL_TECHNICIANS);
@@ -1146,11 +1136,6 @@ export function App() {
       .then((data) => {
         if (data?.mapsApiKey) {
           setApiKey(data.mapsApiKey);
-          const host = typeof window !== 'undefined' ? (window.location.hostname || '').toLowerCase() : '';
-          const isPreviewOrLocal = host.endsWith('.run.app') || host === 'localhost' || host === '127.0.0.1';
-          if (!isPreviewOrLocal && String(data.mapsApiKey).startsWith('AIzaSyC4')) {
-            setMapsAuthError(true);
-          }
         }
       })
       .catch(() => {});
@@ -1569,12 +1554,17 @@ export function App() {
 
               {/* 1-Click Block Caller / Area Code Button on Main Website */}
               <button
-                onClick={() => handleOpenSpamShield()}
-                className="min-h-[36px] px-3 sm:px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleOpenSpamShield();
+                }}
+                className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
                 title="Instant Call Blocker: Block a phone number or entire 3-digit area code across all Twilio lines"
               >
                 <ShieldAlert className="w-3.5 h-3.5 text-white shrink-0" />
-                <span className="hidden md:inline">Block Caller</span>
+                <span>Block Spam Caller</span>
               </button>
 
               {/* Project ZIP Download, Google Drive Backup & AI Build Guide */}
@@ -1642,7 +1632,11 @@ export function App() {
             {/* 1-Click Block Caller / Area Code Quick Button (Always Visible in Staff Header) */}
             <button
               type="button"
-              onClick={() => handleOpenSpamShield()}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleOpenSpamShield();
+              }}
               className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
               title="Block a phone number or entire 3-digit area code"
             >
@@ -2082,6 +2076,7 @@ export function App() {
             onNavigateToMap={() => setIsRoleModalOpen(true)}
             onOpenPhoneModal={() => setIsQuoModalOpen(true)}
             onOpenStaffLogin={() => setIsRoleModalOpen(true)}
+            onOpenSpamShield={handleOpenSpamShield}
             onOpenVoiceIntake={() => {
               setIsStaffAuthenticated(true);
               setActiveTopView('QUICK_QUOTE');
@@ -2103,6 +2098,7 @@ export function App() {
             }}
             onOpenPhoneModal={() => setIsQuoModalOpen(true)}
             onOpenStaffLogin={() => setIsRoleModalOpen(true)}
+            onOpenSpamShield={handleOpenSpamShield}
             onOpenVoiceIntake={() => setActiveTopView('QUICK_QUOTE')}
           />
         ) : activeTopView === 'ADDRESS_SEARCH' ? (
@@ -2250,6 +2246,7 @@ export function App() {
               setTickets((prev) => [ticket, ...prev]);
               saveStateToStore([ticket, ...tickets]);
             }}
+            onOpenSpamShield={handleOpenSpamShield}
           />
         ) : activeTopView === 'QUOTES' ? (
           <QuotesView
@@ -2338,6 +2335,7 @@ export function App() {
             clients={clientsList}
             quotes={quotesList}
             projectId={activeProjectId}
+            onOpenSpamShield={handleOpenSpamShield}
           />
         ) : currentUser.role === 'CLEANER' && !cleanerShowMap ? (
           <CleanerPortalView
@@ -2875,6 +2873,18 @@ export function App() {
             </button>
           </div>
         )}
+        {/* Floating 1-Click Spam Shield & Call Blocker Quick Trigger (Always Accessible) */}
+        <button
+          type="button"
+          onClick={() => handleOpenSpamShield()}
+          className="fixed bottom-4 left-4 z-40 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-black text-xs shadow-2xl flex items-center gap-2 border border-rose-300/50 cursor-pointer transition-all hover:scale-105 active:scale-95 animate-fadeIn"
+          title="Instant Call Blocker: Block nuisance callers, area codes & telemarketers across all Twilio lines"
+          aria-label="Open Twilio Spam Shield & Call Blocker"
+        >
+          <div className="w-2 h-2 rounded-full bg-white animate-ping" />
+          <ShieldAlert className="w-4 h-4 text-white shrink-0" />
+          <span>Block Spam Caller</span>
+        </button>
       </div>
     </APIProvider>
   );

@@ -23,7 +23,8 @@ import {
   Lock,
   Mic,
   MicOff,
-  Wand2
+  Wand2,
+  ShieldAlert
 } from 'lucide-react';
 import { BookMyCleaningLogo } from './BookMyCleaningLogo';
 import { AddressAutocompleteInput } from './AddressAutocompleteInput';
@@ -35,6 +36,7 @@ interface CustomerPortalViewProps {
   onOpenPhoneModal?: () => void;
   onOpenStaffLogin?: () => void;
   onOpenVoiceIntake?: () => void;
+  onOpenSpamShield?: () => void;
   projectId?: 'dispatchgeeni' | 'tidyups' | 'easycleans';
 }
 
@@ -195,6 +197,7 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
   onOpenPhoneModal,
   onOpenStaffLogin,
   onOpenVoiceIntake,
+  onOpenSpamShield,
   projectId = 'tidyups',
 }) => {
   const brandName =
@@ -422,6 +425,17 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
                   className="w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 font-semibold text-xs transition-colors cursor-pointer"
                 >
                   View 5 Regional Phone Lines
+                </button>
+              )}
+              {onOpenSpamShield && (
+                <button
+                  type="button"
+                  onClick={onOpenSpamShield}
+                  className="w-full py-2 px-3 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white font-extrabold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                  title="Block nuisance callers, rotating numbers, and telemarketers in Twilio Spam Shield"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-white" />
+                  <span>Twilio Spam Shield &amp; Call Blocker</span>
                 </button>
               )}
             </div>

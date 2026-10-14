@@ -1403,7 +1403,9 @@ function persistJobberConfigToDisk(projectId?: string) {
 // GET Jobber connection status & settings
 app.get("/api/jobber/config", (req, res) => {
   const baseUrl = getAppBaseUrl(req);
-  const redirectUri = `${baseUrl}/api/jobber/oauth/callback`;
+  const canonicalCallback =
+    (jobberConfig as any).canonicalRedirectUri ||
+    "https://dispatchgeeni.com/api/jobber/oauth/callback";
   res.json({
     isConnected: jobberConfig.isConnected,
     accountName: jobberConfig.accountName,
@@ -1412,13 +1414,18 @@ app.get("/api/jobber/config", (req, res) => {
     accessToken: jobberConfig.accessToken ? `${jobberConfig.accessToken.slice(0, 8)}...${jobberConfig.accessToken.slice(-4)}` : "",
     lastSyncedAt: jobberConfig.lastSyncedAt,
     environment: jobberConfig.environment,
-    redirectUri,
+    redirectUri: `${baseUrl}/api/jobber/oauth/callback`,
+    canonicalRedirectUri: canonicalCallback,
+    registeredDomains: [
+      "https://dispatchgeeni.com/api/jobber/oauth/callback",
+      "https://app.tidyupscleaning.com/api/jobber/oauth/callback"
+    ],
   });
 });
 
 // POST update Jobber credentials (Client ID, Client Secret, or direct Access Token)
 app.post("/api/jobber/config", (req, res) => {
-  const { accessToken, clientId, clientSecret, accountName } = req.body || {};
+  const { accessToken, clientId, clientSecret, accountName, canonicalRedirectUri } = req.body || {};
   if (clientId && String(clientId).trim().length > 0) {
     jobberConfig.clientId = String(clientId).trim();
   }
@@ -1431,6 +1438,9 @@ app.post("/api/jobber/config", (req, res) => {
     jobberConfig.isConnected = true;
   }
   if (accountName) jobberConfig.accountName = String(accountName).trim();
+  if (canonicalRedirectUri && String(canonicalRedirectUri).trim().length > 0) {
+    (jobberConfig as any).canonicalRedirectUri = String(canonicalRedirectUri).trim();
+  }
   jobberConfig.lastSyncedAt = new Date().toISOString();
   persistJobberConfigToDisk();
 
@@ -1447,17 +1457,36 @@ app.post("/api/jobber/config", (req, res) => {
       accessToken: jobberConfig.accessToken ? `${jobberConfig.accessToken.slice(0, 8)}...` : "",
       lastSyncedAt: jobberConfig.lastSyncedAt,
       redirectUri,
+      canonicalRedirectUri: (jobberConfig as any).canonicalRedirectUri || "https://dispatchgeeni.com/api/jobber/oauth/callback",
     },
   });
 });
 
-// GET Jobber OAuth authorization URL for 1-click connect
+// GET Jobber OAuth authorization URL for 1-click connect (Supports Universal 3-Domain Relay)
 app.get("/api/jobber/oauth/authorize-url", (req, res) => {
   const baseUrl = getAppBaseUrl(req);
-  const redirectUri = (req.query.redirectUri as string) || `${baseUrl}/api/jobber/oauth/callback`;
+  const sourceOrigin =
+    (req.query.sourceOrigin as string) ||
+    (req.headers.origin as string) ||
+    baseUrl;
+
+  // Canonical registered callback in Jobber Dev (defaults to dispatchgeeni.com or tidyups)
+  const canonicalCallback =
+    (req.query.canonicalRedirectUri as string) ||
+    (jobberConfig as any).canonicalRedirectUri ||
+    "https://dispatchgeeni.com/api/jobber/oauth/callback";
+
+  // If client requested direct current domain callback
+  const redirectUri = (req.query.useCurrentDomain === "true")
+    ? `${baseUrl}/api/jobber/oauth/callback`
+    : canonicalCallback;
+
   const statePayload = {
     redirectUri,
+    sourceOrigin,
+    returnUrl: `${sourceOrigin}/?jobber_connected=true`,
     nonce: Math.random().toString(36).substring(2, 12),
+    timestamp: Date.now(),
   };
   const state = Buffer.from(JSON.stringify(statePayload)).toString("base64url");
 
@@ -1474,12 +1503,14 @@ app.get("/api/jobber/oauth/authorize-url", (req, res) => {
   res.json({
     authUrl: authUrl.toString(),
     redirectUri,
+    sourceOrigin,
+    canonicalCallback,
     clientId: jobberConfig.clientId,
     state,
   });
 });
 
-// GET Jobber OAuth Callback handler (with safety check if Twilio accidentally calls this URL)
+// GET Jobber OAuth Callback handler (Universal Relay across all 3 domains)
 app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (req, res) => {
   if (req.query.CallSid || req.query.From || req.query.Called) {
     return handleTwilioVoiceWebhook(req, res);
@@ -1489,28 +1520,44 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
   const errorDescription = req.query.error_description as string;
   const stateParam = req.query.state as string;
 
-  // Use the exact redirect_uri that was encoded into state, or fallback to current host callback
+  // Use the exact redirect_uri and sourceOrigin that was encoded into state
   let redirectUri = `${getAppBaseUrl(req)}/api/jobber/oauth/callback`;
+  let sourceOrigin = "";
+  let returnUrl = "/";
+
   if (stateParam) {
     try {
       const decoded = JSON.parse(Buffer.from(stateParam, "base64url").toString("utf-8"));
       if (decoded?.redirectUri && typeof decoded.redirectUri === "string") {
         redirectUri = decoded.redirectUri;
       }
+      if (decoded?.sourceOrigin && typeof decoded.sourceOrigin === "string") {
+        sourceOrigin = decoded.sourceOrigin;
+      }
+      if (decoded?.returnUrl && typeof decoded.returnUrl === "string") {
+        returnUrl = decoded.returnUrl;
+      }
     } catch {
       // Fallback to default redirectUri
     }
   }
 
+  const targetReturnUrl = sourceOrigin ? `${sourceOrigin}/?jobber_connected=true` : returnUrl || "/";
+  const sourceLabel = sourceOrigin.includes("tidyups")
+    ? "app.tidyupscleaning.com"
+    : sourceOrigin.includes("dispatchgeeni")
+    ? "dispatchgeeni.com"
+    : "Dispatch Genie";
+
   if (error) {
     return res.status(400).send(`
       <!DOCTYPE html>
       <html>
-        <head><title>Jobber Authorization Failed</title><style>body{font-family:sans-serif;padding:30px;line-height:1.5;}</style></head>
+        <head><title>Jobber Authorization Notice</title><style>body{font-family:sans-serif;padding:30px;line-height:1.5;}</style></head>
         <body>
           <h2 style="color:#b91c1c;">Jobber Connection Denied</h2>
           <p>${error}: ${errorDescription || "Access was cancelled or denied"}</p>
-          <a href="/">← Return to Dispatch Board</a>
+          <a href="${targetReturnUrl}">← Return to ${sourceLabel}</a>
         </body>
       </html>
     `);
@@ -1528,7 +1575,7 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
         <body>
           <h2 style="color:#b91c1c;">Client Secret Required</h2>
           <p>Please enter your Jobber <strong>Client Secret</strong> in the Integrations Hub modal in the app before connecting, so the app can complete the token exchange.</p>
-          <a href="/">← Return to Dispatch Board</a>
+          <a href="${targetReturnUrl}">← Return to ${sourceLabel}</a>
         </body>
       </html>
     `);
@@ -1565,7 +1612,7 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
             <p>Jobber responded with status ${tokenRes.status}:</p>
             <pre style="background:#f1f5f9;padding:12px;border-radius:8px;">${JSON.stringify(tokenData, null, 2)}</pre>
             <p>Ensure that the Redirect URI in your Jobber Developer Center matches: <code>${redirectUri}</code></p>
-            <a href="/">← Return to Dispatch Board</a>
+            <a href="${targetReturnUrl}">← Return to ${sourceLabel}</a>
           </body>
         </html>
       `);
@@ -1576,6 +1623,26 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
     jobberConfig.isConnected = true;
     jobberConfig.lastSyncedAt = new Date().toISOString();
     persistJobberConfigToDisk();
+
+    // Mirror token to all project database store files so both dispatchgeeni.com and app.tidyupscleaning.com have it immediately
+    try {
+      const allStorePaths = [
+        path.join(__dirname, "data", "store.json"),
+        path.join(__dirname, "data", "dispatchgeeni_store.json"),
+        path.join(__dirname, "data", "tidyups_store.json"),
+      ];
+      for (const sPath of allStorePaths) {
+        if (fs.existsSync(sPath)) {
+          const sObj = JSON.parse(fs.readFileSync(sPath, "utf-8"));
+          if (!sObj.jobberConfig) sObj.jobberConfig = {};
+          sObj.jobberConfig.accessToken = tokenData.access_token;
+          sObj.jobberConfig.refreshToken = tokenData.refresh_token || "";
+          sObj.jobberConfig.isConnected = true;
+          sObj.jobberConfig.lastSyncedAt = new Date().toISOString();
+          fs.writeFileSync(sPath, JSON.stringify(sObj, null, 2), "utf-8");
+        }
+      }
+    } catch {}
 
     // Trigger immediate background sync
     try {
@@ -1592,30 +1659,33 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
         <head>
           <title>Jobber Connected Successfully</title>
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8fafc; color: #0f172a; }
-            .card { background: white; padding: 32px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); text-align: center; max-width: 440px; border: 1px solid #e2e8f0; }
-            h2 { color: #059669; margin: 0 0 12px 0; font-size: 20px; }
-            p { color: #64748b; font-size: 14px; margin-bottom: 20px; }
-            .btn { display: inline-block; background: #059669; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 13px; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; }
+            .card { background: #1e293b; padding: 36px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: center; max-width: 480px; border: 1px solid #334155; }
+            h2 { color: #10b981; margin: 0 0 12px 0; font-size: 22px; font-weight: 800; }
+            p { color: #94a3b8; font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+            .badge { display: inline-block; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 9999px; padding: 4px 12px; font-size: 11px; font-weight: 700; margin-bottom: 16px; font-family: monospace; }
+            .btn { display: inline-block; background: #059669; hover: background: #10b981; color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 14px; transition: all 0.2s; }
           </style>
         </head>
         <body>
           <div class="card">
+            <div class="badge">Universal 3-Domain OAuth Relay Active</div>
             <h2>Connected to Jobber!</h2>
-            <p>Your Jobber account is now authorized. Returning to the Dispatch Board...</p>
-            <a href="/" class="btn">Return to Dispatch Board</a>
+            <p>Your Jobber account is authorized and synced. Tokens are active for <strong>app.tidyupscleaning.com</strong> and <strong>dispatchgeeni.com</strong>.</p>
+            <p style="font-size: 12px; color: #64748b;">Returning automatically to ${sourceLabel}...</p>
+            <a href="${targetReturnUrl}" class="btn">Return to ${sourceLabel}</a>
           </div>
           <script>
             try {
               if (window.opener) {
-                window.opener.postMessage({ type: 'JOBBER_CONNECTED' }, '*');
+                window.opener.postMessage({ type: 'JOBBER_CONNECTED', token: '${tokenData.access_token}' }, '*');
                 window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
                 setTimeout(() => { window.close(); }, 1200);
               } else {
-                setTimeout(() => { window.location.href = '/'; }, 2000);
+                setTimeout(() => { window.location.href = '${targetReturnUrl}'; }, 1600);
               }
             } catch (e) {
-              setTimeout(() => { window.location.href = '/'; }, 2000);
+              setTimeout(() => { window.location.href = '${targetReturnUrl}'; }, 1600);
             }
           </script>
         </body>
