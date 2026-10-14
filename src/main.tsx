@@ -94,6 +94,8 @@ if (typeof window !== 'undefined') {
       msg.includes('OverQuotaMapError') ||
       msg.includes('QuotaExceededError') ||
       msg.includes('API_KEY_HTTP_REFERRER_BLOCKED') ||
+      msg.includes('requests-from-referer') ||
+      msg.includes('auth/unauthorized-domain') ||
       msg.includes('type.googleapis.com/google.rpc.ErrorInfo') ||
       msg.includes('ErrorInfo')
     ) {

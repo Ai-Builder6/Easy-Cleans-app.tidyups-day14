@@ -171,7 +171,11 @@ export const RoleSelectorModal: React.FC<RoleSelectorModalProps> = ({
       }
     } catch (err: any) {
       console.warn('Google sign-in note:', err);
-      const isDomainError = err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain');
+      const codeOrMsg = `${err?.code || ''} ${err?.message || ''}`;
+      const isDomainError =
+        codeOrMsg.includes('unauthorized-domain') ||
+        codeOrMsg.includes('requests-from-referer') ||
+        codeOrMsg.includes('are-blocked');
       if (isDomainError) {
         const owner = APP_USERS.find((u) => u.role === 'OWNER') || APP_USERS[0];
         completeLogin(owner);

@@ -163,6 +163,21 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
     }
   }, [isOpen, preFillNumber]);
 
+  // Deduplicate and group line mappings by 10-digit number (must be called before early return per Rules of Hooks)
+  const uniqueMappings = useMemo(() => {
+    const raw = config.lineMappings || {};
+    const seen = new Map<string, { inbound: string; target: string; allKeys: string[] }>();
+    for (const [inbound, target] of Object.entries(raw)) {
+      const normDigits = inbound.replace(/\D/g, "").slice(-10);
+      if (!seen.has(normDigits)) {
+        seen.set(normDigits, { inbound, target, allKeys: [inbound] });
+      } else {
+        seen.get(normDigits)!.allKeys.push(inbound);
+      }
+    }
+    return Array.from(seen.values());
+  }, [config.lineMappings]);
+
   if (!isOpen) return null;
 
   // Extract 3-digit area code from any input (e.g. "844", "(780) 555-1234", "+18449328819")
@@ -266,21 +281,6 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
     if (digits.endsWith("9007223")) return "Google My Business Direct";
     return "Custom Quo Line";
   };
-
-  // Deduplicate and group line mappings by 10-digit number
-  const uniqueMappings = useMemo(() => {
-    const raw = config.lineMappings || {};
-    const seen = new Map<string, { inbound: string; target: string; allKeys: string[] }>();
-    for (const [inbound, target] of Object.entries(raw)) {
-      const normDigits = inbound.replace(/\D/g, "").slice(-10);
-      if (!seen.has(normDigits)) {
-        seen.set(normDigits, { inbound, target, allKeys: [inbound] });
-      } else {
-        seen.get(normDigits)!.allKeys.push(inbound);
-      }
-    }
-    return Array.from(seen.values());
-  }, [config.lineMappings]);
 
   // Remove 1-to-1 line mapping
   const handleRemoveLineMapping = (inboundNumber: string, allKeys?: string[]) => {

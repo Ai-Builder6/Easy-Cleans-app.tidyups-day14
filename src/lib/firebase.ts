@@ -46,19 +46,32 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ): Unsubscribe => {
-  return onAuthStateChanged(auth, async (user: User | null) => {
-    if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
-        cachedAccessToken = null;
+  try {
+    return onAuthStateChanged(
+      auth,
+      async (user: User | null) => {
+        if (user) {
+          if (cachedAccessToken) {
+            if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
+          } else if (!isSigningIn) {
+            cachedAccessToken = null;
+            if (onAuthFailure) onAuthFailure();
+          }
+        } else {
+          cachedAccessToken = null;
+          if (onAuthFailure) onAuthFailure();
+        }
+      },
+      (err) => {
+        console.warn('Firebase Auth state listener notice:', err?.message || err);
         if (onAuthFailure) onAuthFailure();
       }
-    } else {
-      cachedAccessToken = null;
-      if (onAuthFailure) onAuthFailure();
-    }
-  });
+    );
+  } catch (e) {
+    console.warn('Firebase initAuth notice:', e);
+    if (onAuthFailure) onAuthFailure();
+    return () => {};
+  }
 };
 
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
@@ -71,8 +84,8 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
     cachedAccessToken = credential.accessToken;
     return { user: result.user, accessToken: cachedAccessToken };
-  } catch (error) {
-    console.error('Google Drive OAuth Sign-in error:', error);
+  } catch (error: any) {
+    console.warn('Google Drive OAuth Sign-in notice:', error?.code || error?.message || error);
     throw error;
   } finally {
     isSigningIn = false;
@@ -84,7 +97,11 @@ export const getAccessToken = async (): Promise<string | null> => {
 };
 
 export const logout = async (): Promise<void> => {
-  await auth.signOut();
+  try {
+    await auth.signOut();
+  } catch (e) {
+    console.warn('Firebase signOut notice:', e);
+  }
   cachedAccessToken = null;
 };
 
@@ -92,8 +109,8 @@ export async function signInWithGoogle(): Promise<User | null> {
   try {
     const res = await googleSignIn();
     return res ? res.user : null;
-  } catch (error) {
-    console.error('Firebase Google Sign-in error:', error);
+  } catch (error: any) {
+    console.warn('Firebase Google Sign-in notice:', error?.code || error?.message || error);
     throw error;
   }
 }

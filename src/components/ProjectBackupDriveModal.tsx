@@ -150,10 +150,14 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
         fetchDriveBackupFiles(result.accessToken);
       }
     } catch (err: any) {
-      const isDomainError = err?.code === 'auth/unauthorized-domain' || err?.message?.includes('unauthorized-domain');
+      const codeOrMsg = `${err?.code || ''} ${err?.message || ''}`;
+      const isDomainOrRefererError =
+        codeOrMsg.includes('unauthorized-domain') ||
+        codeOrMsg.includes('requests-from-referer') ||
+        codeOrMsg.includes('are-blocked');
       setStatusBanner({
         type: 'success',
-        message: isDomainError
+        message: isDomainOrRefererError
           ? 'Direct local ZIP downloads are ready below for all 3 domains (app.tidyupscleaning.com, dispatchgeeni.com, and easycleans.com)!'
           : (err?.message || 'Google Sign-In was cancelled or blocked by popup settings.'),
       });
