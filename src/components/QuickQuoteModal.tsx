@@ -78,7 +78,7 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({
   const [serviceType, setServiceType] = useState<string>('Residential Standard Cleaning');
   const [scheduledDate, setScheduledDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [scheduledTime, setScheduledTime] = useState<string>('10:00');
-  const [assignedCleaner, setAssignedCleaner] = useState<string>('Melissa Clarke');
+  const [assignedCleaners, setAssignedCleaners] = useState<string[]>([]);
   const [isRecordingVoice, setIsRecordingVoice] = useState<boolean>(false);
 
   const [copiedBreakdown, setCopiedBreakdown] = useState(false);
@@ -227,7 +227,7 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
           serviceType: `${serviceType} (${bedrooms}, ${bathrooms} • ${hours} hrs)`,
           scheduledDate,
           scheduledTime,
-          assignedCleaners: [assignedCleaner],
+          assignedCleaners,
           totalAmount: calculations.total,
           notes: `Property: ${bedrooms}, ${bathrooms}. Quoted: ${hours} hrs @ $${hourlyRate}/hr + $${fuelSurcharge} fuel. Source: ${selectedSource}. Specific Info: ${quoteNote}`,
         }),
@@ -682,16 +682,58 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
                 className="w-full px-2.5 py-1.5 bg-[#1b1723] border border-[#2e273a] rounded-xl text-white text-xs font-mono focus:outline-none"
               />
               <select
-                value={assignedCleaner}
-                onChange={(e) => setAssignedCleaner(e.target.value)}
+                value=""
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'NONE') {
+                    setAssignedCleaners([]);
+                  } else if (val && !assignedCleaners.includes(val)) {
+                    setAssignedCleaners((prev) => [...prev, val]);
+                  }
+                }}
                 className="w-full px-2 py-1.5 bg-[#1b1723] border border-[#2e273a] rounded-xl text-white text-xs focus:outline-none"
               >
-                <option value="Melissa Clarke">Melissa Clarke</option>
-                <option value="Cindy Guay">Cindy Guay</option>
-                <option value="Sarah Jenkins">Sarah Jenkins</option>
-                <option value="David Miller">David Miller</option>
+                <option value="">
+                  {assignedCleaners.length === 0 ? '— No One (Unassigned) —' : `+ Add Cleaner (${assignedCleaners.length})...`}
+                </option>
+                <option value="NONE">✕ No One / Clear All</option>
+                <option value="Melissa Clarke">+ Melissa Clarke</option>
+                <option value="Cindy Guay">+ Cindy Guay</option>
+                <option value="Joel MBATCHOU">+ Joel MBATCHOU</option>
+                <option value="Sergine Ngongang wetie">+ Sergine Ngongang wetie</option>
+                <option value="Robyn Adele">+ Robyn Adele</option>
+                <option value="Jen & Bryan Cabugon">+ Jen &amp; Bryan Cabugon</option>
+                <option value="Joseph Juma">+ Joseph Juma</option>
+                <option value="Adison Haugland">+ Adison Haugland</option>
+                <option value="Jasmin Kunin">+ Jasmin Kunin</option>
               </select>
             </div>
+            {assignedCleaners.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                {assignedCleaners.map((name) => (
+                  <span
+                    key={name}
+                    className="px-2 py-0.5 rounded-lg bg-emerald-600/25 border border-emerald-400/50 text-emerald-200 text-[10px] font-bold flex items-center gap-1"
+                  >
+                    <span>✓ {name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setAssignedCleaners((prev) => prev.filter((c) => c !== name))}
+                      className="hover:text-white cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setAssignedCleaners([])}
+                  className="text-[10px] text-amber-400 hover:underline cursor-pointer"
+                >
+                  Reset to No One
+                </button>
+              </div>
+            )}
           </div>
 
           {/* 8. Specific Information & Quote Notes */}

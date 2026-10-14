@@ -4135,11 +4135,16 @@ app.post("/api/google-sheets/sync-quote", (req, res) => {
       balanceDue = 191.25,
       scheduledDate = new Date().toISOString().slice(0, 10),
       timeWindow = "09:00 AM - 12:00 PM",
-      assignedCleaner = "Melissa Clarke",
+      assignedCleaner = "Unassigned",
+      assignedCleaners = [],
       selectedSource = "Google",
       addons = [],
       notes = "",
     } = body;
+    const resolvedAssignedCleaner =
+      Array.isArray(assignedCleaners) && assignedCleaners.length > 0
+        ? assignedCleaners.join(" & ")
+        : assignedCleaner || "Unassigned";
 
     const googleSheetUrl = `https://docs.google.com/spreadsheets/d/${LEADS_SPREADSHEET_ID}/edit`;
     googleSheetsSyncState.syncedRowsCount += 1;
@@ -4169,7 +4174,7 @@ app.post("/api/google-sheets/sync-quote", (req, res) => {
       balanceAfterDeposit: `$${Number(balanceDue).toFixed(2)}`,
       scheduledDate,
       timeWindow,
-      assignedCleaner,
+      assignedCleaner: resolvedAssignedCleaner,
       leadSource: selectedSource,
       addons: Array.isArray(addons) ? addons.join(", ") : String(addons || ""),
       notes,
@@ -4221,7 +4226,7 @@ app.post("/api/google-sheets/sync-quote", (req, res) => {
       `$${Number(total).toFixed(2)}`,
       `$${Number(depositAmount).toFixed(2)}`,
       `$${Number(balanceDue).toFixed(2)}`,
-      assignedCleaner,
+      resolvedAssignedCleaner,
       selectedSource,
       `${Array.isArray(addons) && addons.length ? `Add-ons: ${addons.join(", ")}. ` : ""}${notes}`.trim(),
     ];
@@ -4641,11 +4646,14 @@ app.post("/api/quo/calls/convert-to-job", (req, res) => {
     serviceType = "Residential Standard Cleaning",
     scheduledDate,
     scheduledTime = "10:00",
-    assignedCleaners = ["Cindy Guay"],
+    assignedCleaners = [],
     totalAmount = 280,
     discountPercent = 0,
     notes = "",
   } = req.body || {};
+  const normalizedCleaners = Array.isArray(assignedCleaners)
+    ? assignedCleaners.filter((c: any) => typeof c === "string" && c.trim().length > 0 && c !== "NONE" && c !== "Unassigned")
+    : [];
 
   const current = loadStore(projectId) || {
     version: 1,
@@ -4685,7 +4693,7 @@ app.post("/api/quo/calls/convert-to-job", (req, res) => {
     lng: -113.4938 + (Math.random() * 0.08 - 0.04),
     startAt,
     endAt,
-    assignedCleaners: assignedCleaners.length > 0 ? assignedCleaners : ["Cindy Guay"],
+    assignedCleaners: normalizedCleaners,
     serviceType,
     status: "SCHEDULED",
     quoteTotal: finalAmount,
@@ -4739,7 +4747,9 @@ app.post("/api/quo/calls/convert-to-job", (req, res) => {
 
   res.json({
     success: true,
-    message: `Call lead for ${callerName} converted to Job ${visitNum} and dispatched to ${assignedCleaners.join(', ')}!${discountNote}`,
+    message: `Call lead for ${callerName} converted to Job ${visitNum} (${
+      normalizedCleaners.length > 0 ? `Assigned to ${normalizedCleaners.join(" & ")}` : "Unassigned / No Cleaner Assigned Yet"
+    })!${discountNote}`,
     newVisit,
     scheduledVisits: current.scheduledVisits,
   });

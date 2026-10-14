@@ -225,9 +225,29 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   const [scheduledDate, setScheduledDate] = useState<string>(() => getEdmontonToday().dateString);
   const [scheduledTime, setScheduledTime] = useState<string>('10:00');
   const [timeWindow, setTimeWindow] = useState<string>('Morning (8:00 AM - 12:00 PM)');
-  const [assignedCleaner, setAssignedCleaner] = useState<string>('Melissa Clarke');
+  // Default to No One (empty array) so no cleaner is auto-assigned until dispatcher adds 1 or more people
+  const [assignedCleaners, setAssignedCleaners] = useState<string[]>([]);
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
   const [quoteNotes, setQuoteNotes] = useState<string>(initialLead?.notes || '');
+
+  const toggleCleanerSelection = useCallback((cleanerName: string) => {
+    if (!cleanerName) return;
+    setAssignedCleaners((prev) =>
+      prev.includes(cleanerName) ? prev.filter((c) => c !== cleanerName) : [...prev, cleanerName]
+    );
+  }, []);
+
+  const addCleanerSelection = useCallback((cleanerName: string) => {
+    if (!cleanerName || cleanerName === 'NONE') {
+      setAssignedCleaners([]);
+      return;
+    }
+    setAssignedCleaners((prev) => (prev.includes(cleanerName) ? prev : [...prev, cleanerName]));
+  }, []);
+
+  const removeCleanerSelection = useCallback((cleanerName: string) => {
+    setAssignedCleaners((prev) => prev.filter((c) => c !== cleanerName));
+  }, []);
 
   // 4. Quick Map, Two-Address Picker & Weekly/Monthly Schedule State
   const [targetCoords, setTargetCoords] = useState<{ lat: number; lng: number }>({
@@ -641,7 +661,8 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
           balanceDue: calculations.balanceDue,
           scheduledDate,
           timeWindow,
-          assignedCleaner,
+          assignedCleaner: assignedCleaners.length > 0 ? assignedCleaners.join(' & ') : 'Unassigned',
+          assignedCleaners,
           selectedSource,
           addons: selectedAddons,
           notes: quoteNotes,
@@ -706,15 +727,19 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
           serviceType: `${serviceType} (${bedrooms}, ${bathrooms} • ${hours} hrs)`,
           scheduledDate,
           scheduledTime,
-          assignedCleaners: [assignedCleaner],
+          assignedCleaners,
           totalAmount: calculations.total,
           notes: `${combinedPropertyAndNotesSummary} | Quick Quoted: ${hours} hrs @ $${hourlyRate}/hr + $${fuelSurcharge} fuel - $${discountAmount} discount = $${calculations.total.toFixed(2)} (Deposit: $${depositAmount}, Balance: $${calculations.balanceDue.toFixed(2)}). Source: ${selectedSource}.`,
         }),
       });
       const data = await res.json();
       if (data.success && data.newVisit) {
+        const crewText =
+          assignedCleaners.length > 0
+            ? `to ${assignedCleaners.join(' & ')}`
+            : 'with No Cleaner Assigned Yet (Unassigned)';
         setFeedbackNotice(
-          `✓ Synced to Google (Total $${calculations.total.toFixed(2)}, Deposit $${depositAmount}, Discount -$${discountAmount}) & Dispatched Job #${data.newVisit.visitNumber || 'VISIT'} to ${assignedCleaner}!`
+          `✓ Synced to Google (Total $${calculations.total.toFixed(2)}, Deposit $${depositAmount}, Discount -$${discountAmount}) & Created Job #${data.newVisit.visitNumber || 'VISIT'} ${crewText}!`
         );
         if (onVisitCreated) onVisitCreated(data.newVisit);
       } else {
@@ -816,6 +841,7 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
     setServiceAddress('');
     setBedrooms('3 Bedrooms');
     setBathrooms('2 Bathrooms');
+    setAssignedCleaners([]);
     setSelectedAddons([]);
     setQuoteNotes('');
     setVoiceTranscript('');
@@ -1309,20 +1335,129 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                Assign Cleaner / Crew
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-300">
+                  Assign Cleaner(s) / Crew
+                </label>
+                {assignedCleaners.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setAssignedCleaners([])}
+                    className="text-[10px] font-extrabold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                  >
+                    Reset to No One
+                  </button>
+                ) : (
+                  <span className="text-[10px] font-bold text-slate-400">Default: No One</span>
+                )}
+              </div>
               <select
-                value={assignedCleaner}
-                onChange={(e) => setAssignedCleaner(e.target.value)}
+                value=""
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'NONE') {
+                    setAssignedCleaners([]);
+                  } else if (val) {
+                    addCleanerSelection(val);
+                  }
+                }}
                 className="w-full px-3 py-2 bg-[#171b29] border border-slate-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-pink-500 cursor-pointer"
               >
-                {closestCleaners.map((c) => (
-                  <option key={c.tech.id} value={c.tech.name}>
-                    {c.tech.name} ({c.drivingKm} km • ~{c.driveMins}m)
-                  </option>
-                ))}
+                <option value="">
+                  {assignedCleaners.length === 0
+                    ? '— No One Assigned (Click to Add Cleaner) —'
+                    : `+ Add Another Cleaner (${assignedCleaners.length} Assigned)...`}
+                </option>
+                <option value="NONE">✕ No One / Leave Unassigned</option>
+                {closestCleaners.map((c) => {
+                  const alreadyAdded = assignedCleaners.includes(c.tech.name);
+                  return (
+                    <option key={c.tech.id} value={c.tech.name}>
+                      {alreadyAdded ? `✓ ${c.tech.name} (Assigned)` : `+ ${c.tech.name}`} ({c.drivingKm} km • ~{c.driveMins}m)
+                    </option>
+                  );
+                })}
               </select>
+            </div>
+          </div>
+
+          {/* Multi-Cleaner Assignment Strip (Default: No One + Click to Add 1, 2, or More Cleaners) */}
+          <div className="p-3 rounded-2xl bg-[#171b29] border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Users className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span className="text-xs font-extrabold text-slate-200">
+                  Assigned to Job:
+                </span>
+                {assignedCleaners.length === 0 ? (
+                  <span className="px-2.5 py-0.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-300 text-[11px] font-extrabold">
+                    No One Assigned Yet (Unassigned)
+                  </span>
+                ) : (
+                  assignedCleaners.map((name) => (
+                    <span
+                      key={`assigned-chip-${name}`}
+                      className="px-2.5 py-0.5 rounded-lg bg-emerald-600/25 border border-emerald-400/60 text-emerald-200 text-[11px] font-extrabold flex items-center gap-1.5"
+                    >
+                      <span>✓ {name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeCleanerSelection(name)}
+                        className="text-emerald-300 hover:text-white font-black cursor-pointer"
+                        title={`Remove ${name}`}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+              {assignedCleaners.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setAssignedCleaners([])}
+                  className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-rose-950/70 text-slate-300 hover:text-rose-200 border border-slate-700 text-[10px] font-bold cursor-pointer"
+                >
+                  Set to No One (Clear All)
+                </button>
+              )}
+            </div>
+
+            {/* Quick Multi-Select Cleaner Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-800/80">
+              <span className="text-[10px] font-bold text-slate-400 mr-1">
+                Quick Add / Toggle Cleaners (Multi-Select):
+              </span>
+              <button
+                type="button"
+                onClick={() => setAssignedCleaners([])}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition-all cursor-pointer ${
+                  assignedCleaners.length === 0
+                    ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-xs'
+                    : 'bg-[#0f121c] text-slate-300 border-slate-700 hover:border-slate-500'
+                }`}
+              >
+                {assignedCleaners.length === 0 ? '✓ No One (Default)' : 'No One'}
+              </button>
+              {closestCleaners.slice(0, 8).map((c) => {
+                const isSelected = assignedCleaners.includes(c.tech.name);
+                return (
+                  <button
+                    key={`quick-pick-${c.tech.id}`}
+                    type="button"
+                    onClick={() => toggleCleanerSelection(c.tech.name)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white border-emerald-400 shadow-xs font-extrabold'
+                        : 'bg-[#0f121c] text-slate-300 border-slate-700 hover:border-purple-500/50'
+                    }`}
+                    title={`${c.tech.name} (${c.drivingKm} km • ~${c.driveMins}m) — Click to ${isSelected ? 'remove' : 'add'}`}
+                  >
+                    <span>{isSelected ? `✓ ${c.tech.name}` : `+ ${c.tech.name}`}</span>
+                    <span className="text-[9.5px] opacity-75 font-mono">({c.drivingKm}km)</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -2054,24 +2189,25 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
                 )}
 
                 {/* Top 6 Closest Cleaners Pins */}
-                {closestCleaners.slice(0, 6).map((c, idx) => {
+                {closestCleaners.slice(0, 6).map((c) => {
                   const pos = projectMapCoord(c.lat, c.lng);
-                  const isAssigned = assignedCleaner === c.tech.name;
+                  const isAssigned = assignedCleaners.includes(c.tech.name);
                   return (
                     <div
                       key={`qm-tech-${c.tech.id}`}
-                      onClick={() => setAssignedCleaner(c.tech.name)}
+                      onClick={() => toggleCleanerSelection(c.tech.name)}
                       style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                       className="absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center cursor-pointer group"
+                      title={`Click to ${isAssigned ? 'remove' : 'add'} ${c.tech.name}`}
                     >
                       <div
                         className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold shadow-md border whitespace-nowrap mb-0.5 ${
-                          isAssigned || idx === 0
+                          isAssigned
                             ? 'bg-emerald-600 text-white border-emerald-300'
                             : 'bg-white text-slate-900 border-slate-300'
                         }`}
                       >
-                        {c.tech.name.split(' ')[0]} • {c.drivingKm}km
+                        {isAssigned ? '✓ ' : ''}{c.tech.name.split(' ')[0]} • {c.drivingKm}km
                       </div>
                       <div
                         className="w-6 h-6 rounded-xl border-2 border-white shadow-md flex items-center justify-center text-white"
@@ -2119,20 +2255,33 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
 
           {/* Right Column (5 Cols): Closest Cleaners + Live Today / Week / Month Schedule List */}
           <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
-            {/* Closest Cleaners */}
+            {/* Closest Cleaners (Multi-Select or Leave as No One) */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-extrabold text-white">Closest Cleaners to Address A</span>
-                <span className="text-slate-400">Click cleaner to assign</span>
+              <div className="flex items-center justify-between text-xs gap-2 flex-wrap">
+                <span className="font-extrabold text-white">
+                  Closest Cleaners to Address A ({assignedCleaners.length === 0 ? 'No One Assigned' : `${assignedCleaners.length} Assigned`})
+                </span>
+                <div className="flex items-center gap-2">
+                  {assignedCleaners.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setAssignedCleaners([])}
+                      className="text-[10px] font-extrabold text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                    >
+                      Set to No One
+                    </button>
+                  )}
+                  <span className="text-slate-400 text-[11px]">Click to add/remove multiple</span>
+                </div>
               </div>
 
               <div className="space-y-1.5 max-h-[195px] overflow-y-auto pr-1">
-                {closestCleaners.slice(0, 4).map((c, idx) => {
-                  const isAssigned = assignedCleaner === c.tech.name;
+                {closestCleaners.map((c, idx) => {
+                  const isAssigned = assignedCleaners.includes(c.tech.name);
                   return (
                     <div
                       key={c.tech.id}
-                      onClick={() => setAssignedCleaner(c.tech.name)}
+                      onClick={() => toggleCleanerSelection(c.tech.name)}
                       className={`p-2.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                         isAssigned
                           ? 'bg-emerald-950/60 border-emerald-500/80 shadow-md'
@@ -2144,11 +2293,16 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
                           className="w-7 h-7 rounded-xl flex items-center justify-center text-white font-black text-xs shrink-0"
                           style={{ backgroundColor: c.tech.color || '#7C3AED' }}
                         >
-                          #{idx + 1}
+                          {isAssigned ? '✓' : `#${idx + 1}`}
                         </div>
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-extrabold text-xs text-white truncate">{c.tech.name}</span>
+                            {isAssigned && (
+                              <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 border border-emerald-400/50 text-[9.5px] font-black text-emerald-300">
+                                ASSIGNED
+                              </span>
+                            )}
                             {idx === 0 && (
                               <span className="text-[10px] font-bold text-amber-300 flex items-center gap-0.5">
                                 <Award className="w-3 h-3" /> Closest
