@@ -44,6 +44,7 @@ import { AdLeadItem } from '../types/lead';
 import { JobberQuote } from '../services/jobberSyncModules';
 import { Technician, ServiceTicket } from '../types/dispatch';
 import { INITIAL_TECHNICIANS } from '../data/cleaningData';
+import { getEdmontonToday, formatDateTime } from '../data/jobberCalendarData';
 
 function resolveQuickEdmontonCoords(address?: string): { lat: number; lng: number } {
   const norm = (address || '').toLowerCase();
@@ -211,7 +212,17 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   const [serviceType, setServiceType] = useState<string>(
     initialLead?.serviceRequested || 'Residential Standard Cleaning'
   );
-  const [scheduledDate, setScheduledDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  // Live Edmonton Today tracker (e.g., Wednesday, October 14, 2026) — updates automatically every 60s
+  const [liveToday, setLiveToday] = useState(() => getEdmontonToday());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const next = getEdmontonToday();
+      setLiveToday((prev) => (prev.dateString !== next.dateString ? next : prev));
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const [scheduledDate, setScheduledDate] = useState<string>(() => getEdmontonToday().dateString);
   const [scheduledTime, setScheduledTime] = useState<string>('10:00');
   const [timeWindow, setTimeWindow] = useState<string>('Morning (8:00 AM - 12:00 PM)');
   const [assignedCleaner, setAssignedCleaner] = useState<string>('Melissa Clarke');
@@ -229,7 +240,9 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
     lng: -113.6268,
   });
   const [showTwoAddressCompare, setShowTwoAddressCompare] = useState<boolean>(true);
-  const [scheduleHorizon, setScheduleHorizon] = useState<'TODAY' | 'WEEK' | 'MONTH' | 'ALL'>('WEEK');
+  const [scheduleHorizon, setScheduleHorizon] = useState<
+    'TODAY' | 'WEEK' | 'WEEKS_3_4' | 'MONTH' | 'WEEK_1' | 'WEEK_2' | 'WEEK_3' | 'WEEK_4' | 'ALL'
+  >('MONTH');
   const [isGeocodingMap, setIsGeocodingMap] = useState<boolean>(false);
   const [quickMapType, setQuickMapType] = useState<'roadmap' | 'hybrid'>('roadmap');
   const [quickMapZoom, setQuickMapZoom] = useState<number>(1.2);
@@ -543,25 +556,35 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
     return { straightKm, drivingKm, driveMins };
   }, [targetCoords, secondCoords]);
 
-  // Filtered Scheduled Jobs for Today, Week Forward (7 Days), Month Forward (30 Days), or All
+  // Filtered Scheduled Jobs for Today, Week Forward, Week 1-4, Last 2 Weeks (15th-31st), Full Month (All 4 Weeks), or All
   const filteredScheduleVisits = useMemo(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todayMs = new Date(`${todayStr}T00:00:00`).getTime();
-    const weekEndMs = todayMs + 7 * 24 * 60 * 60 * 1000;
-    const monthEndMs = todayMs + 30 * 24 * 60 * 60 * 1000;
+    const todayStr = liveToday.dateString; // e.g. '2026-10-14' (Wednesday, October 14, 2026)
+    const currentMonthPrefix = `${liveToday.year}-${String(liveToday.month).padStart(2, '0')}`;
+    const anchorMs = new Date(liveToday.year, liveToday.monthIndex, liveToday.day).getTime();
 
     return (visits || [])
       .filter((v: any) => {
         const datePart = String(v.startAt || '').slice(0, 10);
         if (!datePart) return true;
+        if (scheduleHorizon === 'ALL') return true;
         if (scheduleHorizon === 'TODAY') return datePart === todayStr;
-        const vMs = new Date(`${datePart}T00:00:00`).getTime();
-        if (scheduleHorizon === 'WEEK') return vMs >= todayMs && vMs <= weekEndMs;
-        if (scheduleHorizon === 'MONTH') return vMs >= todayMs && vMs <= monthEndMs;
+
+        const parts = datePart.split('-').map(Number);
+        const jobDay = parts[2] || 1;
+        const vMs = parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]).getTime() : anchorMs;
+        const diffDays = Math.round((vMs - anchorMs) / (1000 * 60 * 60 * 24));
+
+        if (scheduleHorizon === 'WEEK') return diffDays >= 0 && diffDays <= 7;
+        if (scheduleHorizon === 'WEEKS_3_4') return datePart.startsWith(currentMonthPrefix) && jobDay >= 15;
+        if (scheduleHorizon === 'WEEK_1') return datePart.startsWith(currentMonthPrefix) && jobDay >= 1 && jobDay <= 7;
+        if (scheduleHorizon === 'WEEK_2') return datePart.startsWith(currentMonthPrefix) && jobDay >= 8 && jobDay <= 14;
+        if (scheduleHorizon === 'WEEK_3') return datePart.startsWith(currentMonthPrefix) && jobDay >= 15 && jobDay <= 21;
+        if (scheduleHorizon === 'WEEK_4') return datePart.startsWith(currentMonthPrefix) && jobDay >= 22 && jobDay <= 31;
+        if (scheduleHorizon === 'MONTH') return datePart.startsWith(currentMonthPrefix) || (diffDays >= 0 && diffDays <= 31);
         return true;
       })
       .sort((a: any, b: any) => String(a.startAt || '').localeCompare(String(b.startAt || '')));
-  }, [visits, scheduleHorizon]);
+  }, [visits, scheduleHorizon, liveToday]);
 
   // Auto-apply loyalty discount
   const handleApplyLoyaltyDiscount = (percent: number) => {
@@ -1729,13 +1752,14 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Schedule Horizon Filter Buttons: Today, Week Forward, Month Forward, All */}
-            <div className="flex items-center bg-[#191d2c] p-1 rounded-xl border border-slate-700/80 gap-1">
+            {/* Schedule Horizon Filter Buttons: Today, 7d Forward, Last 2 Weeks, Full Month (All 4 Weeks), All */}
+            <div className="flex items-center bg-[#191d2c] p-1 rounded-xl border border-slate-700/80 gap-1 flex-wrap">
               {(
                 [
-                  { id: 'TODAY', label: "Today's Schedule" },
-                  { id: 'WEEK', label: 'Week Forward (7d)' },
-                  { id: 'MONTH', label: 'Month Forward (30d)' },
+                  { id: 'TODAY', label: `Today (${liveToday.formattedShort})` },
+                  { id: 'WEEK', label: '7 Days Forward' },
+                  { id: 'WEEKS_3_4', label: 'Last 2 Weeks (15th–31st)' },
+                  { id: 'MONTH', label: 'Full Month (All 4 Weeks)' },
                   { id: 'ALL', label: 'All Scheduled' },
                 ] as const
               ).map((tab) => (
@@ -1804,9 +1828,9 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
                   className="bg-[#111420] border border-slate-700 rounded-lg px-2 py-0.5 text-[10px] text-slate-300"
                 >
                   <option value="">Pick from scheduled jobs...</option>
-                  {filteredScheduleVisits.slice(0, 20).map((v: any) => (
+                  {filteredScheduleVisits.map((v: any) => (
                     <option key={`a-${v.id}`} value={v.serviceAddress}>
-                      {v.clientName} — {v.serviceAddress}
+                      {formatDateTime(v.startAt).dateStr} • {v.clientName} — {v.serviceAddress}
                     </option>
                   ))}
                 </select>
@@ -1838,9 +1862,9 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
                   className="bg-[#111420] border border-slate-700 rounded-lg px-2 py-0.5 text-[10px] text-slate-300"
                 >
                   <option value="">Pick from scheduled jobs...</option>
-                  {filteredScheduleVisits.slice(0, 20).map((v: any) => (
+                  {filteredScheduleVisits.map((v: any) => (
                     <option key={`b-${v.id}`} value={v.serviceAddress}>
-                      {v.clientName} — {v.serviceAddress}
+                      {formatDateTime(v.startAt).dateStr} • {v.clientName} — {v.serviceAddress}
                     </option>
                   ))}
                 </select>
@@ -1976,11 +2000,11 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
                   })}
                 </svg>
 
-                {/* Scheduled Jobs Pins for Selected Schedule Horizon (Today / Week Forward / Month Forward) */}
-                {filteredScheduleVisits.slice(0, 28).map((v: any) => {
+                {/* Scheduled Jobs Pins for Selected Schedule Horizon (All Weeks Included) */}
+                {filteredScheduleVisits.map((v: any) => {
                   const vCoords = v.lat && v.lng ? { lat: v.lat, lng: v.lng } : resolveQuickEdmontonCoords(v.serviceAddress);
                   const pos = projectMapCoord(vCoords.lat, vCoords.lng);
-                  const dateShort = String(v.startAt || '').slice(5, 10);
+                  const dt = formatDateTime(v.startAt);
                   return (
                     <div
                       key={`qm-visit-${v.id}`}
@@ -1991,10 +2015,10 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
                       }}
                       style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                       className="absolute -translate-x-1/2 -translate-y-1/2 z-15 flex flex-col items-center cursor-pointer group"
-                      title={`${v.clientName} (${dateShort}) — Click to set as Address B`}
+                      title={`${v.clientName} (${dt.dateStr}) — Click to set as Address B`}
                     >
                       <div className="px-1.5 py-0.5 rounded bg-purple-900/90 text-purple-100 border border-purple-400/60 text-[8.5px] font-bold whitespace-nowrap mb-0.5 shadow-sm">
-                        📅 {dateShort} • {v.clientName.split(' ')[0]}
+                        📅 {dt.dateStr} • {v.clientName.split(' ')[0]}
                       </div>
                       <div className="w-4 h-4 rounded-full bg-purple-600 border border-white shadow-md" />
                     </div>
@@ -2149,20 +2173,13 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
               </div>
             </div>
 
-            {/* Schedule of the Day / Week Forward / Month Forward */}
-            <div className="p-3.5 rounded-2xl bg-[#171b29] border border-purple-500/30 space-y-2.5">
-              <div className="flex items-center justify-between">
+            {/* Fully Scrollable 4-Week / Full-Month Schedule on Quick Map */}
+            <div className="p-3.5 rounded-2xl bg-[#171b29] border border-purple-500/30 space-y-2.5 flex flex-col">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-purple-400" />
                   <span className="text-xs font-extrabold text-white">
-                    {scheduleHorizon === 'TODAY'
-                      ? "Today's Schedule"
-                      : scheduleHorizon === 'WEEK'
-                      ? 'Week Forward Schedule (7 Days)'
-                      : scheduleHorizon === 'MONTH'
-                      ? 'Month Forward Schedule (30 Days)'
-                      : 'All Scheduled Visits'}{' '}
-                    ({filteredScheduleVisits.length})
+                    Live Schedule • Today is {liveToday.formattedFull} ({filteredScheduleVisits.length} Visits)
                   </span>
                 </div>
                 {onNavigateToSchedule && (
@@ -2176,29 +2193,67 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
                 )}
               </div>
 
-              <div className="space-y-1.5 max-h-[210px] overflow-y-auto pr-1">
+              {/* Direct Week 1 / Week 2 / Week 3 / Week 4 / Last 2 Weeks Quick Filter */}
+              <div className="flex items-center gap-1 flex-wrap">
+                {(
+                  [
+                    { id: 'TODAY', label: `Today (${liveToday.formattedShort})` },
+                    { id: 'WEEK_1', label: 'Wk 1 (1–7)' },
+                    { id: 'WEEK_2', label: 'Wk 2 (8–14)' },
+                    { id: 'WEEK_3', label: 'Wk 3 (15–21)' },
+                    { id: 'WEEK_4', label: 'Wk 4 (22–31)' },
+                    { id: 'WEEKS_3_4', label: 'Last 2 Wks (15–31)' },
+                    { id: 'MONTH', label: 'All 4 Wks (Full Month)' },
+                  ] as const
+                ).map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setScheduleHorizon(w.id)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border transition-all cursor-pointer ${
+                      scheduleHorizon === w.id
+                        ? 'bg-purple-600 text-white border-purple-400 shadow-2xs'
+                        : 'bg-[#111420] text-slate-300 border-slate-700 hover:border-purple-500/50'
+                    }`}
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="space-y-1.5 max-h-[310px] overflow-y-auto pr-1">
                 {filteredScheduleVisits.length === 0 ? (
                   <div className="p-3 rounded-xl bg-[#111420] text-slate-400 text-xs text-center">
-                    No scheduled visits in this window. Switch to "Week Forward" or "Month Forward" above.
+                    No scheduled visits in this window. Click "All 4 Wks (Full Month)" or "Last 2 Wks (15–31)" above.
                   </div>
                 ) : (
-                  filteredScheduleVisits.slice(0, 15).map((v: any) => {
-                    const dateStr = String(v.startAt || '').slice(0, 10);
-                    const timeStr = String(v.startAt || '').slice(11, 16) || '09:00';
+                  filteredScheduleVisits.map((v: any) => {
+                    const dt = formatDateTime(v.startAt);
+                    const isVisitToday = dt.dateString === liveToday.dateString;
                     return (
                       <div
                         key={v.id}
-                        className="p-2.5 rounded-xl bg-[#111420] border border-slate-800 hover:border-purple-500/50 flex items-center justify-between gap-2 text-xs"
+                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs ${
+                          isVisitToday
+                            ? 'bg-amber-950/40 border-amber-500/70'
+                            : 'bg-[#111420] border-slate-800 hover:border-purple-500/50'
+                        }`}
                       >
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono text-[10px] font-bold">
-                              {dateStr} {timeStr}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${
+                                isVisitToday
+                                  ? 'bg-amber-500 text-slate-950 font-black'
+                                  : 'bg-purple-500/20 text-purple-300'
+                              }`}
+                            >
+                              {isVisitToday ? `TODAY • ${dt.dateStr}` : dt.dateStr} • {dt.timeStr}
                             </span>
                             <span className="font-bold text-white truncate">{v.clientName}</span>
                           </div>
                           <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                            📍 {v.serviceAddress} • {(v.assignedCleaners && v.assignedCleaners[0]) || 'Assigned'}
+                            📍 {v.serviceAddress} • {(v.assignedCleaners && v.assignedCleaners.join(' & ')) || 'Assigned'}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">

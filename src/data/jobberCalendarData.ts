@@ -110,21 +110,95 @@ export function getCleanerInitials(cleanerName: string): string {
 }
 
 /**
- * Format ISO datetime string nicely for calendar and map views
+ * Returns the real-time current date in Edmonton (America/Edmonton) so the app
+ * always knows the exact live "Today" (e.g., Wednesday, October 14, 2026) and
+ * automatically updates every day.
+ */
+export function getEdmontonToday() {
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth() + 1;
+  let day = now.getDate();
+
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Edmonton',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const y = Number(parts.find((p) => p.type === 'year')?.value);
+    const m = Number(parts.find((p) => p.type === 'month')?.value);
+    const d = Number(parts.find((p) => p.type === 'day')?.value);
+    if (y && m && d) {
+      year = y;
+      month = m;
+      day = d;
+    }
+  } catch {
+    // Fallback to local system date if Intl timezone is unavailable
+  }
+
+  const monthIndex = month - 1;
+  const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const date = new Date(year, monthIndex, day, 12, 0, 0);
+
+  return {
+    year,
+    month,
+    monthIndex,
+    day,
+    dateString,
+    date,
+    formattedFull: date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    formattedShort: date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    }),
+  };
+}
+
+/**
+ * Format ISO datetime string nicely for calendar and map views without UTC day-shift bugs
  */
 export function formatDateTime(iso: string) {
   try {
-    const d = new Date(iso);
+    const raw = String(iso || '').trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
+    if (match) {
+      const year = Number(match[1]);
+      const monthIndex = Number(match[2]) - 1;
+      const day = Number(match[3]);
+      const hour = match[4] !== undefined ? Number(match[4]) : 9;
+      const minute = match[5] !== undefined ? Number(match[5]) : 0;
+      const d = new Date(year, monthIndex, day, hour, minute);
+      return {
+        dateStr: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        timeStr: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        hour,
+        dateString: `${match[1]}-${match[2]}-${match[3]}`,
+      };
+    }
+
+    const d = new Date(raw);
     return {
-      dateStr: d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }),
+      dateStr: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
       timeStr: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
       hour: d.getHours(),
+      dateString: raw.slice(0, 10),
     };
   } catch {
     return {
       dateStr: iso,
       timeStr: 'Scheduled',
       hour: 9,
+      dateString: String(iso || '').slice(0, 10),
     };
   }
 }

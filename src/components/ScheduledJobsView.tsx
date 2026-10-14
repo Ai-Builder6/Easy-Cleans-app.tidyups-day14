@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -53,6 +53,7 @@ import {
   CLEANER_COLOR_MAP, 
   getCleanerColor, 
   getCleanerInitials,
+  getEdmontonToday,
   JOBBER_TEAM_MEMBERS 
 } from '../data/jobberCalendarData';
 import { JobberQuote, JobberInvoice } from '../services/jobberSyncModules';
@@ -183,8 +184,18 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
   const [copiedPhone, setCopiedPhone] = useState<boolean>(false);
   const [copiedAddress, setCopiedAddress] = useState<boolean>(false);
   
-  // Focused date for schedule navigation (Default: October 11, 2026)
-  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date(2026, 9, 11));
+  // Live Edmonton "Today" tracker (automatically stays synced to the real live calendar date, e.g. Wednesday, October 14, 2026)
+  const [liveToday, setLiveToday] = useState(() => getEdmontonToday());
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const next = getEdmontonToday();
+      setLiveToday((prev) => (prev.dateString !== next.dateString ? next : prev));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Focused date for schedule navigation (Default: Live Edmonton Today, e.g. Wednesday, October 14, 2026)
+  const [selectedDate, setSelectedDate] = useState<Date>(() => getEdmontonToday().date);
 
   // Day sub-view mode: 'TIMELINE' or 'LANES' (cleaner grid)
   const [daySubView, setDaySubView] = useState<'TIMELINE' | 'LANES'>('TIMELINE');
@@ -197,18 +208,26 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
   const showQuotes = itemTypeFilter === 'ALL' || itemTypeFilter === 'QUOTES';
   const showInvoices = itemTypeFilter === 'ALL' || itemTypeFilter === 'INVOICES';
 
-  // Selected schedule item for inspector: can be a Job, Quote, or Invoice
+  // Selected schedule item for inspector: defaults to first job on Today if available, otherwise first job
   const [selectedItem, setSelectedItem] = useState<{
     type: 'JOB' | 'QUOTE' | 'INVOICE';
     id: string;
-  } | null>(() => (jobs[0] ? { type: 'JOB', id: jobs[0].id } : null));
+  } | null>(() => {
+    const todayStr = getEdmontonToday().dateString;
+    const todayJob = jobs.find((j) => j.startAt.startsWith(todayStr)) || jobs[0];
+    return todayJob ? { type: 'JOB', id: todayJob.id } : null;
+  });
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCleanerFilter, setSelectedCleanerFilter] = useState<string>('ALL');
   const [serviceFilter, setServiceFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'IN_PROGRESS' | 'SCHEDULED' | 'CANCELLED'>('ALL');
   const [financialFilter, setFinancialFilter] = useState<'ALL' | 'INVOICED' | 'PAID' | 'QUOTED'>('ALL');
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(jobs[0]?.id || null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(() => {
+    const todayStr = getEdmontonToday().dateString;
+    const todayJob = jobs.find((j) => j.startAt.startsWith(todayStr)) || jobs[0];
+    return todayJob?.id || null;
+  });
 
   // Cleaner assignment editor modal state
   const [editingJobForCleaners, setEditingJobForCleaners] = useState<ScheduledJobItem | null>(null);
@@ -222,7 +241,7 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
 
   // Unscheduled job schedule modal state
   const [schedulingUnscheduledJob, setSchedulingUnscheduledJob] = useState<UnscheduledJobItem | null>(null);
-  const [scheduleDate, setScheduleDate] = useState<string>('2026-10-05');
+  const [scheduleDate, setScheduleDate] = useState<string>(() => getEdmontonToday().dateString);
   const [scheduleTime, setScheduleTime] = useState<string>('10:00');
   const [scheduleDuration, setScheduleDuration] = useState<number>(2.5);
   const [scheduleCleaners, setScheduleCleaners] = useState<string[]>([]);
@@ -288,7 +307,9 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
   };
 
   const handleGoToToday = () => {
-    setSelectedDate(new Date(2026, 9, 11)); // Sunday, October 11, 2026 (Today)
+    const freshToday = getEdmontonToday();
+    setLiveToday(freshToday);
+    setSelectedDate(freshToday.date);
   };
 
   const handleJumpToMonth = (yr: number, mo: number) => {
@@ -459,12 +480,13 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
       const day = daysInPrevMonth - i;
       const d = new Date(currentYear, currentMonth - 1, day);
       const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const isToday = ds === liveToday.dateString;
       const { jobsOnDate, quotesOnDate, invoicesOnDate } = getItemsForDateString(ds);
       cells.push({
         date: d,
         dayNumber: day,
         isCurrentMonth: false,
-        isToday: false,
+        isToday,
         dateString: ds,
         jobsOnDate,
         quotesOnDate,
@@ -476,7 +498,7 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
     for (let day = 1; day <= daysInMonth; day++) {
       const d = new Date(currentYear, currentMonth, day);
       const ds = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const isToday = currentYear === 2026 && currentMonth === 9 && day === 11; // Oct 11, 2026 (Today)
+      const isToday = ds === liveToday.dateString;
       const { jobsOnDate, quotesOnDate, invoicesOnDate } = getItemsForDateString(ds);
       cells.push({
         date: d,
@@ -495,12 +517,13 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
     for (let day = 1; day <= remaining; day++) {
       const d = new Date(currentYear, currentMonth + 1, day);
       const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const isToday = ds === liveToday.dateString;
       const { jobsOnDate, quotesOnDate, invoicesOnDate } = getItemsForDateString(ds);
       cells.push({
         date: d,
         dayNumber: day,
         isCurrentMonth: false,
-        isToday: false,
+        isToday,
         dateString: ds,
         jobsOnDate,
         quotesOnDate,
@@ -509,7 +532,7 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
     }
 
     return cells;
-  }, [currentYear, currentMonth, filteredJobs, filteredQuotes, filteredInvoices, showJobs, showQuotes, showInvoices]);
+  }, [currentYear, currentMonth, filteredJobs, filteredQuotes, filteredInvoices, showJobs, showQuotes, showInvoices, liveToday.dateString]);
 
   // 2. 7-DAY WEEK VIEW DAYS (Monday through Sunday)
   const weekDays = useMemo(() => {
@@ -522,7 +545,7 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
       const d = new Date(startOfWeek);
       d.setDate(startOfWeek.getDate() + offset);
       const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const isToday = d.getFullYear() === 2026 && d.getMonth() === 9 && d.getDate() === 11;
+      const isToday = ds === liveToday.dateString;
       const { jobsOnDate, quotesOnDate, invoicesOnDate } = getItemsForDateString(ds);
       return {
         date: d,
@@ -536,7 +559,7 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
         invoicesOnDate,
       };
     });
-  }, [selectedDate, filteredJobs, filteredQuotes, filteredInvoices, showJobs, showQuotes, showInvoices]);
+  }, [selectedDate, filteredJobs, filteredQuotes, filteredInvoices, showJobs, showQuotes, showInvoices, liveToday.dateString]);
 
   // 3. 3-DAY VIEW DAYS (Selected date + next 2 days)
   const threeDays = useMemo(() => {
@@ -544,7 +567,7 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
       const d = new Date(selectedDate);
       d.setDate(selectedDate.getDate() + offset);
       const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const isToday = d.getFullYear() === 2026 && d.getMonth() === 9 && d.getDate() === 11;
+      const isToday = ds === liveToday.dateString;
       const { jobsOnDate, quotesOnDate, invoicesOnDate } = getItemsForDateString(ds);
       return {
         date: d,
@@ -558,13 +581,13 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
         invoicesOnDate,
       };
     });
-  }, [selectedDate, filteredJobs, filteredQuotes, filteredInvoices, showJobs, showQuotes, showInvoices]);
+  }, [selectedDate, filteredJobs, filteredQuotes, filteredInvoices, showJobs, showQuotes, showInvoices, liveToday.dateString]);
 
   // 4. SINGLE DAY VIEW (Focused date)
   const singleDayInfo = useMemo(() => {
     const ds = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
     const { jobsOnDate, quotesOnDate, invoicesOnDate } = getItemsForDateString(ds);
-    const isToday = selectedDate.getFullYear() === 2026 && selectedDate.getMonth() === 9 && selectedDate.getDate() === 11;
+    const isToday = ds === liveToday.dateString;
 
     // Cleaner lanes: Group jobs by assigned cleaner
     const cleanerLanes: Record<string, ScheduledJobItem[]> = {};
@@ -589,7 +612,7 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
       invoicesOnDate,
       cleanerLanes,
     };
-  }, [selectedDate, filteredJobs, filteredQuotes, filteredInvoices, showJobs, showQuotes, showInvoices, activeCleaners]);
+  }, [selectedDate, filteredJobs, filteredQuotes, filteredInvoices, showJobs, showQuotes, showInvoices, activeCleaners, liveToday.dateString]);
 
   // Period label for top bar based on view mode
   const currentPeriodLabel = useMemo(() => {
@@ -664,7 +687,7 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
   // Handler: Open unscheduled job schedule modal
   const handleOpenScheduleModal = (ujob: UnscheduledJobItem) => {
     setSchedulingUnscheduledJob(ujob);
-    setScheduleDate('2026-10-05');
+    setScheduleDate(getEdmontonToday().dateString);
     setScheduleTime('10:00');
     setScheduleDuration(2.5);
     setScheduleCleaners(ujob.preferredCleaners && ujob.preferredCleaners.length > 0 ? ujob.preferredCleaners : ['Melissa Clarke']);
@@ -863,9 +886,10 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
               </button>
               <button
                 onClick={handleGoToToday}
-                className="px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                className="px-2.5 py-1 text-xs font-extrabold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                title={`Jump to Today (${liveToday.formattedFull})`}
               >
-                Today
+                <span>Today ({liveToday.formattedShort})</span>
               </button>
               <button
                 onClick={handleNext}
@@ -1193,12 +1217,12 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
          ───────────────────────────────────────────────────────────────────────────── */}
       {activeTab === 'CALENDAR' && (
         <div className="flex-1 flex overflow-hidden">
-          {/* 1. MONTH VIEW */}
+          {/* 1. MONTH VIEW (Full 6-Week Scrollable Month Grid) */}
           {calendarViewMode === 'MONTH' && (
             <div className="flex-1 flex flex-col overflow-y-auto p-3 sm:p-4">
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col flex-1">
-                {/* Day of Week Headers (Sunday through Saturday) */}
-                <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50 text-[11px] font-extrabold text-slate-600 uppercase tracking-wider text-center py-2">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col shrink-0">
+                {/* Day of Week Headers (Sunday through Saturday) - Sticky so it stays visible while scrolling all 6 weeks */}
+                <div className="sticky top-0 z-10 grid grid-cols-7 border-b border-slate-200 bg-slate-50/95 backdrop-blur-xs text-[11px] font-extrabold text-slate-600 uppercase tracking-wider text-center py-2.5 rounded-t-2xl">
                   <div className="text-rose-600">Sun</div>
                   <div>Mon</div>
                   <div>Tue</div>
@@ -1208,8 +1232,8 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
                   <div className="text-indigo-600">Sat</div>
                 </div>
 
-                {/* 42 Calendar Cells */}
-                <div className="grid grid-cols-7 grid-rows-6 flex-1 divide-x divide-y divide-slate-100">
+                {/* 42 Calendar Cells (All 6 Weeks Fully Scrollable) */}
+                <div className="grid grid-cols-7 divide-x divide-y divide-slate-100">
                   {calendarCells.map((cell, idx) => {
                     const totalDayItems = cell.jobsOnDate.length + cell.quotesOnDate.length + cell.invoicesOnDate.length;
 
