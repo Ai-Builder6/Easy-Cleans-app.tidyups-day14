@@ -20,9 +20,11 @@ export interface AdLeadItem {
   email: string;
   address: string;
   city: string;
+  postalCode?: string;
   serviceRequested: string;
   bedrooms?: number | string;
   bathrooms?: number | string;
+  dateOfServiceRequested?: string;
   source: LeadSource;
   sourceTab?: string; // e.g. "FB Leads_V2", "Google Leads_V3", "Tidy FB Leads_V1"
   campaignName?: string;

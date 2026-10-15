@@ -691,7 +691,8 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                     </button>
                   </th>
                   <th className="py-3 px-4">Phone &amp; Caller ID</th>
-                  <th className="py-3 px-4">Service &amp; Quote</th>
+                  <th className="py-3 px-4">Service Requested &amp; Quote</th>
+                  <th className="py-3 px-4">Bedrooms &amp; Bathrooms</th>
                   <th className="py-3 px-4">Address / City</th>
                   <th className="py-3 px-4">Quick Label (Good / Bad / Spam / Garbage)</th>
                   <th className="py-3 px-4 text-right">Quote &amp; Actions</th>
@@ -700,7 +701,7 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
               <tbody className="divide-y divide-slate-800/60">
                 {filteredLeads.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-500">
+                    <td colSpan={8} className="py-8 text-center text-slate-500">
                       No leads match current filters.
                     </td>
                   </tr>
@@ -775,12 +776,12 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                           )}
                         </td>
 
-                        {/* Service & Synced Quote Badge */}
+                        {/* Service Requested & Synced Quote Badge */}
                         <td className="py-3.5 px-4 text-slate-300">
-                          <div className="font-semibold text-slate-200">{lead.serviceRequested}</div>
-                          {lead.bedrooms && (
-                            <span className="text-[11px] text-slate-500 block">
-                              {lead.bedrooms} bed • {lead.bathrooms} bath
+                          <div className="font-semibold text-slate-100">{lead.serviceRequested || 'Residential Cleaning'}</div>
+                          {lead.dateOfServiceRequested && (
+                            <span className="text-[10px] text-amber-300/90 font-mono block mt-0.5">
+                              Requested: {lead.dateOfServiceRequested}
                             </span>
                           )}
                           {linkedQuote && (
@@ -797,6 +798,18 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                               </span>
                             </button>
                           )}
+                        </td>
+
+                        {/* Dedicated Bedrooms & Bathrooms Column (Google Sheets Synced) */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-1">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-950/80 text-purple-200 border border-purple-700/70 text-[11px] font-bold">
+                              <span>🛏️ {String(lead.bedrooms || '3 Bedrooms').replace(/\bbed$/i, 'Bedrooms')}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-950/80 text-cyan-200 border border-cyan-700/70 text-[11px] font-bold">
+                              <span>🚿 {String(lead.bathrooms || '2 Bathrooms').replace(/\bbath$/i, 'Bathrooms')}</span>
+                            </span>
+                          </div>
                         </td>
 
                         {/* Address */}
@@ -982,8 +995,22 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="text-xs text-slate-300 space-y-1 mt-2">
-                    <p className="font-semibold text-slate-200">{lead.serviceRequested}</p>
+                  <div className="text-xs text-slate-300 space-y-1.5 mt-2">
+                    <p className="font-semibold text-slate-100">{lead.serviceRequested || 'Residential Cleaning'}</p>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-md bg-purple-950/80 text-purple-200 border border-purple-700/70 text-[11px] font-bold">
+                        🛏️ {lead.bedrooms || '3 Bedrooms'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-cyan-950/80 text-cyan-200 border border-cyan-700/70 text-[11px] font-bold">
+                        🚿 {lead.bathrooms || '2 Bathrooms'}
+                      </span>
+                      {lead.dateOfServiceRequested && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-950/70 text-amber-300 border border-amber-800/60 text-[10px] font-mono">
+                          📅 {lead.dateOfServiceRequested}
+                        </span>
+                      )}
+                    </div>
 
                     {linkedQuote && (
                       <button
@@ -1208,14 +1235,20 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                 <div><strong>Total Active Leads:</strong> {leadsList.length}</div>
               </div>
               <p className="text-slate-400 text-[11px]">
-                Showing first 5 rows currently mapped from Google Sheets:
+                Showing rows currently mapped from Google Sheets (with Service Requested, Bedrooms &amp; Bathrooms):
               </p>
               <div className="space-y-2">
-                {leadsList.slice(0, 5).map((l, i) => (
-                  <div key={l.id} className="p-2.5 bg-[#171b2a] border border-slate-800/80 rounded-xl text-[11px] flex items-center justify-between">
+                {leadsList.slice(0, 8).map((l, i) => (
+                  <div key={l.id} className="p-2.5 bg-[#171b2a] border border-slate-800/80 rounded-xl text-[11px] flex items-center justify-between gap-2 flex-wrap">
                     <div>
                       <span className="font-bold text-white">#{i + 1} {l.customerName}</span> • <span className="font-mono text-pink-400">{l.phone || 'No Phone'}</span>
-                      <span className="block text-slate-400 text-[10px]">{l.serviceRequested} ({l.city})</span>
+                      <span className="block text-slate-200 font-semibold text-[11px] mt-0.5">
+                        {l.serviceRequested} ({l.city})
+                      </span>
+                      <span className="block text-purple-300 font-mono text-[10px] mt-0.5">
+                        🛏️ {l.bedrooms || '3 Bedrooms'} • 🚿 {l.bathrooms || '2 Bathrooms'}
+                        {l.dateOfServiceRequested ? ` • 📅 Requested: ${l.dateOfServiceRequested}` : ''}
+                      </span>
                     </div>
                     <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono text-[9px]">
                       {l.sourceTab}

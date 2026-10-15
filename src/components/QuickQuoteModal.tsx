@@ -33,7 +33,12 @@ interface QuickQuoteModalProps {
     phone?: string;
     email?: string;
     address?: string;
+    city?: string;
+    postalCode?: string;
     serviceType?: string;
+    serviceRequested?: string;
+    bedrooms?: string | number;
+    bathrooms?: string | number;
     source?: string;
     notes?: string;
   } | null;
@@ -91,8 +96,21 @@ export const QuickQuoteModal: React.FC<QuickQuoteModalProps> = ({
       if (initialLead.customerName) setCustomerName(initialLead.customerName);
       if (initialLead.phone) setCustomerPhone(initialLead.phone);
       if (initialLead.email) setCustomerEmail(initialLead.email);
-      if (initialLead.address) setServiceAddress(initialLead.address);
-      if (initialLead.serviceType) setServiceType(initialLead.serviceType);
+      if (initialLead.address) {
+        const fullAddr = [initialLead.address, initialLead.city, initialLead.postalCode].filter(Boolean).join(', ');
+        setServiceAddress(fullAddr);
+      }
+      if (initialLead.serviceType || initialLead.serviceRequested) {
+        setServiceType(initialLead.serviceType || initialLead.serviceRequested || 'Residential Standard Cleaning');
+      }
+      if (initialLead.bedrooms) {
+        const bStr = String(initialLead.bedrooms);
+        setBedrooms(bStr.toLowerCase().includes('bed') || bStr.toLowerCase().includes('studio') ? bStr : `${bStr} Bedrooms`);
+      }
+      if (initialLead.bathrooms) {
+        const baStr = String(initialLead.bathrooms);
+        setBathrooms(baStr.toLowerCase().includes('bath') ? baStr : `${baStr} Bathrooms`);
+      }
       if (initialLead.source) setSelectedSource(initialLead.source);
       if (initialLead.notes) setQuoteNote(initialLead.notes);
     }
@@ -287,8 +305,14 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
           clientEmail: customerEmail,
           serviceAddress: serviceAddress || 'Edmonton, AB',
           service: `${serviceType} (${bedrooms}, ${bathrooms} • ${hours} hrs)`,
+          bedrooms,
+          bathrooms,
           total: calculations.total,
+          discountAmount: Number(discountAmount) || 0,
           depositRequired: depositAmount,
+          scheduledDate,
+          scheduledTime,
+          assignedCleaners,
           lineItems,
           notes: `Property: ${bedrooms}, ${bathrooms}. Fast Quote: ${hours} hrs @ $${hourlyRate}/hr + $${fuelSurcharge} fuel. Source: ${selectedSource}. Specific Info: ${quoteNote}`,
         }),

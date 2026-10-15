@@ -1250,7 +1250,8 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                         <tr className="bg-slate-100 text-slate-600 text-left border-b border-slate-200">
                           <th className="p-2 font-semibold">Client Name</th>
                           <th className="p-2 font-semibold">Phone</th>
-                          <th className="p-2 font-semibold">Service</th>
+                          <th className="p-2 font-semibold">Service Requested</th>
+                          <th className="p-2 font-semibold">Bedrooms &amp; Bathrooms</th>
                           <th className="p-2 font-semibold">Address</th>
                           <th className="p-2 font-semibold">Date Requested</th>
                           <th className="p-2 font-semibold">Status</th>
@@ -1264,6 +1265,9 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                               <td className="p-2 font-medium text-slate-900">{row.first_name} {row.last_name}</td>
                               <td className="p-2 text-slate-600 font-mono">{row.phone_number}</td>
                               <td className="p-2 text-blue-700 font-semibold">{row.service}</td>
+                              <td className="p-2 text-purple-800 font-semibold whitespace-nowrap">
+                                {row.bedrooms} • {row.bathrooms}
+                              </td>
                               <td className="p-2 text-slate-600 truncate max-w-xs">{row.street_address}, {row.city}</td>
                               <td className="p-2 text-slate-600">{row.date_of_service_requested}</td>
                               <td className="p-2">
