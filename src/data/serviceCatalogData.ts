@@ -1,7 +1,18 @@
 /**
  * Canonical Service Catalog & Price List for Tidyups Cleaning Service Inc.
  * Synchronized with Jobber Products & Services Line Items
+ * 
+ * Supports exact Jobber line item schema:
+ * - Service Name / Jobber Line Item
+ * - Category
+ * - Beds & Baths
+ * - Quantity (units or labor hours)
+ * - Unit Price (CAD)
+ * - Total (CAD) = Quantity * Unit Price
+ * - Status & Active flag
  */
+
+import * as XLSX from 'xlsx';
 
 export interface ServiceCatalogItem {
   id: string;
@@ -26,36 +37,48 @@ export interface ServiceCatalogItem {
     | 'Add-on';
   bedrooms?: string;
   bathrooms?: string;
-  baseHours: number;
+  beds?: string;
+  baths?: string;
+  quantity: number; // e.g. 3, 1, 2.5
+  unitPrice: number; // e.g. 105.00
+  total: number; // Quantity * Unit Price = 315.00
+  basePrice: number; // Backward-compatibility alias = total
+  baseHours: number; // Backward-compatibility alias = quantity
   cleanersCount: number;
-  basePrice: number;
   depositRequired: number;
   taxable: boolean;
   jobberItemName: string;
   description: string;
   isAddon?: boolean;
-  isActive: boolean;
+  status?: string; // 'Active', 'Standard', 'Draft'
+  isActive: boolean; // Active?
   sortOrder: number;
 }
 
 export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
-  // ── 1. MOVE-OUT CLEANING 2026 ──
+  // ── 1. MOVE-OUT CLEANING 2026 (Jobber Line Items: 2 Pro Cleaners @ $105/hr) ──
   {
     id: 'cat-mo-1b1b',
     category: 'MOVE_OUT',
     categoryLabel: 'Move-Out Cleaning 2026',
-    name: '1Bed 1Bath Moveout Cleaning 2026',
+    name: '1Bed 1Bath Moveout Cleaning - Online Booking',
     shortName: '1 Bed / 1 Bath Move-Out',
     serviceType: 'Move-Out Cleaning',
     bedrooms: '1 Bedroom',
     bathrooms: '1 Bathroom',
+    beds: '1 Bed',
+    baths: '1 Bath',
+    quantity: 2.5,
+    unitPrice: 105.00,
+    total: 262.50,
+    basePrice: 262.50,
     baseHours: 2.5,
-    cleanersCount: 1,
-    basePrice: 265.00,
+    cleanersCount: 2,
     depositRequired: 50.00,
     taxable: true,
-    jobberItemName: '1Bed 1Bath Moveout Cleaning 2026',
-    description: 'Complete move-out sanitization for 1 Bed / 1 Bath apartment/condo. High-touch surfaces, kitchen, bath, and floors.',
+    jobberItemName: '1Bed 1Bath Moveout Cleaning - Online Booking',
+    description: "1Bed 1Bath Moveout Cleaning\n2 Pro Cleaners\nIncludes Fuel Surcharge",
+    status: 'Active',
     isActive: true,
     sortOrder: 10,
   },
@@ -63,18 +86,24 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     id: 'cat-mo-2b1b',
     category: 'MOVE_OUT',
     categoryLabel: 'Move-Out Cleaning 2026',
-    name: 'Move Out Cleaning Services 2026 (Basement Suite)',
-    shortName: '2 Bed / 1 Bath Basement Suite Move-Out',
+    name: '2Bed 1Bath Moveout Cleaning - Online Booking (Basement Suite)',
+    shortName: '2 Bed / 1 Bath Basement Move-Out',
     serviceType: 'Move-Out Cleaning',
     bedrooms: '2 Bedrooms',
     bathrooms: '1 Bathroom',
-    baseHours: 3.0,
-    cleanersCount: 1,
+    beds: '2 Bed',
+    baths: '1 Bath',
+    quantity: 3.0,
+    unitPrice: 105.00,
+    total: 315.00,
     basePrice: 315.00,
+    baseHours: 3.0,
+    cleanersCount: 2,
     depositRequired: 100.00,
     taxable: true,
-    jobberItemName: 'Move Out Cleaning Services 2026 (Basement Suite)',
-    description: 'Comprehensive move-out turnover clean for 2 Bed / 1 Bath basement suite. Kitchen, bath, fixtures, and full sanitization.',
+    jobberItemName: '2Bed 1Bath Moveout Cleaning - Online Booking (Basement Suite)',
+    description: "2Bed 1Bath Moveout Cleaning (Basement Suite)\n2 Pro Cleaners\nIncludes Fuel Surcharge",
+    status: 'Active',
     isActive: true,
     sortOrder: 20,
   },
@@ -82,134 +111,151 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     id: 'cat-mo-2b2b',
     category: 'MOVE_OUT',
     categoryLabel: 'Move-Out Cleaning 2026',
-    name: '2Bed 2Bath Move Out Cleaning 2026',
+    name: '2Bed 2Bath Moveout Cleaning - Online Booking',
     shortName: '2 Bed / 2 Bath Move-Out',
     serviceType: 'Move-Out Cleaning',
     bedrooms: '2 Bedrooms',
     bathrooms: '2 Bathrooms',
-    baseHours: 3.5,
-    cleanersCount: 1,
-    basePrice: 325.00,
+    beds: '2 Bed',
+    baths: '2 Bath',
+    quantity: 3.0,
+    unitPrice: 105.00,
+    total: 315.00,
+    basePrice: 315.00,
+    baseHours: 3.0,
+    cleanersCount: 2,
     depositRequired: 100.00,
     taxable: true,
-    jobberItemName: '2Bed 2Bath Move Out Cleaning 2026',
-    description: 'Detailed move-out clean for 2 Bed / 2 Bath residence. Both full baths, kitchen surfaces, baseboards wipe, vacuum & mop.',
+    jobberItemName: '2Bed 2Bath Moveout Cleaning - Online Booking',
+    description: "2Bed 2Bath Moveout Cleaning\n2 Pro Cleaners\nIncludes Fuel Surcharge",
+    status: 'Active',
     isActive: true,
     sortOrder: 30,
   },
   {
-    id: 'cat-mo-3b2b-main',
+    id: 'cat-mo-3b2b',
     category: 'MOVE_OUT',
     categoryLabel: 'Move-Out Cleaning 2026',
-    name: 'Move Out Cleaning Services 2026 (Main Level)',
-    shortName: '3 Bed / 2 Bath Main Level Move-Out',
-    serviceType: 'Move-Out Cleaning',
-    bedrooms: '3 Bedrooms',
-    bathrooms: '2 Bathrooms',
-    baseHours: 3.5,
-    cleanersCount: 1,
-    basePrice: 325.00,
-    depositRequired: 100.00,
-    taxable: true,
-    jobberItemName: 'Move Out Cleaning Services 2026 (Main Level)',
-    description: 'Complete main-level move-out cleaning for 3 Bedrooms & 2 Bathrooms. Kitchen degrease, baths, closets, and floors.',
-    isActive: true,
-    sortOrder: 40,
-  },
-  {
-    id: 'cat-mo-3b2b-std',
-    category: 'MOVE_OUT',
-    categoryLabel: 'Move-Out Cleaning 2026',
-    name: '3Bed 2Bath Moveout Cleaning 2026',
+    name: '3Bed 2Bath Moveout Cleaning - Online Booking',
     shortName: '3 Bed / 2 Bath Move-Out',
     serviceType: 'Move-Out Cleaning',
     bedrooms: '3 Bedrooms',
     bathrooms: '2 Bathrooms',
+    beds: '3 Bed',
+    baths: '2 Bath',
+    quantity: 3.5,
+    unitPrice: 105.00,
+    total: 367.50,
+    basePrice: 367.50,
     baseHours: 3.5,
-    cleanersCount: 1,
-    basePrice: 325.00,
+    cleanersCount: 2,
     depositRequired: 100.00,
     taxable: true,
-    jobberItemName: '3Bed 2Bath Moveout Cleaning 2026',
-    description: 'Full moveout turnover for 3 Bed / 2 Bath home. Hand-wiped surfaces, kitchen exterior cabinets & appliances, full baths.',
+    jobberItemName: '3Bed 2Bath Moveout Cleaning - Online Booking',
+    description: "3Bed 2Bath Moveout Cleaning\n2 Pro Cleaners\nIncludes Fuel Surcharge",
+    status: 'Active',
     isActive: true,
-    sortOrder: 50,
+    sortOrder: 40,
   },
   {
     id: 'cat-mo-3b25b',
     category: 'MOVE_OUT',
     categoryLabel: 'Move-Out Cleaning 2026',
-    name: 'Move Out Cleaning Services 2026 (3 Bed / 2.5 Bath)',
+    name: '3Bed 2.5Bath Moveout Cleaning - Online Booking',
     shortName: '3 Bed / 2.5 Bath Move-Out',
     serviceType: 'Move-Out Cleaning',
     bedrooms: '3 Bedrooms',
     bathrooms: '2.5 Bathrooms',
+    beds: '3 Bed',
+    baths: '2.5 Bath',
+    quantity: 4.0,
+    unitPrice: 105.00,
+    total: 420.00,
+    basePrice: 420.00,
     baseHours: 4.0,
     cleanersCount: 2,
-    basePrice: 407.50,
-    depositRequired: 125.00,
+    depositRequired: 100.00,
     taxable: true,
-    jobberItemName: 'Move Out Cleaning Services 2026 (3 Bed / 2.5 Bath)',
-    description: 'Tandem cleaner move-out for 3 Bed / 2.5 Bath two-storey home. Detailed bathrooms, powder room, kitchen, baseboards.',
+    jobberItemName: '3Bed 2.5Bath Moveout Cleaning - Online Booking',
+    description: "3Bed 2.5Bath Moveout Cleaning\n2 Pro Cleaners\nIncludes Fuel Surcharge",
+    status: 'Active',
     isActive: true,
-    sortOrder: 60,
-  },
-  {
-    id: 'cat-mo-4b25b',
-    category: 'MOVE_OUT',
-    categoryLabel: 'Move-Out Cleaning 2026',
-    name: '4Bed 2.5Bath Move Out Cleaning 2026',
-    shortName: '4 Bed / 2.5 Bath Move-Out',
-    serviceType: 'Move-Out Cleaning',
-    bedrooms: '4 Bedrooms',
-    bathrooms: '2.5 Bathrooms',
-    baseHours: 4.5,
-    cleanersCount: 2,
-    basePrice: 450.00,
-    depositRequired: 125.00,
-    taxable: true,
-    jobberItemName: '4Bed 2.5Bath Move Out Cleaning 2026',
-    description: 'Move-out turnover for 4 Bedrooms and 2.5 Bathrooms. Full home detail, stairwells, sanitization, and baseboards.',
-    isActive: true,
-    sortOrder: 70,
+    sortOrder: 50,
   },
   {
     id: 'cat-mo-4b3b',
     category: 'MOVE_OUT',
     categoryLabel: 'Move-Out Cleaning 2026',
-    name: '4Bed 3Bath Move Out Cleaning 2026',
+    name: '4Bed 3Bath Moveout Cleaning - Online Booking',
     shortName: '4 Bed / 3 Bath Move-Out',
     serviceType: 'Move-Out Cleaning',
     bedrooms: '4 Bedrooms',
     bathrooms: '3 Bathrooms',
-    baseHours: 5.0,
+    beds: '4 Bed',
+    baths: '3 Bath',
+    quantity: 4.5,
+    unitPrice: 105.00,
+    total: 472.50,
+    basePrice: 472.50,
+    baseHours: 4.5,
     cleanersCount: 2,
-    basePrice: 495.00,
-    depositRequired: 150.00,
+    depositRequired: 125.00,
     taxable: true,
-    jobberItemName: '4Bed 3Bath Move Out Cleaning 2026',
-    description: 'Comprehensive 4 Bed / 3 Bath home move-out cleaning with team dispatch. All three bathrooms and kitchen deep cleaned.',
+    jobberItemName: '4Bed 3Bath Moveout Cleaning - Online Booking',
+    description: "4Bed 3Bath Moveout Cleaning\n2 Pro Cleaners\nIncludes Fuel Surcharge",
+    status: 'Active',
     isActive: true,
-    sortOrder: 80,
+    sortOrder: 60,
   },
   {
-    id: 'cat-mo-5b35b',
+    id: 'cat-mo-4b4b',
     category: 'MOVE_OUT',
     categoryLabel: 'Move-Out Cleaning 2026',
-    name: '5Bed 3.5+Bath Executive Estate Move Out Clean',
-    shortName: '5+ Bed / 3.5+ Bath Estate Move-Out',
+    name: '4Bed 4Bath Moveout Cleaning - Online Booking',
+    shortName: '4 Bed / 4 Bath Move-Out',
+    serviceType: 'Move-Out Cleaning',
+    bedrooms: '4 Bedrooms',
+    bathrooms: '4 Bathrooms',
+    beds: '4 Bed',
+    baths: '4 Bath',
+    quantity: 5.0,
+    unitPrice: 105.00,
+    total: 525.00,
+    basePrice: 525.00,
+    baseHours: 5.0,
+    cleanersCount: 2,
+    depositRequired: 125.00,
+    taxable: true,
+    jobberItemName: '4Bed 4Bath Moveout Cleaning - Online Booking',
+    description: "4Bed 4Bath Moveout Cleaning\n2 Pro Cleaners\nIncludes Fuel Surcharge",
+    status: 'Active',
+    isActive: true,
+    sortOrder: 70,
+  },
+  {
+    id: 'cat-mo-5b4b',
+    category: 'MOVE_OUT',
+    categoryLabel: 'Move-Out Cleaning 2026',
+    name: '5Bed 4Bath Moveout Cleaning - Online Booking',
+    shortName: '5 Bed / 4 Bath Move-Out',
     serviceType: 'Move-Out Cleaning',
     bedrooms: '5 Bedrooms',
-    bathrooms: '3.5 Bathrooms',
-    baseHours: 6.0,
+    bathrooms: '4 Bathrooms',
+    beds: '5 Bed',
+    baths: '4 Bath',
+    quantity: 5.5,
+    unitPrice: 105.00,
+    total: 577.50,
+    basePrice: 577.50,
+    baseHours: 5.5,
     cleanersCount: 2,
-    basePrice: 585.00,
     depositRequired: 150.00,
     taxable: true,
-    jobberItemName: '5Bed 3.5+Bath Executive Estate Move Out Clean',
-    description: 'Executive estate move-out turnover clean. Large square footage, master ensuite, bonus room, multiple full bathrooms.',
+    jobberItemName: '5Bed 4Bath Moveout Cleaning - Online Booking',
+    description: "5Bed 4Bath Moveout Cleaning\n2 Pro Cleaners\nIncludes Fuel Surcharge",
+    status: 'Active',
     isActive: true,
-    sortOrder: 90,
+    sortOrder: 80,
   },
 
   // ── 2. DEEP CLEANING SERVICES 2026 ──
@@ -222,15 +268,21 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     serviceType: 'Deep Cleaning',
     bedrooms: '1 Bedroom',
     bathrooms: '1 Bathroom',
+    beds: '1 Bed',
+    baths: '1 Bath',
+    quantity: 2.0,
+    unitPrice: 105.00,
+    total: 210.00,
+    basePrice: 210.00,
     baseHours: 2.0,
-    cleanersCount: 1,
-    basePrice: 175.00,
+    cleanersCount: 2,
     depositRequired: 50.00,
     taxable: true,
     jobberItemName: '1Bed 1Bath Deep Cleaning 2026',
-    description: 'Detailed deep sanitization for 1 Bed / 1 Bath residence. Grout, faucets, stove top, bathroom descaling, high dusting.',
+    description: "1Bed 1Bath Deep Cleaning 2026\n2 Pro Cleaners hand-scrubbing kitchen, bath, high touch surfaces",
+    status: 'Active',
     isActive: true,
-    sortOrder: 100,
+    sortOrder: 90,
   },
   {
     id: 'cat-dc-2b1b',
@@ -241,15 +293,21 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     serviceType: 'Deep Cleaning',
     bedrooms: '2 Bedrooms',
     bathrooms: '1 Bathroom',
+    beds: '2 Bed',
+    baths: '1 Bath',
+    quantity: 2.5,
+    unitPrice: 105.00,
+    total: 262.50,
+    basePrice: 262.50,
     baseHours: 2.5,
-    cleanersCount: 1,
-    basePrice: 185.00,
+    cleanersCount: 2,
     depositRequired: 50.00,
     taxable: true,
     jobberItemName: '2Bed 1Bath Deep Cleaning 2026',
-    description: 'Deep residential clean for 2 Bed / 1 Bath home. Scrub showers, kitchen backsplash, edge vacuuming, doors & frames.',
+    description: "2Bed 1Bath Deep Cleaning 2026\n2 Pro Cleaners hand-scrubbing kitchen, bath, high touch surfaces",
+    status: 'Active',
     isActive: true,
-    sortOrder: 110,
+    sortOrder: 100,
   },
   {
     id: 'cat-dc-2b2b',
@@ -260,15 +318,21 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     serviceType: 'Deep Cleaning',
     bedrooms: '2 Bedrooms',
     bathrooms: '2 Bathrooms',
+    beds: '2 Bed',
+    baths: '2 Bath',
+    quantity: 3.0,
+    unitPrice: 105.00,
+    total: 315.00,
+    basePrice: 315.00,
     baseHours: 3.0,
-    cleanersCount: 1,
-    basePrice: 197.50,
+    cleanersCount: 2,
     depositRequired: 50.00,
     taxable: true,
     jobberItemName: '2Bed 2Bath Deep Cleaning 2026',
-    description: 'Intensive deep clean for 2 Bed / 2 Bath home. Deep scrubbing of 2 bathrooms, kitchen degrease, baseboards, floor detail.',
+    description: "2Bed 2Bath Deep Cleaning 2026\n2 Pro Cleaners tandem crew deep sanitize",
+    status: 'Active',
     isActive: true,
-    sortOrder: 120,
+    sortOrder: 110,
   },
   {
     id: 'cat-dc-3b2b',
@@ -279,15 +343,21 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     serviceType: 'Deep Cleaning',
     bedrooms: '3 Bedrooms',
     bathrooms: '2 Bathrooms',
-    baseHours: 3.0,
-    cleanersCount: 1,
-    basePrice: 210.00,
-    depositRequired: 50.00,
+    beds: '3 Bed',
+    baths: '2 Bath',
+    quantity: 3.5,
+    unitPrice: 105.00,
+    total: 367.50,
+    basePrice: 367.50,
+    baseHours: 3.5,
+    cleanersCount: 2,
+    depositRequired: 75.00,
     taxable: true,
     jobberItemName: '3Bed 2Bath Deep Cleaning 2026',
-    description: 'Deep residential rejuvenation for 3 Bed / 2 Bath house or condo. Living areas, bedrooms, kitchen scrub, bathroom descaling.',
+    description: "3Bed 2Bath Deep Cleaning 2026\n2 Pro Cleaners tandem crew deep sanitize",
+    status: 'Active',
     isActive: true,
-    sortOrder: 130,
+    sortOrder: 120,
   },
   {
     id: 'cat-dc-3b25b',
@@ -298,34 +368,21 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     serviceType: 'Deep Cleaning',
     bedrooms: '3 Bedrooms',
     bathrooms: '2.5 Bathrooms',
-    baseHours: 3.5,
-    cleanersCount: 1,
-    basePrice: 223.32,
-    depositRequired: 50.00,
-    taxable: true,
-    jobberItemName: '3Bed 2.5Bath Deep Cleaning 2026',
-    description: 'Full residential deep cleaning for 3 Bedrooms and 2.5 Bathrooms (approx. 1800-2200 sq ft). Includes powder room & ensuite.',
-    isActive: true,
-    sortOrder: 140,
-  },
-  {
-    id: 'cat-dc-4b25b',
-    category: 'DEEP_CLEAN',
-    categoryLabel: 'Deep Cleaning Services 2026',
-    name: '4Bed 2.5Bath Deep Cleaning 2026',
-    shortName: '4 Bed / 2.5 Bath Deep Clean',
-    serviceType: 'Deep Cleaning',
-    bedrooms: '4 Bedrooms',
-    bathrooms: '2.5 Bathrooms',
+    beds: '3 Bed',
+    baths: '2.5 Bath',
+    quantity: 4.0,
+    unitPrice: 105.00,
+    total: 420.00,
+    basePrice: 420.00,
     baseHours: 4.0,
     cleanersCount: 2,
-    basePrice: 385.00,
-    depositRequired: 100.00,
+    depositRequired: 75.00,
     taxable: true,
-    jobberItemName: '4Bed 2.5Bath Deep Cleaning 2026',
-    description: 'Team deep clean for 4 Bed / 2.5 Bath home. Complete kitchen, bathrooms, bedrooms, and high/low detailed dusting.',
+    jobberItemName: '3Bed 2.5Bath Deep Cleaning 2026',
+    description: "3Bed 2.5Bath Deep Cleaning 2026\n2 Pro Cleaners tandem crew",
+    status: 'Active',
     isActive: true,
-    sortOrder: 150,
+    sortOrder: 130,
   },
   {
     id: 'cat-dc-4b3b',
@@ -336,326 +393,197 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     serviceType: 'Deep Cleaning',
     bedrooms: '4 Bedrooms',
     bathrooms: '3 Bathrooms',
-    baseHours: 4.5,
+    beds: '4 Bed',
+    baths: '3 Bath',
+    quantity: 4.25,
+    unitPrice: 105.00,
+    total: 446.25,
+    basePrice: 446.25,
+    baseHours: 4.25,
     cleanersCount: 2,
-    basePrice: 439.29,
     depositRequired: 100.00,
     taxable: true,
     jobberItemName: '4Bed 3Bath Deep Cleaning 2026',
-    description: 'Comprehensive deep cleaning for large 4 Bed / 3 Bath residence. Triple bathroom scrub, kitchen, living spaces, and floors.',
+    description: "4Bed 3Bath Deep Cleaning 2026\n2 Pro Cleaners comprehensive sanitization",
+    status: 'Active',
+    isActive: true,
+    sortOrder: 140,
+  },
+
+  // ── 3. STANDARD RESIDENTIAL CLEANING 2026 ──
+  {
+    id: 'cat-std-1b1b',
+    category: 'STANDARD_CLEAN',
+    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
+    name: '1Bed 1Bath Standard Residential Clean',
+    shortName: '1 Bed / 1 Bath Standard',
+    serviceType: 'Standard Cleaning',
+    bedrooms: '1 Bedroom',
+    bathrooms: '1 Bathroom',
+    beds: '1 Bed',
+    baths: '1 Bath',
+    quantity: 2.0,
+    unitPrice: 65.00,
+    total: 130.00,
+    basePrice: 130.00,
+    baseHours: 2.0,
+    cleanersCount: 1,
+    depositRequired: 0,
+    taxable: true,
+    jobberItemName: '1Bed 1Bath Standard Residential Clean',
+    description: "Standard regular maintenance clean for 1 Bed / 1 Bath home",
+    status: 'Active',
+    isActive: true,
+    sortOrder: 150,
+  },
+  {
+    id: 'cat-std-2b1b',
+    category: 'STANDARD_CLEAN',
+    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
+    name: '2Bed 1Bath Standard Residential Clean',
+    shortName: '2 Bed / 1 Bath Standard',
+    serviceType: 'Standard Cleaning',
+    bedrooms: '2 Bedrooms',
+    bathrooms: '1 Bathroom',
+    beds: '2 Bed',
+    baths: '1 Bath',
+    quantity: 2.5,
+    unitPrice: 65.00,
+    total: 162.50,
+    basePrice: 162.50,
+    baseHours: 2.5,
+    cleanersCount: 1,
+    depositRequired: 0,
+    taxable: true,
+    jobberItemName: '2Bed 1Bath Standard Residential Clean',
+    description: "Standard regular maintenance clean for 2 Bed / 1 Bath home",
+    status: 'Active',
     isActive: true,
     sortOrder: 160,
   },
   {
-    id: 'cat-dc-5b35b',
-    category: 'DEEP_CLEAN',
-    categoryLabel: 'Deep Cleaning Services 2026',
-    name: '5Bed 3.5+Bath Estate Deep Clean 2026',
-    shortName: '5+ Bed / 3.5+ Bath Estate Deep Clean',
-    serviceType: 'Deep Cleaning',
-    bedrooms: '5 Bedrooms',
-    bathrooms: '3.5 Bathrooms',
-    baseHours: 5.5,
-    cleanersCount: 2,
-    basePrice: 520.00,
-    depositRequired: 125.00,
+    id: 'cat-std-3b2b',
+    category: 'STANDARD_CLEAN',
+    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
+    name: '3Bed 2Bath Standard Residential Clean',
+    shortName: '3 Bed / 2 Bath Standard',
+    serviceType: 'Standard Cleaning',
+    bedrooms: '3 Bedrooms',
+    bathrooms: '2 Bathrooms',
+    beds: '3 Bed',
+    baths: '2 Bath',
+    quantity: 3.0,
+    unitPrice: 65.00,
+    total: 195.00,
+    basePrice: 195.00,
+    baseHours: 3.0,
+    cleanersCount: 1,
+    depositRequired: 0,
     taxable: true,
-    jobberItemName: '5Bed 3.5+Bath Estate Deep Clean 2026',
-    description: 'Estate-scale deep cleaning for large family properties. Multi-cleaner crew, bathrooms, chef kitchen, stairs, and living suites.',
+    jobberItemName: '3Bed 2Bath Standard Residential Clean',
+    description: "Standard regular maintenance clean for 3 Bed / 2 Bath home",
+    status: 'Active',
     isActive: true,
     sortOrder: 170,
   },
 
-  // ── 3. INITIAL BASIC / STANDARD CLEANING 2026 ──
-  {
-    id: 'cat-sc-1b1b',
-    category: 'STANDARD_CLEAN',
-    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
-    name: '1Bed 1Bath Initial Basic Cleaning',
-    shortName: '1 Bed / 1 Bath Standard Clean',
-    serviceType: 'Standard Cleaning',
-    bedrooms: '1 Bedroom',
-    bathrooms: '1 Bathroom',
-    baseHours: 2.0,
-    cleanersCount: 1,
-    basePrice: 155.00,
-    depositRequired: 50.00,
-    taxable: true,
-    jobberItemName: '1Bed 1Bath Initial Basic Cleaning',
-    description: 'General residential maintenance clean for 1 Bed / 1 Bath home. Dust surfaces, sanitize bathroom, kitchen counters, vacuum & mop.',
-    isActive: true,
-    sortOrder: 180,
-  },
-  {
-    id: 'cat-sc-2b1b',
-    category: 'STANDARD_CLEAN',
-    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
-    name: '2Bed 1Bath Initial Basic Cleaning',
-    shortName: '2 Bed / 1 Bath Standard Clean',
-    serviceType: 'Standard Cleaning',
-    bedrooms: '2 Bedrooms',
-    bathrooms: '1 Bathroom',
-    baseHours: 2.5,
-    cleanersCount: 1,
-    basePrice: 175.00,
-    depositRequired: 50.00,
-    taxable: true,
-    jobberItemName: '2Bed 1Bath Initial Basic Cleaning',
-    description: 'Standard residential cleaning for 2 Bed / 1 Bath home. Living rooms, kitchen, bathroom sanitization, empty bins, floors.',
-    isActive: true,
-    sortOrder: 190,
-  },
-  {
-    id: 'cat-sc-2b2b',
-    category: 'STANDARD_CLEAN',
-    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
-    name: '2Bed 2Bath Initial Basic Cleaning',
-    shortName: '2 Bed / 2 Bath Standard Clean',
-    serviceType: 'Standard Cleaning',
-    bedrooms: '2 Bedrooms',
-    bathrooms: '2 Bathrooms',
-    baseHours: 2.5,
-    cleanersCount: 1,
-    basePrice: 198.50,
-    depositRequired: 50.00,
-    taxable: true,
-    jobberItemName: '2Bed 2Bath Initial Basic Cleaning',
-    description: 'Standard initial basic cleaning for 2 Bed / 2 Bath home. Surface wipe down, both bathrooms, kitchen sinks, floors vacuumed/mopped.',
-    isActive: true,
-    sortOrder: 200,
-  },
-  {
-    id: 'cat-sc-3b2b',
-    category: 'STANDARD_CLEAN',
-    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
-    name: '3Bed 2Bath Initial Basic Cleaning',
-    shortName: '3 Bed / 2 Bath Standard Clean',
-    serviceType: 'Standard Cleaning',
-    bedrooms: '3 Bedrooms',
-    bathrooms: '2 Bathrooms',
-    baseHours: 3.0,
-    cleanersCount: 1,
-    basePrice: 215.00,
-    depositRequired: 50.00,
-    taxable: true,
-    jobberItemName: '3Bed 2Bath Initial Basic Cleaning',
-    description: 'Standard residential clean for 3 Bed / 2 Bath residence. Kitchen, bathrooms, bedrooms tidied, dusting, and full floor care.',
-    isActive: true,
-    sortOrder: 210,
-  },
-  {
-    id: 'cat-sc-3b25b',
-    category: 'STANDARD_CLEAN',
-    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
-    name: '3Bed 2.5Bath Initial Basic Cleaning',
-    shortName: '3 Bed / 2.5 Bath Standard Clean',
-    serviceType: 'Standard Cleaning',
-    bedrooms: '3 Bedrooms',
-    bathrooms: '2.5 Bathrooms',
-    baseHours: 3.0,
-    cleanersCount: 1,
-    basePrice: 235.00,
-    depositRequired: 50.00,
-    taxable: true,
-    jobberItemName: '3Bed 2.5Bath Initial Basic Cleaning',
-    description: 'Standard home clean for 3 Bed / 2.5 Bath two-storey home. Kitchen counters & stove, 2.5 baths, dusting, vacuuming and mopping.',
-    isActive: true,
-    sortOrder: 220,
-  },
-  {
-    id: 'cat-sc-4b25b',
-    category: 'STANDARD_CLEAN',
-    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
-    name: '4Bed 2.5Bath Initial Basic Cleaning',
-    shortName: '4 Bed / 2.5 Bath Standard Clean',
-    serviceType: 'Standard Cleaning',
-    bedrooms: '4 Bedrooms',
-    bathrooms: '2.5 Bathrooms',
-    baseHours: 3.5,
-    cleanersCount: 1,
-    basePrice: 285.00,
-    depositRequired: 50.00,
-    taxable: true,
-    jobberItemName: '4Bed 2.5Bath Initial Basic Cleaning',
-    description: 'Residential standard cleaning for 4 Bed / 2.5 Bath home. Bedrooms, shared bathrooms, ensuite, kitchen, and common areas.',
-    isActive: true,
-    sortOrder: 230,
-  },
-  {
-    id: 'cat-sc-4b3b',
-    category: 'STANDARD_CLEAN',
-    categoryLabel: 'Initial Basic / Standard Cleaning 2026',
-    name: '4Bed 3Bath Initial Basic Cleaning',
-    shortName: '4 Bed / 3 Bath Standard Clean',
-    serviceType: 'Standard Cleaning',
-    bedrooms: '4 Bedrooms',
-    bathrooms: '3 Bathrooms',
-    baseHours: 4.0,
-    cleanersCount: 2,
-    basePrice: 320.00,
-    depositRequired: 75.00,
-    taxable: true,
-    jobberItemName: '4Bed 3Bath Initial Basic Cleaning',
-    description: 'Standard clean for 4 Bed / 3 Bath home. 3 full bathrooms, extensive floor square footage, dusting, kitchen and entrance.',
-    isActive: true,
-    sortOrder: 240,
-  },
-
-  // ── 4. POST-CONSTRUCTION & MOVE-IN ──
+  // ── 4. POST-CONSTRUCTION / MOVE-IN ──
   {
     id: 'cat-pc-2b2b',
     category: 'POST_CONSTRUCTION',
     categoryLabel: 'MoveIn - Post Construction',
-    name: '2Bed 2Bath MoveIn - Post Construction Cleaning',
-    shortName: '2 Bed / 2 Bath Post-Construction',
+    name: '2Bed 2Bath MoveIn - Post Construction Clean',
+    shortName: '2 Bed / 2 Bath Post-Con',
     serviceType: 'Post-Construction Cleaning',
     bedrooms: '2 Bedrooms',
     bathrooms: '2 Bathrooms',
-    baseHours: 3.5,
-    cleanersCount: 1,
-    basePrice: 295.00,
+    beds: '2 Bed',
+    baths: '2 Bath',
+    quantity: 4.0,
+    unitPrice: 110.00,
+    total: 440.00,
+    basePrice: 440.00,
+    baseHours: 4.0,
+    cleanersCount: 2,
     depositRequired: 100.00,
     taxable: true,
-    jobberItemName: '2Bed 2Bath MoveIn - Post Construction Cleaning',
-    description: 'Fine drywall dust wipe down, inside drawers, sticker removal, vacuuming track crevices, sanitized fixtures for new move-in.',
+    jobberItemName: '2Bed 2Bath MoveIn - Post Construction Clean',
+    description: "Drywall dust extraction, sticker removal, fixtures polish, HEPA filter air scrub",
+    status: 'Active',
     isActive: true,
-    sortOrder: 250,
+    sortOrder: 180,
   },
   {
     id: 'cat-pc-3b25b',
     category: 'POST_CONSTRUCTION',
     categoryLabel: 'MoveIn - Post Construction',
-    name: 'MoveIn - Post Construction Cleaning (3 Bed / 2.5 Bath)',
-    shortName: '3 Bed / 2.5 Bath Post-Construction',
+    name: '3Bed 2.5Bath MoveIn - Post Construction Clean',
+    shortName: '3 Bed / 2.5 Bath Post-Con',
     serviceType: 'Post-Construction Cleaning',
     bedrooms: '3 Bedrooms',
     bathrooms: '2.5 Bathrooms',
-    baseHours: 4.0,
+    beds: '3 Bed',
+    baths: '2.5 Bath',
+    quantity: 4.5,
+    unitPrice: 110.00,
+    total: 495.00,
+    basePrice: 495.00,
+    baseHours: 4.5,
     cleanersCount: 2,
-    basePrice: 335.00,
-    depositRequired: 100.00,
-    taxable: true,
-    jobberItemName: 'MoveIn - Post Construction Cleaning',
-    description: 'Comprehensive post-construction detailing. Drywall dust extraction, fixtures polishing, window sill vacuuming, and floor scrub.',
-    isActive: true,
-    sortOrder: 260,
-  },
-  {
-    id: 'cat-pc-4b3b',
-    category: 'POST_CONSTRUCTION',
-    categoryLabel: 'MoveIn - Post Construction',
-    name: '4Bed 3Bath MoveIn - Post Construction Cleaning',
-    shortName: '4 Bed / 3 Bath Post-Construction',
-    serviceType: 'Post-Construction Cleaning',
-    bedrooms: '4 Bedrooms',
-    bathrooms: '3 Bathrooms',
-    baseHours: 5.0,
-    cleanersCount: 2,
-    basePrice: 425.00,
     depositRequired: 125.00,
     taxable: true,
-    jobberItemName: '4Bed 3Bath MoveIn - Post Construction Cleaning',
-    description: 'Full new build or renovation detailed turnover. Multiple full bathrooms, kitchen millwork wipe down, baseboards, floor wash.',
+    jobberItemName: '3Bed 2.5Bath MoveIn - Post Construction Clean',
+    description: "Detailed post-construction drywall dust scrubbing and turnkey move-in detailing",
+    status: 'Active',
     isActive: true,
-    sortOrder: 270,
+    sortOrder: 190,
   },
 
-  // ── 5. RECURRING MAINTENANCE TIERS ──
+  // ── 5. ADD-ON LINE ITEMS (Matches Jobber screenshot exactly!) ──
   {
-    id: 'cat-rec-biweekly-2b',
-    category: 'RECURRING',
-    categoryLabel: 'Bi-Weekly Recurring Residential Clean',
-    name: 'Bi-Weekly Maintenance Clean (2 Bed / 2 Bath)',
-    shortName: 'Bi-Weekly 2 Bed / 2 Bath',
-    serviceType: 'Recurring Cleaning',
-    bedrooms: '2 Bedrooms',
-    bathrooms: '2 Bathrooms',
-    baseHours: 2.0,
+    id: 'addon-fuel',
+    category: 'ADD_ON',
+    categoryLabel: 'Add-on Services',
+    name: 'Fuel Surcharge 2',
+    shortName: 'Fuel Surcharge 2',
+    serviceType: 'Add-on',
+    quantity: 1.0,
+    unitPrice: 12.50,
+    total: 12.50,
+    basePrice: 12.50,
+    baseHours: 0,
     cleanersCount: 1,
-    basePrice: 165.00,
-    depositRequired: 0.00,
-    taxable: true,
-    jobberItemName: 'Bi-Weekly Recurring Residential Clean (2 Bed)',
-    description: 'Recurring bi-weekly maintenance cleaning. Consistent cleaner assigned, high priority rotation, automatic card-on-file billing.',
+    depositRequired: 0,
+    taxable: false,
+    jobberItemName: 'Fuel Surcharge 2',
+    description: 'Fuel Surcharge 2',
+    isAddon: true,
+    status: 'Active',
     isActive: true,
-    sortOrder: 280,
+    sortOrder: 200,
   },
   {
-    id: 'cat-rec-biweekly-3b',
-    category: 'RECURRING',
-    categoryLabel: 'Bi-Weekly Recurring Residential Clean',
-    name: 'Bi-Weekly Maintenance Clean (3 Bed / 2.5 Bath)',
-    shortName: 'Bi-Weekly 3 Bed / 2.5 Bath',
-    serviceType: 'Recurring Cleaning',
-    bedrooms: '3 Bedrooms',
-    bathrooms: '2.5 Bathrooms',
-    baseHours: 2.5,
+    id: 'addon-discount-10',
+    category: 'ADD_ON',
+    categoryLabel: 'Add-on Services',
+    name: 'Discount $10 Facebook Ad',
+    shortName: 'Discount $10 FB Promo',
+    serviceType: 'Add-on',
+    quantity: 1.0,
+    unitPrice: -10.00,
+    total: -10.00,
+    basePrice: -10.00,
+    baseHours: 0,
     cleanersCount: 1,
-    basePrice: 195.00,
-    depositRequired: 0.00,
-    taxable: true,
-    jobberItemName: 'Bi-Weekly Recurring Residential Clean (3 Bed)',
-    description: 'Bi-weekly scheduled home maintenance. 3 bedrooms, 2.5 bathrooms, kitchen scrub, vacuuming, mopping, trash removal.',
+    depositRequired: 0,
+    taxable: false,
+    jobberItemName: 'Discount $10 Facebook Ad',
+    description: 'Discount $10 Facebook Ad Promo',
+    isAddon: true,
+    status: 'Active',
     isActive: true,
-    sortOrder: 290,
+    sortOrder: 210,
   },
-  {
-    id: 'cat-rec-biweekly-4b',
-    category: 'RECURRING',
-    categoryLabel: 'Bi-Weekly Recurring Residential Clean',
-    name: 'Bi-Weekly Maintenance Clean (4 Bed / 3 Bath)',
-    shortName: 'Bi-Weekly 4 Bed / 3 Bath',
-    serviceType: 'Recurring Cleaning',
-    bedrooms: '4 Bedrooms',
-    bathrooms: '3 Bathrooms',
-    baseHours: 3.0,
-    cleanersCount: 1,
-    basePrice: 245.00,
-    depositRequired: 0.00,
-    taxable: true,
-    jobberItemName: 'Bi-Weekly Recurring Residential Clean (4 Bed)',
-    description: 'Regular recurring bi-weekly home detail for 4 Bed / 3 Bath property. Full sanitization and maintenance.',
-    isActive: true,
-    sortOrder: 300,
-  },
-
-  // ── 6. HOURLY CREW RATES ──
-  {
-    id: 'cat-hr-1cleaner',
-    category: 'HOURLY',
-    categoryLabel: 'Hourly Crew Rates',
-    name: 'Standard Hourly Rate (1 Cleaner @ $52.50/hr)',
-    shortName: '1 Cleaner @ $52.50/hr',
-    serviceType: 'Standard Cleaning',
-    baseHours: 1.0,
-    cleanersCount: 1,
-    basePrice: 52.50,
-    depositRequired: 50.00,
-    taxable: true,
-    jobberItemName: 'Solo Cleaner Hourly Rate ($52.50/hr)',
-    description: 'Billed per labor hour for 1 professional cleaner with all eco-friendly supplies and commercial vacuum equipment.',
-    isActive: true,
-    sortOrder: 310,
-  },
-  {
-    id: 'cat-hr-2cleaners',
-    category: 'HOURLY',
-    categoryLabel: 'Hourly Crew Rates',
-    name: 'Tandem Crew Rate (2 Cleaners @ $105.00/hr)',
-    shortName: '2 Cleaners @ $105.00/hr',
-    serviceType: 'Deep Cleaning',
-    baseHours: 1.0,
-    cleanersCount: 2,
-    basePrice: 105.00,
-    depositRequired: 50.00,
-    taxable: true,
-    jobberItemName: 'Tandem Crew Hourly Rate ($105.00/hr)',
-    description: 'Billed per clock hour for a 2-cleaner tandem crew (provides 2 person-hours per clock hour of service).',
-    isActive: true,
-    sortOrder: 320,
-  },
-
-  // ── 7. ADD-ON SERVICES CATALOG ──
   {
     id: 'addon-oven',
     category: 'ADD_ON',
@@ -663,16 +591,20 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     name: 'Inside Oven Deep Cleaning',
     shortName: 'Inside Oven',
     serviceType: 'Add-on',
+    quantity: 1.0,
+    unitPrice: 45.00,
+    total: 45.00,
+    basePrice: 45.00,
     baseHours: 0.75,
     cleanersCount: 1,
-    basePrice: 45.00,
-    depositRequired: 0.00,
+    depositRequired: 0,
     taxable: true,
-    jobberItemName: 'Inside Oven Cleaning',
-    description: 'Degrease and scrub inside of oven, racks, interior glass door, and bottom heating elements.',
+    jobberItemName: 'Inside Oven Deep Cleaning',
+    description: 'Degrease and scrub inside of oven, racks, interior glass door, and heating elements.',
     isAddon: true,
+    status: 'Active',
     isActive: true,
-    sortOrder: 400,
+    sortOrder: 220,
   },
   {
     id: 'addon-fridge',
@@ -681,16 +613,20 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     name: 'Inside Refrigerator & Freezer Deep Clean',
     shortName: 'Inside Fridge',
     serviceType: 'Add-on',
+    quantity: 1.0,
+    unitPrice: 45.00,
+    total: 45.00,
+    basePrice: 45.00,
     baseHours: 0.75,
     cleanersCount: 1,
-    basePrice: 45.00,
-    depositRequired: 0.00,
+    depositRequired: 0,
     taxable: true,
-    jobberItemName: 'Inside Refrigerator Sanitization',
-    description: 'Remove shelves & crispers, wash, sanitize interior walls, wipe seals, and replace items neatly.',
+    jobberItemName: 'Inside Refrigerator & Freezer Deep Clean',
+    description: 'Wash and sanitize shelves, crispers, door seals, and wipe interior walls.',
     isAddon: true,
+    status: 'Active',
     isActive: true,
-    sortOrder: 410,
+    sortOrder: 230,
   },
   {
     id: 'addon-cabinets',
@@ -699,16 +635,20 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     name: 'Inside Kitchen Cabinets & Drawers Detail',
     shortName: 'Inside Cabinets',
     serviceType: 'Add-on',
+    quantity: 1.0,
+    unitPrice: 55.00,
+    total: 55.00,
+    basePrice: 55.00,
     baseHours: 1.0,
     cleanersCount: 1,
-    basePrice: 55.00,
-    depositRequired: 0.00,
+    depositRequired: 0,
     taxable: true,
-    jobberItemName: 'Inside Cabinets & Drawers Cleaning',
+    jobberItemName: 'Inside Kitchen Cabinets & Drawers Detail',
     description: 'Vacuum crumbs and wipe down inside shelves and drawers throughout the kitchen.',
     isAddon: true,
+    status: 'Active',
     isActive: true,
-    sortOrder: 420,
+    sortOrder: 240,
   },
   {
     id: 'addon-baseboards',
@@ -717,16 +657,20 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     name: 'Baseboards Hand-Scrub & Detail',
     shortName: 'Baseboards Detail',
     serviceType: 'Add-on',
+    quantity: 1.0,
+    unitPrice: 60.00,
+    total: 60.00,
+    basePrice: 60.00,
     baseHours: 1.0,
     cleanersCount: 1,
-    basePrice: 60.00,
-    depositRequired: 0.00,
+    depositRequired: 0,
     taxable: true,
-    jobberItemName: 'Baseboards Hand-Scrub & Wipe',
-    description: 'Detailed hand wipe and scrub of baseboards throughout the entire home to remove scuffs and dust.',
+    jobberItemName: 'Baseboards Hand-Scrub & Detail',
+    description: 'Detailed hand wipe and scrub of baseboards throughout the entire home to remove scuffs.',
     isAddon: true,
+    status: 'Active',
     isActive: true,
-    sortOrder: 430,
+    sortOrder: 250,
   },
   {
     id: 'addon-windows',
@@ -735,52 +679,42 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     name: 'Interior Windows & Tracks (Up to 10 Panes)',
     shortName: 'Interior Windows',
     serviceType: 'Add-on',
+    quantity: 1.0,
+    unitPrice: 50.00,
+    total: 50.00,
+    basePrice: 50.00,
     baseHours: 1.0,
     cleanersCount: 1,
-    basePrice: 50.00,
-    depositRequired: 0.00,
+    depositRequired: 0,
     taxable: true,
-    jobberItemName: 'Interior Window Panes & Sills Clean',
+    jobberItemName: 'Interior Windows & Tracks (Up to 10 Panes)',
     description: 'Squeegee and polish interior window glass, vacuum and wipe window tracks and sills.',
     isAddon: true,
+    status: 'Active',
     isActive: true,
-    sortOrder: 440,
+    sortOrder: 260,
   },
   {
-    id: 'addon-basement-living',
+    id: 'addon-basement',
     category: 'ADD_ON',
     categoryLabel: 'Add-on Services',
     name: 'Finished Basement Living Area',
-    shortName: 'Basement Area',
+    shortName: 'Basement Living Area',
     serviceType: 'Add-on',
+    quantity: 1.0,
+    unitPrice: 85.00,
+    total: 85.00,
+    basePrice: 85.00,
     baseHours: 1.5,
     cleanersCount: 1,
-    basePrice: 85.00,
-    depositRequired: 0.00,
+    depositRequired: 0,
     taxable: true,
-    jobberItemName: 'Basement Living Space Cleaning',
-    description: 'Clean finished basement family room, rec space, dust surfaces, vacuum carpets, and mop hard floors.',
+    jobberItemName: 'Finished Basement Living Area',
+    description: 'Dust surfaces, vacuum carpets, mop floors, clean living/rec area.',
     isAddon: true,
+    status: 'Active',
     isActive: true,
-    sortOrder: 450,
-  },
-  {
-    id: 'addon-basement-suite',
-    category: 'ADD_ON',
-    categoryLabel: 'Add-on Services',
-    name: 'Full Basement Suite (Kitchenette + Bath)',
-    shortName: 'Basement Suite',
-    serviceType: 'Add-on',
-    baseHours: 2.0,
-    cleanersCount: 1,
-    basePrice: 125.00,
-    depositRequired: 25.00,
-    taxable: true,
-    jobberItemName: 'Basement Suite Complete Detail',
-    description: 'Complete clean of basement rental or mother-in-law suite including kitchen/wet bar and full bathroom.',
-    isAddon: true,
-    isActive: true,
-    sortOrder: 460,
+    sortOrder: 270,
   },
   {
     id: 'addon-pet-hair',
@@ -789,309 +723,372 @@ export const CANONICAL_SERVICE_CATALOG: ServiceCatalogItem[] = [
     name: 'Pet Hair & Heavy Dander Detail Treatment',
     shortName: 'Pet Hair Detail',
     serviceType: 'Add-on',
-    baseHours: 0.5,
-    cleanersCount: 1,
+    quantity: 1.0,
+    unitPrice: 35.00,
+    total: 35.00,
     basePrice: 35.00,
-    depositRequired: 0.00,
-    taxable: true,
-    jobberItemName: 'Pet Hair & Dander Sanitizer Treatment',
-    description: 'Specialized rubber squeegee carpet raking and pet-safe botanical enzyme sanitizer application.',
-    isAddon: true,
-    isActive: true,
-    sortOrder: 470,
-  },
-  {
-    id: 'addon-blinds',
-    category: 'ADD_ON',
-    categoryLabel: 'Add-on Services',
-    name: 'Blinds Hand-Dusting & Wipe (Per Room)',
-    shortName: 'Blinds Detail',
-    serviceType: 'Add-on',
     baseHours: 0.5,
     cleanersCount: 1,
-    basePrice: 40.00,
-    depositRequired: 0.00,
+    depositRequired: 0,
     taxable: true,
-    jobberItemName: 'Horizontal / Faux-Wood Blinds Detail',
-    description: 'Hand dusting and microfiber wiping of horizontal slats on faux-wood or vinyl window blinds.',
+    jobberItemName: 'Pet Hair & Heavy Dander Detail Treatment',
+    description: 'Rubber squeegee carpet raking and pet-safe enzyme sanitizer application.',
     isAddon: true,
+    status: 'Active',
     isActive: true,
-    sortOrder: 480,
+    sortOrder: 280,
+  },
+
+  // ── 6. HOURLY RATES ──
+  {
+    id: 'cat-hr-1cleaner',
+    category: 'HOURLY',
+    categoryLabel: 'Hourly Crew Rates',
+    name: 'Solo Cleaner Hourly Rate ($52.50/hr)',
+    shortName: '1 Cleaner @ $52.50/hr',
+    serviceType: 'Standard Cleaning',
+    quantity: 1.0,
+    unitPrice: 52.50,
+    total: 52.50,
+    basePrice: 52.50,
+    baseHours: 1.0,
+    cleanersCount: 1,
+    depositRequired: 50.00,
+    taxable: true,
+    jobberItemName: 'Solo Cleaner Hourly Rate ($52.50/hr)',
+    description: 'Billed per labor hour for 1 professional cleaner with eco supplies and equipment.',
+    status: 'Active',
+    isActive: true,
+    sortOrder: 290,
   },
   {
-    id: 'addon-balcony',
-    category: 'ADD_ON',
-    categoryLabel: 'Add-on Services',
-    name: 'Balcony / Patio Sweep & Glass Clean',
-    shortName: 'Balcony Sweep',
-    serviceType: 'Add-on',
-    baseHours: 0.5,
-    cleanersCount: 1,
-    basePrice: 35.00,
-    depositRequired: 0.00,
+    id: 'cat-hr-2cleaners',
+    category: 'HOURLY',
+    categoryLabel: 'Hourly Crew Rates',
+    name: 'Tandem Crew Rate (2 Cleaners @ $105.00/hr)',
+    shortName: '2 Cleaners @ $105.00/hr',
+    serviceType: 'Deep Cleaning',
+    quantity: 1.0,
+    unitPrice: 105.00,
+    total: 105.00,
+    basePrice: 105.00,
+    baseHours: 1.0,
+    cleanersCount: 2,
+    depositRequired: 50.00,
     taxable: true,
-    jobberItemName: 'Balcony / Deck Sweep & Sliding Glass Door',
-    description: 'Sweep exterior debris, wipe railings, and clean exterior of sliding patio glass doors.',
-    isAddon: true,
+    jobberItemName: 'Tandem Crew Rate (2 Cleaners @ $105.00/hr)',
+    description: 'Billed per clock hour for a 2-cleaner tandem crew (provides 2 person-hours per clock hour).',
+    status: 'Active',
     isActive: true,
-    sortOrder: 490,
-  },
-  {
-    id: 'addon-fuel',
-    category: 'ADD_ON',
-    categoryLabel: 'Add-on Services',
-    name: 'Fuel & Greater Edmonton Dispatch Surcharge',
-    shortName: 'Fuel Surcharge',
-    serviceType: 'Add-on',
-    baseHours: 0,
-    cleanersCount: 1,
-    basePrice: 12.50,
-    depositRequired: 0.00,
-    taxable: false,
-    jobberItemName: 'Fuel & Mobile Dispatch Surcharge',
-    description: 'Standard mobile van deployment, transit insurance, and equipment sanitization fee.',
-    isAddon: true,
-    isActive: true,
-    sortOrder: 500,
+    sortOrder: 300,
   },
 ];
 
 /**
- * Finds the most relevant Service Catalog item for a given service name, bedrooms, and bathrooms.
+ * Parses spreadsheet array buffer (Excel .xlsx, .xls, .csv, .tsv) using SheetJS XLSX
  */
-export function matchCatalogItem(
-  serviceQuery: string,
-  bedrooms?: string,
-  bathrooms?: string,
-  catalog: ServiceCatalogItem[] = CANONICAL_SERVICE_CATALOG
-): ServiceCatalogItem | null {
-  const normSvc = (serviceQuery || '').toLowerCase();
-  const normBed = (bedrooms || '').toLowerCase();
-  const normBath = (bathrooms || '').toLowerCase();
-
-  // 1. Direct match by service + bed + bath
-  const exact = catalog.find((item) => {
-    if (!item.isActive) return false;
-    const sameBed = normBed ? (item.bedrooms || '').toLowerCase() === normBed : true;
-    const sameBath = normBath ? (item.bathrooms || '').toLowerCase() === normBath : true;
-    const matchType =
-      normSvc.includes('move') && item.category === 'MOVE_OUT'
-        ? true
-        : normSvc.includes('deep') && item.category === 'DEEP_CLEAN'
-        ? true
-        : normSvc.includes('post') && item.category === 'POST_CONSTRUCTION'
-        ? true
-        : (normSvc.includes('basic') || normSvc.includes('standard')) && item.category === 'STANDARD_CLEAN'
-        ? true
-        : normSvc.includes('bi-weekly') && item.category === 'RECURRING'
-        ? true
-        : false;
-
-    return matchType && sameBed && sameBath;
-  });
-
-  if (exact) return exact;
-
-  // 2. Fuzzy match on item name or shortName containing bed and bath
-  if (normBed || normBath) {
-    const bedDigit = normBed.match(/\d+/)?.[0];
-    const bathDigit = normBath.match(/\d+(\.\d+)?/)?.[0];
-
-    const digitMatch = catalog.find((item) => {
-      if (!item.isActive) return false;
-      const itemBedDigit = (item.bedrooms || '').match(/\d+/)?.[0];
-      const itemBathDigit = (item.bathrooms || '').match(/\d+(\.\d+)?/)?.[0];
-      const categoryMatch =
-        normSvc.includes('move') && item.category === 'MOVE_OUT'
-          ? true
-          : normSvc.includes('deep') && item.category === 'DEEP_CLEAN'
-          ? true
-          : normSvc.includes('post') && item.category === 'POST_CONSTRUCTION'
-          ? true
-          : normSvc.includes('basic') && item.category === 'STANDARD_CLEAN';
-
-      return categoryMatch && (!bedDigit || itemBedDigit === bedDigit) && (!bathDigit || itemBathDigit === bathDigit);
-    });
-
-    if (digitMatch) return digitMatch;
-  }
-
-  // 3. Fallback to category default
-  if (normSvc.includes('move')) {
-    return catalog.find((item) => item.id === 'cat-mo-3b2b-std') || catalog[0];
-  }
-  if (normSvc.includes('deep')) {
-    return catalog.find((item) => item.id === 'cat-dc-3b2b') || catalog[10];
-  }
-  if (normSvc.includes('post')) {
-    return catalog.find((item) => item.id === 'cat-pc-3b25b') || catalog[20];
-  }
-  if (normSvc.includes('basic') || normSvc.includes('standard')) {
-    return catalog.find((item) => item.id === 'cat-sc-3b2b') || catalog[15];
-  }
-
-  return null;
+export function parseSpreadsheetBuffer(buffer: ArrayBuffer | Uint8Array): {
+  headers: string[];
+  rows: any[][];
+  rawText: string;
+} {
+  const workbook = XLSX.read(buffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0] || 'Sheet1';
+  const worksheet = workbook.Sheets[firstSheetName];
+  const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+  const rawText = XLSX.utils.sheet_to_csv(worksheet, { FS: '\t' });
+  const headers = rows.length > 0 ? rows[0].map((h) => String(h || '').trim()) : [];
+  return { headers, rows, rawText };
 }
 
 /**
- * Intelligent parser that can take ANY user-provided price list text,
- * whether from email, spreadsheet, CSV, tab-delimited, or bulleted list,
- * and extract structured ServiceCatalogItem records.
+ * Parses user price list text, CSV, TSV, or spreadsheet rows.
+ * Explicitly supports the user's canonical spreadsheet columns:
+ * SERVICE NAME/JOBBER LINE ITEM | CATEGORY | BEDS | BATHS | QUANTITY | UNIT PRICE (CAD) | TOTAL (CAD) | STATUS | ACTIVE?
  */
-export function parsePastedPriceList(rawText: string): ServiceCatalogItem[] {
-  if (!rawText || !rawText.trim()) return [];
+export function parsePastedPriceList(
+  input: string | any[][],
+  existingCatalog: ServiceCatalogItem[] = CANONICAL_SERVICE_CATALOG
+): ServiceCatalogItem[] {
+  let rawRows: string[][] = [];
 
-  const text = rawText.trim();
+  if (Array.isArray(input)) {
+    rawRows = input
+      .filter((r) => Array.isArray(r) && r.some((c) => String(c || '').trim().length > 0))
+      .map((r) => r.map((c) => String(c ?? '').trim()));
+  } else if (typeof input === 'string') {
+    const lines = input.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return [];
 
-  // Try JSON parsing first
-  if (text.startsWith('[') && text.endsWith(']')) {
-    try {
-      const parsed = JSON.parse(text);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((item, idx) => ({
-          id: item.id || `custom-cat-${Date.now()}-${idx}`,
-          category: item.category || 'STANDARD_CLEAN',
-          categoryLabel: item.categoryLabel || item.category || 'Custom Pricing',
-          name: item.name || item.title || item.description || `Service Item #${idx + 1}`,
-          shortName: item.shortName || item.name || `Item ${idx + 1}`,
-          serviceType: item.serviceType || 'Standard Cleaning',
-          bedrooms: item.bedrooms,
-          bathrooms: item.bathrooms,
-          baseHours: Number(item.baseHours || item.hours) || 3.0,
-          cleanersCount: Number(item.cleanersCount || item.cleaners) || 1,
-          basePrice: Number(item.basePrice || item.price || item.total) || 200,
-          depositRequired: Number(item.depositRequired || item.deposit) || 50,
-          taxable: item.taxable !== false,
-          jobberItemName: item.jobberItemName || item.name,
-          description: item.description || item.name,
-          isAddon: Boolean(item.isAddon),
-          isActive: true,
-          sortOrder: idx * 10,
-        }));
+    // Detect delimiter: tab or comma
+    for (const line of lines) {
+      if (line.includes('\t')) {
+        rawRows.push(line.split('\t').map((c) => c.trim().replace(/^["']|["']$/g, '')));
+      } else if (line.includes(',')) {
+        // Simple CSV parse handling quotes
+        const match = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+        if (match && match.length > 1) {
+          rawRows.push(match.map((c) => c.trim().replace(/^["']|["']$/g, '')));
+        } else {
+          rawRows.push(line.split(',').map((c) => c.trim().replace(/^["']|["']$/g, '')));
+        }
+      } else {
+        rawRows.push([line]);
       }
-    } catch {
-      // Continue to line-by-line parsing
     }
   }
 
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+  if (rawRows.length === 0) return [];
+
+  // Check if first row is a header row
+  let headerIndex = -1;
+  let colServiceName = 0;
+  let colCategory = -1;
+  let colBeds = -1;
+  let colBaths = -1;
+  let colQuantity = -1;
+  let colUnitPrice = -1;
+  let colTotal = -1;
+  let colStatus = -1;
+  let colActive = -1;
+
+  for (let r = 0; r < Math.min(5, rawRows.length); r++) {
+    const row = rawRows[r];
+    const joined = row.join(' ').toLowerCase();
+    if (
+      joined.includes('service') ||
+      joined.includes('item') ||
+      joined.includes('unit price') ||
+      joined.includes('quantity') ||
+      joined.includes('total') ||
+      joined.includes('category')
+    ) {
+      headerIndex = r;
+      // Map columns
+      row.forEach((col, idx) => {
+        const c = col.toLowerCase().trim();
+        if (/service\s*name|jobber\s*line\s*item|line\s*item|^service$|^name$/i.test(c)) {
+          colServiceName = idx;
+        } else if (/category|cat|^type$/i.test(c)) {
+          colCategory = idx;
+        } else if (/^beds?$|bedroom/i.test(c)) {
+          colBeds = idx;
+        } else if (/^baths?$|bathroom/i.test(c)) {
+          colBaths = idx;
+        } else if (/quantity|qty|units|^hours$/i.test(c)) {
+          colQuantity = idx;
+        } else if (/unit\s*price|rate|price\/hr|unit_price/i.test(c)) {
+          colUnitPrice = idx;
+        } else if (/^total|total\s*\(cad\)|total_price/i.test(c)) {
+          colTotal = idx;
+        } else if (/^status$/i.test(c)) {
+          colStatus = idx;
+        } else if (/active|active\?|is_active/i.test(c)) {
+          colActive = idx;
+        }
+      });
+      break;
+    }
+  }
+
+  const dataRows = headerIndex !== -1 ? rawRows.slice(headerIndex + 1) : rawRows;
   const items: ServiceCatalogItem[] = [];
 
-  let currentCategory: ServiceCatalogItem['category'] = 'STANDARD_CLEAN';
-  let currentCategoryLabel = 'General Cleaning Services';
+  let currentCategory: ServiceCatalogItem['category'] = 'MOVE_OUT';
+  let currentCategoryLabel = 'Move-Out Cleaning 2026';
 
-  for (let idx = 0; idx < lines.length; idx++) {
-    const line = lines[idx];
+  dataRows.forEach((row, idx) => {
+    if (!row || row.length === 0) return;
+    const firstCell = String(row[0] || '').trim();
+    if (!firstCell) return;
 
-    // Check for section header like "=== MOVE OUT CLEANING ===" or "Deep Cleaning:"
-    if (
-      line.startsWith('#') ||
-      line.startsWith('===') ||
-      line.startsWith('---') ||
-      (!line.match(/\$|\b\d+(\.\d{2})?\b/) && line.endsWith(':'))
-    ) {
-      const cleanHeader = line.replace(/[#=\-:*]/g, '').trim().toLowerCase();
-      if (cleanHeader.includes('move out') || cleanHeader.includes('move-out') || cleanHeader.includes('moveout')) {
+    // Detect section header rows if single cell
+    if (row.length === 1 && (firstCell.startsWith('#') || firstCell.endsWith(':') || firstCell.toUpperCase() === firstCell)) {
+      const cleanHeader = firstCell.toLowerCase();
+      if (cleanHeader.includes('move') || cleanHeader.includes('turnover')) {
         currentCategory = 'MOVE_OUT';
-        currentCategoryLabel = 'Move-Out Cleaning';
+        currentCategoryLabel = 'Move-Out Cleaning 2026';
       } else if (cleanHeader.includes('deep')) {
         currentCategory = 'DEEP_CLEAN';
-        currentCategoryLabel = 'Deep Cleaning Services';
+        currentCategoryLabel = 'Deep Cleaning Services 2026';
       } else if (cleanHeader.includes('post') || cleanHeader.includes('construction')) {
         currentCategory = 'POST_CONSTRUCTION';
         currentCategoryLabel = 'MoveIn - Post Construction';
-      } else if (cleanHeader.includes('add') || cleanHeader.includes('extra')) {
+      } else if (cleanHeader.includes('add') || cleanHeader.includes('surcharge')) {
         currentCategory = 'ADD_ON';
         currentCategoryLabel = 'Add-on Services';
-      } else if (cleanHeader.includes('recur') || cleanHeader.includes('bi-weekly')) {
-        currentCategory = 'RECURRING';
-        currentCategoryLabel = 'Bi-Weekly Recurring Residential Clean';
       } else if (cleanHeader.includes('hour') || cleanHeader.includes('rate')) {
         currentCategory = 'HOURLY';
         currentCategoryLabel = 'Hourly Crew Rates';
-      } else {
-        currentCategory = 'STANDARD_CLEAN';
-        currentCategoryLabel = line.replace(/[#=\-:*]/g, '').trim();
+      } else if (cleanHeader.includes('recur') || cleanHeader.includes('bi-weekly')) {
+        currentCategory = 'RECURRING';
+        currentCategoryLabel = 'Bi-Weekly Recurring Residential Clean';
       }
-      continue;
+      return;
     }
 
-    // Try CSV or TSV splitting: Name, Price, [Hours], [Category], [Bed], [Bath]
-    const delimiter = line.includes('\t') ? '\t' : line.includes(',') ? ',' : null;
-    let name = line;
-    let price = 0;
-    let hours = 3.0;
+    let serviceName = '';
+    let categoryStr = '';
+    let bedsStr = '';
+    let bathsStr = '';
+    let quantityNum: number | undefined;
+    let unitPriceNum: number | undefined;
+    let totalNum: number | undefined;
+    let statusStr = 'Active';
+    let isActiveBool = true;
 
-    // Price extraction: look for $XXX or XXX.XX
-    const priceMatch = line.match(/\$\s*(\d+(?:\.\d{1,2})?)/) || line.match(/\b(\d+(?:\.\d{2}))\b/);
-    if (priceMatch) {
-      price = parseFloat(priceMatch[1]);
-    }
-
-    if (delimiter) {
-      const cols = line.split(delimiter).map((c) => c.trim().replace(/^["']|["']$/g, ''));
-      if (cols.length >= 2) {
-        name = cols[0];
-        const colPrice = parseFloat(cols[1].replace(/[^\d.]/g, ''));
-        if (!isNaN(colPrice) && colPrice > 0) price = colPrice;
-        if (cols[2]) {
-          const colHours = parseFloat(cols[2].replace(/[^\d.]/g, ''));
-          if (!isNaN(colHours) && colHours > 0) hours = colHours;
-        }
+    if (headerIndex !== -1) {
+      // Structured column extraction based on matched headers
+      serviceName = (row[colServiceName] || '').trim();
+      if (colCategory !== -1 && row[colCategory]) categoryStr = row[colCategory].trim();
+      if (colBeds !== -1 && row[colBeds]) bedsStr = row[colBeds].trim();
+      if (colBaths !== -1 && row[colBaths]) bathsStr = row[colBaths].trim();
+      if (colQuantity !== -1 && row[colQuantity]) {
+        const qParsed = parseFloat(String(row[colQuantity]).replace(/[^\d.-]/g, ''));
+        if (!isNaN(qParsed)) quantityNum = qParsed;
+      }
+      if (colUnitPrice !== -1 && row[colUnitPrice]) {
+        const upParsed = parseFloat(String(row[colUnitPrice]).replace(/[^\d.-]/g, ''));
+        if (!isNaN(upParsed)) unitPriceNum = upParsed;
+      }
+      if (colTotal !== -1 && row[colTotal]) {
+        const tParsed = parseFloat(String(row[colTotal]).replace(/[^\d.-]/g, ''));
+        if (!isNaN(tParsed)) totalNum = tParsed;
+      }
+      if (colStatus !== -1 && row[colStatus]) statusStr = row[colStatus].trim();
+      if (colActive !== -1 && row[colActive]) {
+        const aVal = row[colActive].toLowerCase().trim();
+        isActiveBool = aVal === 'yes' || aVal === 'true' || aVal === '1' || aVal === 'y';
+      }
+    } else if (row.length >= 4) {
+      // Direct positional mapping if user pastes without headers:
+      // [0] Name, [1] Category, [2] Beds, [3] Baths, [4] Quantity, [5] Unit Price, [6] Total
+      serviceName = row[0].trim();
+      categoryStr = row[1]?.trim() || '';
+      bedsStr = row[2]?.trim() || '';
+      bathsStr = row[3]?.trim() || '';
+      if (row[4]) {
+        const qp = parseFloat(String(row[4]).replace(/[^\d.-]/g, ''));
+        if (!isNaN(qp)) quantityNum = qp;
+      }
+      if (row[5]) {
+        const upp = parseFloat(String(row[5]).replace(/[^\d.-]/g, ''));
+        if (!isNaN(upp)) unitPriceNum = upp;
+      }
+      if (row[6]) {
+        const tp = parseFloat(String(row[6]).replace(/[^\d.-]/g, ''));
+        if (!isNaN(tp)) totalNum = tp;
       }
     } else {
-      // Plain text like: "3 Bed / 2 Bath Move Out: $325" or "Inside Oven - $45"
-      name = line.replace(/\s*[-:—]\s*\$\s*\d+(\.\d{1,2})?.*$/i, '').trim();
+      // 2 or 3 columns: Name, Price, [Hours/Qty]
+      serviceName = row[0].trim();
+      if (row[1]) {
+        const p1 = parseFloat(String(row[1]).replace(/[^\d.-]/g, ''));
+        if (!isNaN(p1)) totalNum = p1;
+      }
+      if (row[2]) {
+        const p2 = parseFloat(String(row[2]).replace(/[^\d.-]/g, ''));
+        if (!isNaN(p2)) quantityNum = p2;
+      }
     }
 
-    if (price <= 0) continue; // Skip lines with no price
+    // Freeform regex fallback for text lines like: "2 Bed 2 Bath Moveout: $315 (3.0 hrs @ $105)"
+    if (!serviceName && row.length === 1) {
+      serviceName = row[0].replace(/\s*[-:—]\s*\$?\s*\d+(\.\d{1,2})?.*$/i, '').trim();
+    }
+    if (unitPriceNum === undefined && totalNum === undefined) {
+      const fullLine = row.join(' ');
+      const priceMatch = fullLine.match(/\$\s*(-?\d+(?:\.\d{1,2})?)/);
+      if (priceMatch) {
+        totalNum = parseFloat(priceMatch[1]);
+      }
+    }
 
-    // Extract bedrooms and bathrooms
-    const bedMatch = line.match(/(\d+)\s*(?:bed|bedroom)/i);
-    const bathMatch = line.match(/(\d+(?:\.5)?)\s*(?:bath|bathroom)/i);
+    // Bed / Bath extraction from service name if missing
+    if (!bedsStr) {
+      const bm = serviceName.match(/(\d+)\s*(?:bed|bedroom)/i);
+      if (bm) bedsStr = `${bm[1]} Bedroom${bm[1] === '1' ? '' : 's'}`;
+    }
+    if (!bathsStr) {
+      const btm = serviceName.match(/(\d+(?:\.5)?)\s*(?:bath|bathroom)/i);
+      if (btm) bathsStr = `${btm[1]} Bathroom${btm[1] === '1' ? '' : 's'}`;
+    }
 
-    const bedrooms = bedMatch ? `${bedMatch[1]} Bedroom${bedMatch[1] === '1' ? '' : 's'}` : undefined;
-    const bathrooms = bathMatch ? `${bathMatch[1]} Bathroom${bathMatch[1] === '1' ? '' : 's'}` : undefined;
+    // Resolve mathematical relationships: Quantity, Unit Price, Total
+    let finalQuantity = quantityNum !== undefined && quantityNum > 0 ? quantityNum : 1.0;
+    let finalUnitPrice = unitPriceNum !== undefined ? unitPriceNum : 0;
+    let finalTotal = totalNum !== undefined ? totalNum : 0;
 
-    // Determine category if not explicitly in header
+    if (unitPriceNum !== undefined && totalNum !== undefined && (quantityNum === undefined || quantityNum <= 0)) {
+      finalQuantity = unitPriceNum !== 0 ? Math.round((totalNum / unitPriceNum) * 100) / 100 : 1.0;
+    } else if (quantityNum !== undefined && unitPriceNum !== undefined && totalNum === undefined) {
+      finalTotal = Math.round(quantityNum * unitPriceNum * 100) / 100;
+    } else if (quantityNum !== undefined && totalNum !== undefined && (unitPriceNum === undefined || unitPriceNum === 0)) {
+      finalUnitPrice = quantityNum !== 0 ? Math.round((totalNum / quantityNum) * 100) / 100 : totalNum;
+    } else if (totalNum !== undefined && unitPriceNum === undefined && quantityNum === undefined) {
+      finalQuantity = 1.0;
+      finalUnitPrice = totalNum;
+      finalTotal = totalNum;
+    } else if (unitPriceNum !== undefined && totalNum === undefined && quantityNum === undefined) {
+      finalQuantity = 1.0;
+      finalUnitPrice = unitPriceNum;
+      finalTotal = unitPriceNum;
+    }
+
+    // If still no valid price or name, skip line
+    if (!serviceName || (finalUnitPrice === 0 && finalTotal === 0 && finalQuantity === 0)) {
+      return;
+    }
+
+    // Determine category
     let category = currentCategory;
     let categoryLabel = currentCategoryLabel;
-    const lowerName = name.toLowerCase();
+    const lowerName = `${serviceName} ${categoryStr}`.toLowerCase();
 
     if (lowerName.includes('move out') || lowerName.includes('move-out') || lowerName.includes('moveout')) {
       category = 'MOVE_OUT';
-      categoryLabel = 'Move-Out Cleaning';
+      categoryLabel = 'Move-Out Cleaning 2026';
     } else if (lowerName.includes('deep')) {
       category = 'DEEP_CLEAN';
-      categoryLabel = 'Deep Cleaning Services';
-    } else if (lowerName.includes('post') || lowerName.includes('construction')) {
+      categoryLabel = 'Deep Cleaning Services 2026';
+    } else if (lowerName.includes('post') || lowerName.includes('construction') || lowerName.includes('movein') || lowerName.includes('move in')) {
       category = 'POST_CONSTRUCTION';
       categoryLabel = 'MoveIn - Post Construction';
     } else if (
+      lowerName.includes('fuel') ||
+      lowerName.includes('discount') ||
       lowerName.includes('oven') ||
       lowerName.includes('fridge') ||
       lowerName.includes('cabinet') ||
       lowerName.includes('baseboard') ||
       lowerName.includes('window') ||
       lowerName.includes('basement') ||
-      lowerName.includes('pet hair')
+      lowerName.includes('pet hair') ||
+      lowerName.includes('surcharge') ||
+      lowerName.includes('add-on') ||
+      lowerName.includes('addon')
     ) {
       category = 'ADD_ON';
       categoryLabel = 'Add-on Services';
-    } else if (lowerName.includes('hour') || lowerName.includes('/hr')) {
+    } else if (lowerName.includes('hour') || lowerName.includes('/hr') || lowerName.includes('crew rate')) {
       category = 'HOURLY';
       categoryLabel = 'Hourly Crew Rates';
+    } else if (lowerName.includes('recur') || lowerName.includes('bi-weekly')) {
+      category = 'RECURRING';
+      categoryLabel = 'Bi-Weekly Recurring Residential Clean';
+    } else if (categoryStr) {
+      categoryLabel = categoryStr;
     }
 
     const isAddon = category === 'ADD_ON';
-    const depositRequired = price >= 400 ? 125 : price >= 300 ? 100 : price >= 180 ? 50 : 0;
+    const depositRequired = finalTotal >= 400 ? 125 : finalTotal >= 300 ? 100 : finalTotal >= 180 ? 50 : 0;
 
     items.push({
-      id: `custom-cat-${Date.now()}-${idx}`,
+      id: `cat-import-${Date.now()}-${idx}`,
       category,
       categoryLabel,
-      name,
-      shortName: name.length > 35 ? `${name.slice(0, 32)}...` : name,
+      name: serviceName,
+      shortName: serviceName.length > 35 ? `${serviceName.slice(0, 32)}...` : serviceName,
       serviceType:
         category === 'MOVE_OUT'
           ? 'Move-Out Cleaning'
@@ -1101,21 +1098,94 @@ export function parsePastedPriceList(rawText: string): ServiceCatalogItem[] {
           ? 'Post-Construction Cleaning'
           : category === 'ADD_ON'
           ? 'Add-on'
+          : category === 'HOURLY'
+          ? 'Hourly Crew Rates' as any
           : 'Standard Cleaning',
-      bedrooms,
-      bathrooms,
-      baseHours: hours,
-      cleanersCount: price >= 400 ? 2 : 1,
-      basePrice: Math.round(price * 100) / 100,
+      bedrooms: bedsStr || undefined,
+      bathrooms: bathsStr || undefined,
+      beds: bedsStr || undefined,
+      baths: bathsStr || undefined,
+      quantity: finalQuantity,
+      unitPrice: finalUnitPrice,
+      total: finalTotal,
+      basePrice: finalTotal,
+      baseHours: finalQuantity,
+      cleanersCount: finalTotal >= 300 ? 2 : 1,
       depositRequired,
       taxable: true,
-      jobberItemName: name,
-      description: `${name}${bedrooms ? ` (${bedrooms}${bathrooms ? `, ${bathrooms}` : ''})` : ''} - Tidyups Cleaning Service`,
+      jobberItemName: serviceName,
+      description: `${serviceName}${bedsStr ? `\n${bedsStr}, ${bathsStr || ''}` : ''}\n${
+        finalTotal >= 300 ? '2 Pro Cleaners\nIncludes Fuel Surcharge' : 'Tidyups Cleaning Service'
+      }`,
       isAddon,
-      isActive: true,
+      status: statusStr || 'Active',
+      isActive: isActiveBool,
       sortOrder: (idx + 1) * 10,
     });
-  }
+  });
 
   return items;
+}
+
+/**
+ * Helper to match an item in the service catalog based on service type & bed/bath count
+ */
+export function matchCatalogItem(
+  serviceType: string,
+  bedrooms?: string,
+  bathrooms?: string,
+  catalog: ServiceCatalogItem[] = CANONICAL_SERVICE_CATALOG
+): ServiceCatalogItem | undefined {
+  if (!catalog || catalog.length === 0) return undefined;
+
+  const normService = (serviceType || '').toLowerCase();
+  const normBed = (bedrooms || '').toLowerCase();
+  const normBath = (bathrooms || '').toLowerCase();
+
+  // Extract bed & bath digits
+  const bedDigit = normBed.match(/\d+/)?.[0] || normService.match(/(\d+)\s*(?:bed|bedroom)/i)?.[1];
+  const bathDigit = normBath.match(/[\d.]+/)?.[0] || normService.match(/(\d+(?:\.5)?)\s*(?:bath|bathroom)/i)?.[1];
+
+  let targetCategory: ServiceCatalogItem['category'] = 'STANDARD_CLEAN';
+  if (normService.includes('move out') || normService.includes('move-out') || normService.includes('moveout')) {
+    targetCategory = 'MOVE_OUT';
+  } else if (normService.includes('deep')) {
+    targetCategory = 'DEEP_CLEAN';
+  } else if (normService.includes('post') || normService.includes('construction') || normService.includes('move in')) {
+    targetCategory = 'POST_CONSTRUCTION';
+  } else if (normService.includes('recur') || normService.includes('bi-weekly')) {
+    targetCategory = 'RECURRING';
+  } else if (normService.includes('hour') || normService.includes('/hr')) {
+    targetCategory = 'HOURLY';
+  }
+
+  // 1. Try exact match on category + bed digit + bath digit
+  if (bedDigit && bathDigit) {
+    const exact = catalog.find((item) => {
+      if (item.category !== targetCategory) return false;
+      const itemBed = (item.bedrooms || item.beds || item.name).toLowerCase();
+      const itemBath = (item.bathrooms || item.baths || item.name).toLowerCase();
+      return (
+        itemBed.includes(`${bedDigit} bed`) &&
+        (itemBath.includes(`${bathDigit} bath`) || itemBath.includes(`${bathDigit}bath`))
+      );
+    });
+    if (exact) return exact;
+  }
+
+  // 2. Try match on category + bed digit
+  if (bedDigit) {
+    const bedMatch = catalog.find((item) => {
+      if (item.category !== targetCategory) return false;
+      const itemBed = (item.bedrooms || item.beds || item.name).toLowerCase();
+      return itemBed.includes(`${bedDigit} bed`);
+    });
+    if (bedMatch) return bedMatch;
+  }
+
+  // 3. Fallback to first item in category
+  const catMatch = catalog.find((item) => item.category === targetCategory);
+  if (catMatch) return catMatch;
+
+  return catalog[0];
 }

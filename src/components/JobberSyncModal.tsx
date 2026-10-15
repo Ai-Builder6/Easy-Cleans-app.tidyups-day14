@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { JobberConfig, ServiceTicket } from '../types/dispatch';
 import { ticketToSheetRow, APP_LEAD_HEADERS, generateTsvRows, LEADS_SPREADSHEET_ID, APP_LEADS_TAB } from '../services/leadSheetSync';
+import { parseSpreadsheetBuffer } from '../data/serviceCatalogData';
 
 interface JobberSyncModalProps {
   isOpen: boolean;
@@ -84,9 +85,10 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
   const [isVerifyingToken, setIsVerifyingToken] = useState(false);
   const [tokenVerificationMsg, setTokenVerificationMsg] = useState<{ isValid: boolean; text: string } | null>(null);
 
-  // CSV Import state
+  // CSV / Spreadsheet Import state
   const [csvImportType, setCsvImportType] = useState<'visits' | 'quotes' | 'invoices'>('visits');
   const [csvInputText, setCsvInputText] = useState('');
+  const [attachedFile, setAttachedFile] = useState<{ name: string; sizeKb: string; type: string } | null>(null);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [csvImportFeedback, setCsvImportFeedback] = useState<{ success: boolean; text: string } | null>(null);
 
@@ -472,18 +474,36 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        setCsvInputText(content);
-        setCsvImportFeedback({ success: true, text: `Loaded file "${file.name}" (${(file.size / 1024).toFixed(1)} KB). Ready to import.` });
+    const sizeKb = (file.size / 1024).toFixed(1);
+
+    try {
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const { rawText } = parseSpreadsheetBuffer(arrayBuffer);
+        setCsvInputText(rawText);
+        setAttachedFile({ name: file.name, sizeKb, type: 'Excel Spreadsheet (.xlsx / .xls)' });
+        setCsvImportFeedback({
+          success: true,
+          text: `Loaded Excel file "${file.name}" (${sizeKb} KB). Converted sheets to text and ready to import.`,
+        });
+      } else {
+        const text = await file.text();
+        setCsvInputText(text);
+        setAttachedFile({ name: file.name, sizeKb, type: 'CSV / Text File' });
+        setCsvImportFeedback({
+          success: true,
+          text: `Loaded file "${file.name}" (${sizeKb} KB). Ready to import.`,
+        });
       }
-    };
-    reader.readAsText(file);
+    } catch (err: any) {
+      setCsvImportFeedback({
+        success: false,
+        text: `Error reading file "${file.name}": ${err.message || 'Invalid spreadsheet file'}`,
+      });
+    }
   };
 
   return (
@@ -948,27 +968,60 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                   </p>
                 </div>
 
-                {/* File Upload Selector */}
-                <div className="flex items-center justify-between gap-3 p-3 border border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100/70 transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600">
-                      <Upload className="w-4 h-4" />
+                {/* File Upload Selector & Persistent Attached Badge */}
+                {attachedFile ? (
+                  <div className="flex items-center justify-between gap-3 p-3 border-2 border-emerald-300 rounded-xl bg-emerald-50 shadow-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-extrabold text-emerald-950 flex items-center gap-2">
+                          <span>{attachedFile.name}</span>
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-200 text-emerald-800">
+                            Loaded
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-emerald-700">
+                          {attachedFile.type} • {attachedFile.sizeKb} KB
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">Upload Jobber Export File</div>
-                      <div className="text-[10px] text-slate-500">Supports .csv and .txt exports directly from Jobber</div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttachedFile(null);
+                        setCsvInputText('');
+                        setCsvImportFeedback(null);
+                      }}
+                      className="px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Clear File
+                    </button>
                   </div>
-                  <label className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs cursor-pointer transition-colors">
-                    <span>Browse File</span>
-                    <input
-                      type="file"
-                      accept=".csv, text/csv, .txt, text/plain"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 p-3 border border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100/70 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">Upload Jobber Export / Spreadsheet File</div>
+                        <div className="text-[10px] text-slate-500">Supports Excel (.xlsx, .xls), CSV, and TSV files</div>
+                      </div>
+                    </div>
+                    <label className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow-2xs cursor-pointer transition-colors flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Browse File</span>
+                      <input
+                        type="file"
+                        accept=".xlsx, .xls, .csv, .tsv, text/csv, text/tab-separated-values, text/plain"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
 
                 {/* Textarea for direct paste */}
                 <div>

@@ -27,7 +27,7 @@ import { getCustomerIntelligence } from '../services/customerIntelligenceService
 import { CustomerIntelligenceBadge } from './CustomerIntelligenceBadge';
 import { QuoteDetailModal } from './QuoteDetailModal';
 import { ServiceCatalogModal } from './ServiceCatalogModal';
-import { ServiceCatalogItem, CANONICAL_SERVICE_CATALOG } from '../data/serviceCatalogData';
+import { ServiceCatalogItem, CANONICAL_SERVICE_CATALOG, matchCatalogItem } from '../data/serviceCatalogData';
 
 interface QuotesViewProps {
   quotes: JobberQuote[];
@@ -103,15 +103,28 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   const [newAssignedCleaners, setNewAssignedCleaners] = useState<string[]>([]);
   const [newNotes, setNewNotes] = useState('');
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
+  const [selectedLineItems, setSelectedLineItems] = useState<any[]>([]);
 
   const handleSelectCatalogItemForNewQuote = (item: ServiceCatalogItem) => {
     setNewService(item.categoryLabel || item.name);
-    if (item.bedrooms) setNewBedrooms(item.bedrooms);
-    if (item.bathrooms) setNewBathrooms(item.bathrooms);
-    setNewTotal(String(item.basePrice));
+    if (item.bedrooms || item.beds) setNewBedrooms(item.bedrooms || item.beds || '2 Bedrooms');
+    if (item.bathrooms || item.baths) setNewBathrooms(item.bathrooms || item.baths || '2 Bathrooms');
+    const qty = item.quantity ?? item.baseHours ?? 1;
+    const unitPrice = item.unitPrice ?? item.basePrice ?? 105;
+    const total = item.total ?? (qty * unitPrice);
+    setNewTotal(String(total));
     setNewDeposit(String(item.depositRequired));
     if (item.description) setNewNotes(item.description);
-    setSyncFeedback(`Applied price list item: ${item.name} ($${item.basePrice.toFixed(2)})`);
+    setSelectedLineItems([
+      {
+        name: item.jobberItemName || item.name,
+        description: item.description || `${item.name}\nQuantity: ${qty} @ $${unitPrice.toFixed(2)} = $${total.toFixed(2)} CAD`,
+        quantity: qty,
+        unitPrice: unitPrice,
+        total: total,
+      },
+    ]);
+    setSyncFeedback(`Applied line item: ${item.name} (${qty} @ $${unitPrice.toFixed(2)} = $${total.toFixed(2)} CAD)`);
   };
 
   const filteredQuotes = quotes.filter((q) => {
@@ -287,16 +300,34 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
 
     try {
       const totalNum = Number(newTotal) || 280;
-      const unitPrice = Math.max(0, Math.round((totalNum / 1.05) * 100) / 100);
-      const lineItems = [
-        {
-          name: `${newService} (${newBedrooms}, ${newBathrooms})`,
-          description: `${newBedrooms}, ${newBathrooms} • ${newService} — ${newServiceAddress.trim() || 'Edmonton, AB'}`,
-          quantity: 1,
-          unitPrice,
-          total: totalNum,
-        },
-      ];
+      let lineItems = selectedLineItems;
+      if (lineItems.length === 0) {
+        const matched = matchCatalogItem(newService, newBedrooms, newBathrooms, localCatalog || CANONICAL_SERVICE_CATALOG);
+        if (matched) {
+          const qty = matched.quantity ?? matched.baseHours ?? 1;
+          const unitPrice = matched.unitPrice ?? matched.basePrice ?? 105;
+          const total = matched.total ?? (qty * unitPrice);
+          lineItems = [
+            {
+              name: matched.jobberItemName || matched.name,
+              description: matched.description || `${matched.name} (${newBedrooms}, ${newBathrooms})`,
+              quantity: qty,
+              unitPrice: unitPrice,
+              total: total,
+            },
+          ];
+        } else {
+          lineItems = [
+            {
+              name: `${newService} (${newBedrooms}, ${newBathrooms})`,
+              description: `${newBedrooms}, ${newBathrooms} • ${newService} — ${newServiceAddress.trim() || 'Edmonton, AB'}`,
+              quantity: 1,
+              unitPrice: totalNum,
+              total: totalNum,
+            },
+          ];
+        }
+      }
 
       const res = await fetch(`/api/database/quotes?project=${projectId}`, {
         method: 'POST',

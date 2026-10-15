@@ -2418,16 +2418,19 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
       if (!Array.isArray(q.lineItems) || q.lineItems.length === 0) {
         const matched = matchCatalogItem(q.service || "", q.bedrooms, q.bathrooms, store.serviceCatalog || CANONICAL_SERVICE_CATALOG);
         const totalVal = Number(q.total) || 280;
-        const unitPrice = matched ? matched.basePrice : Math.round((totalVal / 1.05) * 100) / 100;
+        const qty = matched ? (matched.quantity ?? matched.baseHours ?? 1) : 1;
+        const unitPrice = matched ? (matched.unitPrice ?? matched.basePrice ?? 105) : Math.round((totalVal / 1.05) * 100) / 100;
         const itemDesc = matched
           ? matched.jobberItemName
           : `${q.service || "Residential Cleaning"} (${q.bedrooms || "3 Bed"}, ${q.bathrooms || "2 Bath"})`;
+        const lineTotal = matched ? (matched.total ?? (qty * unitPrice)) : totalVal;
         q.lineItems = [
           {
+            name: itemDesc,
             description: itemDesc,
-            quantity: 1,
+            quantity: qty,
             unitPrice,
-            total: unitPrice,
+            total: lineTotal,
           },
         ];
         mutated = true;
@@ -2714,21 +2717,66 @@ app.post("/api/database/quotes", async (req, res) => {
 
   const defaultLineItems =
     Array.isArray(lineItems) && lineItems.length > 0
-      ? lineItems
-      : [
-          {
-            description: `${resolvedService} (${resolvedBedrooms}, ${resolvedBathrooms})`,
-            quantity: 1,
-            unitPrice: Math.max(0, Number(total) - 12.5),
-            total: Math.max(0, Number(total) - 12.5),
-          },
-          {
-            description: "Fuel & Travel Surcharge",
-            quantity: 1,
-            unitPrice: 12.5,
-            total: 12.5,
-          },
-        ];
+      ? lineItems.map((li: any) => {
+          const qty = Number(li.quantity) || 1;
+          const up = Number(li.unitPrice) || Number(li.total) || 0;
+          const tot =
+            li.total !== undefined && !isNaN(Number(li.total))
+              ? Number(li.total)
+              : Math.round(qty * up * 100) / 100;
+          return {
+            name: li.name || li.description,
+            description: li.description || li.name,
+            quantity: qty,
+            unitPrice: up,
+            total: tot,
+          };
+        })
+      : (() => {
+          const matched = matchCatalogItem(
+            resolvedService,
+            resolvedBedrooms,
+            resolvedBathrooms,
+            currentStore.serviceCatalog || CANONICAL_SERVICE_CATALOG
+          );
+          if (matched) {
+            const qty = matched.quantity ?? matched.baseHours ?? 1;
+            const up = matched.unitPrice ?? matched.basePrice ?? 105;
+            const tot = matched.total ?? (qty * up);
+            return [
+              {
+                name: matched.jobberItemName || matched.name,
+                description: matched.description || `${matched.name} (${resolvedBedrooms}, ${resolvedBathrooms})`,
+                quantity: qty,
+                unitPrice: up,
+                total: tot,
+              },
+              {
+                name: "Fuel Surcharge 2",
+                description: "Fuel Surcharge 2",
+                quantity: 1,
+                unitPrice: 12.5,
+                total: 12.5,
+              },
+            ];
+          }
+          return [
+            {
+              name: `${resolvedService} (${resolvedBedrooms}, ${resolvedBathrooms})`,
+              description: `${resolvedService} (${resolvedBedrooms}, ${resolvedBathrooms})`,
+              quantity: 1,
+              unitPrice: Math.max(0, Number(total) - 12.5),
+              total: Math.max(0, Number(total) - 12.5),
+            },
+            {
+              name: "Fuel Surcharge 2",
+              description: "Fuel Surcharge 2",
+              quantity: 1,
+              unitPrice: 12.5,
+              total: 12.5,
+            },
+          ];
+        })();
 
   // Step 1: Create Client in Jobber -> Step 2: Create Property -> Step 3: Create Draft Quote in Jobber
   const pushRes = await pushQuoteToJobber(
