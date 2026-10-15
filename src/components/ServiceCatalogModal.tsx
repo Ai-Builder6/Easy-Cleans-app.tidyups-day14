@@ -30,6 +30,7 @@ import {
   buildPriceListWorkbook,
   generatePriceListSheetRows,
 } from '../data/serviceCatalogData';
+import { saveServiceCatalogToFirestore } from '../services/firestoreSyncService';
 
 interface ServiceCatalogModalProps {
   isOpen: boolean;
@@ -135,6 +136,9 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     try {
       localStorage.setItem('tidyups_service_catalog_live', JSON.stringify(repaired));
     } catch {}
+
+    // Push live price list to Firebase Firestore in background
+    saveServiceCatalogToFirestore(repaired).catch(() => {});
 
     const res = await fetch(`/api/price-list?project=${projectId}`, {
       method: 'POST',

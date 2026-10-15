@@ -212,6 +212,23 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(invoiceId);
     }
 
+    // Service Catalog & Price List Collection (Publicly readable for live website booking & quotes; writable by verified staff/admin)
+    function isValidServiceCatalogItem(data) {
+      return data.keys().hasAll(['id', 'name', 'cleanersCount', 'quantity', 'unitPrice', 'total']) &&
+             data.id is string && isValidId(data.id) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.cleanersCount is number && data.cleanersCount >= 1 && data.cleanersCount <= 20 &&
+             data.quantity is number && data.quantity >= 0 && data.quantity <= 500 &&
+             data.unitPrice is number && data.unitPrice >= -5000 && data.unitPrice <= 50000 &&
+             data.total is number && data.total >= -5000 && data.total <= 100000;
+    }
+
+    match /serviceCatalog/{itemId} {
+      allow get, list: if true;
+      allow create, update: if isVerified() && isValidId(itemId) && isValidServiceCatalogItem(incoming()) && incoming().id == itemId;
+      allow delete: if isVerified() && isValidId(itemId);
+    }
+
     // Admins Collection
     match /admins/{adminId} {
       allow get: if isAdmin() && isValidId(adminId);

@@ -281,6 +281,83 @@ export async function saveVanOverrideToFirestore(tech: Technician): Promise<void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SERVICE CATALOG & PRICE LIST SYNC (Number of Cleaners x QTY x Unit Price = Total)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function saveServiceCatalogItemToFirestore(item: any): Promise<void> {
+  const docId = sanitizeDocId(item.id || item.name, 'cat');
+  const cleanersCount = Math.max(1, Number(item.cleanersCount) || 2);
+  const quantity = Number(item.quantity ?? item.baseHours ?? 1);
+  const unitPrice = Number(item.unitPrice ?? item.basePrice ?? 105);
+  const total = Number(item.total ?? Math.round(quantity * unitPrice * 100) / 100);
+
+  const payload = {
+    id: docId,
+    name: String(item.name || 'Cleaning Service').substring(0, 200),
+    shortName: String(item.shortName || item.name || '').substring(0, 100),
+    category: String(item.category || 'MOVE_OUT').substring(0, 50),
+    categoryLabel: String(item.categoryLabel || 'Move-Out Cleaning 2026').substring(0, 100),
+    serviceType: String(item.serviceType || 'Move-Out Cleaning').substring(0, 100),
+    bedrooms: item.bedrooms ? String(item.bedrooms).substring(0, 50) : '',
+    bathrooms: item.bathrooms ? String(item.bathrooms).substring(0, 50) : '',
+    cleanersCount,
+    quantity,
+    unitPrice,
+    total,
+    basePrice: total,
+    baseHours: quantity,
+    depositRequired: Number(item.depositRequired || 0),
+    jobberItemName: String(item.jobberItemName || item.name || '').substring(0, 200),
+    description: String(item.description || '').substring(0, 1000),
+    isAddon: Boolean(item.isAddon),
+    status: String(item.status || 'Active').substring(0, 30),
+    isActive: item.isActive !== false,
+    sortOrder: Number(item.sortOrder || 10),
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    const docRef = doc(db, 'serviceCatalog', docId);
+    await setDoc(docRef, payload, { merge: true });
+  } catch (error) {
+    console.warn(`Firestore save error on serviceCatalog/${docId}:`, error);
+  }
+}
+
+export async function saveServiceCatalogToFirestore(items: any[]): Promise<number> {
+  let saved = 0;
+  for (const item of items) {
+    try {
+      await saveServiceCatalogItemToFirestore(item);
+      saved++;
+    } catch {
+      // continue
+    }
+  }
+  return saved;
+}
+
+export async function fetchServiceCatalogFromFirestore(): Promise<any[]> {
+  try {
+    const snap = await getDocs(collection(db, 'serviceCatalog'));
+    const list: any[] = [];
+    snap.forEach((d) => {
+      const data = d.data();
+      if (data && data.name) {
+        list.push({
+          ...data,
+          id: data.id || d.id,
+        });
+      }
+    });
+    return list.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  } catch (err) {
+    console.warn('Could not read serviceCatalog from Firestore:', err);
+    return [];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // BATCH FULL SYNC
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -291,6 +368,7 @@ export interface FullSyncResult {
   quotesCount: number;
   invoicesCount: number;
   vanOverridesCount: number;
+  serviceCatalogCount?: number;
   errors: string[];
 }
 
@@ -304,6 +382,7 @@ export async function syncAllToFirestore({
   quotes,
   invoices,
   technicians,
+  serviceCatalog = [],
 }: {
   clients: ClientRecord[];
   scheduledVisits: ScheduledJobItem[];
@@ -311,6 +390,7 @@ export async function syncAllToFirestore({
   quotes: JobberQuote[];
   invoices: JobberInvoice[];
   technicians: Technician[];
+  serviceCatalog?: any[];
 }): Promise<FullSyncResult> {
   const result: FullSyncResult = {
     clientsCount: 0,
@@ -319,6 +399,7 @@ export async function syncAllToFirestore({
     quotesCount: 0,
     invoicesCount: 0,
     vanOverridesCount: 0,
+    serviceCatalogCount: 0,
     errors: [],
   };
 
@@ -373,6 +454,15 @@ export async function syncAllToFirestore({
       result.vanOverridesCount++;
     } catch (e: any) {
       result.errors.push(`Van ${tech.id}: ${e?.message || e}`);
+    }
+  }
+
+  for (const catItem of serviceCatalog) {
+    try {
+      await saveServiceCatalogItemToFirestore(catItem);
+      result.serviceCatalogCount = (result.serviceCatalogCount || 0) + 1;
+    } catch (e: any) {
+      result.errors.push(`Catalog ${catItem.id}: ${e?.message || e}`);
     }
   }
 

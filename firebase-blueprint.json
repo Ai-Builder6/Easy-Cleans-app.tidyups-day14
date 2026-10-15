@@ -374,6 +374,78 @@
         }
       },
       "required": ["email", "role"]
+    },
+    "ServiceCatalogItem": {
+      "title": "ServiceCatalogItem",
+      "description": "Service catalog & price list line item synchronized with Jobber using Formula: Number of Cleaners ( QTY x Unit Price ) = Total.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique catalog item ID.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Service Name / Jobber Line Item.",
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "description": "Category code.",
+          "maxLength": 50
+        },
+        "categoryLabel": {
+          "type": "string",
+          "description": "Display category label.",
+          "maxLength": 100
+        },
+        "bedrooms": {
+          "type": "string",
+          "description": "Bedroom count label.",
+          "maxLength": 50
+        },
+        "bathrooms": {
+          "type": "string",
+          "description": "Bathroom count label.",
+          "maxLength": 50
+        },
+        "cleanersCount": {
+          "type": "number",
+          "description": "Number of cleaners for the line item."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity (hours or units) for the specified cleaners count."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "Unit price in CAD."
+        },
+        "total": {
+          "type": "number",
+          "description": "Total price in CAD (QTY x Unit Price)."
+        },
+        "depositRequired": {
+          "type": "number",
+          "description": "Required booking deposit in CAD."
+        },
+        "status": {
+          "type": "string",
+          "description": "Catalog item status.",
+          "maxLength": 30
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the item is active."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update."
+        }
+      },
+      "required": ["id", "name", "cleanersCount", "quantity", "unitPrice", "total"]
     }
   },
   "firestore": {
@@ -404,6 +476,10 @@
     "/invoices/{invoiceId}": {
       "schema": "Invoice",
       "description": "Client billing records and payment states."
+    },
+    "/serviceCatalog/{itemId}": {
+      "schema": "ServiceCatalogItem",
+      "description": "Live Service Catalog & Price List items (Number of Cleaners x QTY x Unit Price = Total)."
     },
     "/admins/{adminId}": {
       "schema": "Admin",

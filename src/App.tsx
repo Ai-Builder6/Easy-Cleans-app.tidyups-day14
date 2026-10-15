@@ -576,9 +576,10 @@ export function App() {
         quotes: quotesList,
         invoices: invoicesList,
         technicians,
+        serviceCatalog,
       });
       setFirestoreSyncStatus(
-        `Synced ${res.clientsCount} clients, ${res.scheduledVisitsCount} visits, ${res.quotesCount} quotes, ${res.invoicesCount} invoices, and ${res.vanOverridesCount} van hubs to Firestore!`
+        `Synced ${res.clientsCount} clients, ${res.scheduledVisitsCount} visits, ${res.quotesCount} quotes, ${res.invoicesCount} invoices, ${res.serviceCatalogCount || 0} price list items, and ${res.vanOverridesCount} van hubs to Firestore!`
       );
       setTimeout(() => setFirestoreSyncStatus(null), 6000);
     } catch (e: any) {
@@ -588,7 +589,7 @@ export function App() {
     } finally {
       setIsSyncingFirestore(false);
     }
-  }, [clientsList, scheduledJobsList, unscheduledJobsList, quotesList, invoicesList, technicians]);
+  }, [clientsList, scheduledJobsList, unscheduledJobsList, quotesList, invoicesList, technicians, serviceCatalog]);
 
   // Inspect job directly on map: selects job, highlights technician if matched, switches to live map
   const handleSelectJobOnMap = (job: ScheduledJobItem) => {
