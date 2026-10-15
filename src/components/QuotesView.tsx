@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileCheck,
   ExternalLink,
@@ -70,7 +70,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   calls = [],
   visits = [],
   clients = [],
-  projectId = 'dispatchgeeni',
+  projectId = 'tidyups',
   serviceCatalog,
   onCatalogUpdated,
 }) => {
@@ -82,6 +82,12 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   // Service Catalog & Price List state
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [localCatalog, setLocalCatalog] = useState<ServiceCatalogItem[]>(serviceCatalog || CANONICAL_SERVICE_CATALOG);
+
+  useEffect(() => {
+    if (serviceCatalog && serviceCatalog.length > 0) {
+      setLocalCatalog(serviceCatalog);
+    }
+  }, [serviceCatalog]);
 
   // Selected Quote for Jobber Detail, Adjustment, Schedule & Text Sender Modal
   const [selectedQuote, setSelectedQuote] = useState<JobberQuote | null>(null);
@@ -842,11 +848,17 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
                   className="w-full px-3 py-2 border border-purple-300 rounded-xl focus:outline-none focus:border-purple-600 bg-white font-semibold text-slate-800 text-xs shadow-2xs"
                 >
                   <option value="" disabled>-- Select a pre-priced line item from Catalog --</option>
-                  {(localCatalog || CANONICAL_SERVICE_CATALOG).map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.categoryLabel}: {item.name} — ${item.basePrice.toFixed(2)} CAD (Deposit: ${item.depositRequired})
-                    </option>
-                  ))}
+                  {(localCatalog || CANONICAL_SERVICE_CATALOG).map((item) => {
+                    const cln = item.cleanersCount || 2;
+                    const qty = item.quantity ?? item.baseHours ?? 3;
+                    const up = item.unitPrice ?? item.basePrice ?? 105;
+                    const tot = item.total ?? item.basePrice ?? 315;
+                    return (
+                      <option key={item.id} value={item.id}>
+                        {item.categoryLabel}: {item.name} — {cln} Cleaner{cln > 1 ? 's' : ''} ({qty} × ${up.toFixed(2)}) = ${tot.toFixed(2)} CAD
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

@@ -65,11 +65,16 @@ import * as dbSchema from "./src/db/schema";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import { getOrCreateUser, getUserByUid } from "./src/db/users";
 import { eq } from "drizzle-orm";
+import * as XLSX from "xlsx";
 import {
   CANONICAL_SERVICE_CATALOG,
   ServiceCatalogItem,
   parsePastedPriceList,
   matchCatalogItem,
+  normalizeAndRepairCatalogItems,
+  buildPriceListWorkbook,
+  generatePriceListSheetRows,
+  convertItemForCleanersCount,
 } from "./src/data/serviceCatalogData";
 
 dotenv.config();
@@ -2406,10 +2411,22 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
     }
   }
 
-  // 5. Ensure Service Catalog Price List is initialized
+  // 5. Ensure Service Catalog Price List is initialized and all items have quantity, unitPrice, total, and cleanersCount
   if (!Array.isArray(store.serviceCatalog) || store.serviceCatalog.length === 0) {
     store.serviceCatalog = [...CANONICAL_SERVICE_CATALOG];
     mutated = true;
+  } else {
+    const needsRepair = store.serviceCatalog.some(
+      (item: any) =>
+        item.quantity === undefined ||
+        item.unitPrice === undefined ||
+        item.total === undefined ||
+        item.cleanersCount === undefined
+    );
+    if (needsRepair) {
+      store.serviceCatalog = normalizeAndRepairCatalogItems(store.serviceCatalog);
+      mutated = true;
+    }
   }
 
   // 6. Ensure every quote has complete line items matching the service catalog
@@ -2562,14 +2579,16 @@ app.get("/api/price-list", (req, res) => {
   if (currentStore && repairAndSyncStoreData(currentStore)) {
     saveStore(currentStore, projectId);
   }
-  const items =
+  const rawItems =
     currentStore?.serviceCatalog && currentStore.serviceCatalog.length > 0
       ? currentStore.serviceCatalog
       : CANONICAL_SERVICE_CATALOG;
+  const items = normalizeAndRepairCatalogItems(rawItems);
   res.json({
     success: true,
     items,
     count: items.length,
+    formula: "Number of Cleaners ( QTY × Unit Price ) = Total",
     activeProjectId: projectId,
   });
 });
@@ -2581,6 +2600,7 @@ app.post("/api/price-list", (req, res) => {
   if (!Array.isArray(items)) {
     return res.status(400).json({ error: "items array is required" });
   }
+  const normalizedItems = normalizeAndRepairCatalogItems(items);
   const currentStore = loadStore(projectId) || {
     version: 1,
     lastSavedAt: new Date().toISOString(),
@@ -2593,16 +2613,123 @@ app.post("/api/price-list", (req, res) => {
     clients: INITIAL_CLIENTS,
     adLeads: INITIAL_AD_LEADS,
   };
-  currentStore.serviceCatalog = items;
+  currentStore.serviceCatalog = normalizedItems;
   currentStore.lastSavedAt = new Date().toISOString();
   saveStore(currentStore, projectId);
   res.json({
     success: true,
-    message: `Successfully saved ${items.length} service catalog price list items.`,
-    items,
-    count: items.length,
+    message: `Successfully saved ${normalizedItems.length} service catalog price list items.`,
+    items: normalizedItems,
+    count: normalizedItems.length,
     activeProjectId: projectId,
   });
+});
+
+// POST /api/price-list/convert-cleaners: Convert item(s) to target Number of Cleaners using Number of Cleaners ( QTY × Unit Price ) = Total
+app.post("/api/price-list/convert-cleaners", (req, res) => {
+  const projectId = getProjectId(req);
+  const { itemId, cleanersCount } = req.body || {};
+  const targetCleaners = Math.max(1, Number(cleanersCount) || 2);
+
+  const currentStore = loadStore(projectId) || {
+    version: 1,
+    lastSavedAt: new Date().toISOString(),
+    tickets: INITIAL_TICKETS,
+    cleanerOverrides: {},
+    scheduledVisits: generateHistoricAndFutureVisits(),
+    unscheduledJobs: INITIAL_UNSCHEDULED_JOBS,
+    quotes: generateJobberQuotes(),
+    invoices: generateJobberInvoices(),
+    clients: INITIAL_CLIENTS,
+    adLeads: INITIAL_AD_LEADS,
+  };
+
+  const existing = normalizeAndRepairCatalogItems(
+    currentStore.serviceCatalog || CANONICAL_SERVICE_CATALOG
+  );
+
+  const updated = existing.map((item) => {
+    if (item.isAddon) return item;
+    if (itemId && item.id !== itemId) return item;
+    const conv = convertItemForCleanersCount(item, targetCleaners);
+    return {
+      ...item,
+      cleanersCount: conv.cleanersCount,
+      quantity: conv.quantity,
+      unitPrice: conv.unitPrice,
+      total: conv.total,
+      baseHours: conv.quantity,
+      basePrice: conv.total,
+    };
+  });
+
+  currentStore.serviceCatalog = updated;
+  currentStore.lastSavedAt = new Date().toISOString();
+  saveStore(currentStore, projectId);
+
+  res.json({
+    success: true,
+    message: itemId
+      ? `Converted item to ${targetCleaners} Cleaner${targetCleaners > 1 ? "s" : ""} formula.`
+      : `Converted all residential services to ${targetCleaners} Cleaner${targetCleaners > 1 ? "s" : ""} (QTY × Unit Price = Total).`,
+    items: updated,
+    count: updated.length,
+    activeProjectId: projectId,
+  });
+});
+
+// GET /api/price-list/export.xlsx: Download live updated Google Sheets (.xlsx) file of actual price list
+app.get("/api/price-list/export.xlsx", (req, res) => {
+  const projectId = getProjectId(req);
+  const currentStore = loadStore(projectId);
+  const rawItems =
+    currentStore?.serviceCatalog && currentStore.serviceCatalog.length > 0
+      ? currentStore.serviceCatalog
+      : CANONICAL_SERVICE_CATALOG;
+  const items = normalizeAndRepairCatalogItems(rawItems);
+  const wb = buildPriceListWorkbook(items);
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const filename = `Tidyups_Updated_Price_List_Google_Sheets_${dateStr}.xlsx`;
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(buffer);
+});
+
+// GET /api/price-list/export.csv: Download live updated Google Sheets (.csv) file of actual price list
+app.get("/api/price-list/export.csv", (req, res) => {
+  const projectId = getProjectId(req);
+  const cleanersParam = req.query.cleaners ? Number(req.query.cleaners) : undefined;
+  const currentStore = loadStore(projectId);
+  const rawItems =
+    currentStore?.serviceCatalog && currentStore.serviceCatalog.length > 0
+      ? currentStore.serviceCatalog
+      : CANONICAL_SERVICE_CATALOG;
+  const items = normalizeAndRepairCatalogItems(rawItems);
+  const { headers, rows } = generatePriceListSheetRows(items, cleanersParam);
+
+  const escapeCsvCell = (val: any) => {
+    const str = String(val ?? "");
+    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const csvContent = [
+    headers.map(escapeCsvCell).join(","),
+    ...rows.map((r) => r.map(escapeCsvCell).join(",")),
+  ].join("\n");
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const filename = `Tidyups_Updated_Price_List_Google_Sheets_${dateStr}.csv`;
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(csvContent);
 });
 
 // POST /api/price-list/import: Parse and import pasted price list text, CSV, or spreadsheet rows
@@ -2631,7 +2758,9 @@ app.post("/api/price-list/import", (req, res) => {
     clients: INITIAL_CLIENTS,
     adLeads: INITIAL_AD_LEADS,
   };
-  const existing = currentStore.serviceCatalog || CANONICAL_SERVICE_CATALOG;
+  const existing = normalizeAndRepairCatalogItems(
+    currentStore.serviceCatalog || CANONICAL_SERVICE_CATALOG
+  );
   const nextItems =
     mode === "REPLACE"
       ? parsed
@@ -2641,15 +2770,16 @@ app.post("/api/price-list/import", (req, res) => {
           ),
           ...parsed,
         ];
-  currentStore.serviceCatalog = nextItems;
+  const normalizedNext = normalizeAndRepairCatalogItems(nextItems);
+  currentStore.serviceCatalog = normalizedNext;
   currentStore.lastSavedAt = new Date().toISOString();
   saveStore(currentStore, projectId);
   res.json({
     success: true,
     message: `Successfully imported ${parsed.length} price list items!`,
-    items: nextItems,
+    items: normalizedNext,
     importedCount: parsed.length,
-    totalCount: nextItems.length,
+    totalCount: normalizedNext.length,
     activeProjectId: projectId,
   });
 });

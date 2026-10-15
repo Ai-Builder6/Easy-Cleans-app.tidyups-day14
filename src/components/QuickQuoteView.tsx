@@ -186,6 +186,12 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
   const [localCatalog, setLocalCatalog] = useState<ServiceCatalogItem[]>(serviceCatalog || CANONICAL_SERVICE_CATALOG);
 
+  useEffect(() => {
+    if (serviceCatalog && serviceCatalog.length > 0) {
+      setLocalCatalog(serviceCatalog);
+    }
+  }, [serviceCatalog]);
+
   // 1. Live Voice Dictation state
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [voiceTranscript, setVoiceTranscript] = useState<string>('');
@@ -538,11 +544,17 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
     if (item.categoryLabel) setServiceType(item.categoryLabel);
     if (item.bedrooms) setBedrooms(item.bedrooms);
     if (item.bathrooms) setBathrooms(item.bathrooms);
-    if (item.baseHours) setHours(item.baseHours);
-    if (item.cleanersCount === 2) setCrewSelection('2_CLEANERS');
-    else if (item.cleanersCount === 1) setCrewSelection('1_CLEANER');
+    const qty = item.quantity ?? item.baseHours ?? 3;
+    const unitPrice = item.unitPrice ?? item.basePrice ?? 105;
+    const total = item.total ?? Math.round(qty * unitPrice * 100) / 100;
+    const cleaners = item.cleanersCount || 2;
+    setHours(qty);
+    if (cleaners >= 2) setCrewSelection('2_CLEANERS');
+    else setCrewSelection('1_CLEANER');
     if (item.depositRequired !== undefined) setDepositAmount(item.depositRequired);
-    setFeedbackNotice(`✓ Applied Price List Item: "${item.name}" ($${item.basePrice.toFixed(2)})`);
+    setFeedbackNotice(
+      `✓ Applied "${item.name}": ${cleaners} Cleaner${cleaners > 1 ? 's' : ''} (${qty} × $${unitPrice.toFixed(2)}) = $${total.toFixed(2)} CAD`
+    );
   }, []);
 
   // Hourly Rate resolution
@@ -1363,22 +1375,22 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
                   <Tag className="w-4 h-4 text-purple-300" />
                 </span>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-purple-400 font-extrabold">
                       Catalog Price List Match
                     </span>
-                    <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-200 text-[10px] font-bold font-mono">
-                      {matchedCatalogItem.categoryLabel}
+                    <span className="text-purple-200 text-[10px] font-bold font-mono">
+                      · {matchedCatalogItem.categoryLabel}
                     </span>
                   </div>
                   <div className="text-xs font-bold text-white mt-0.5">
                     {matchedCatalogItem.name} —{' '}
                     <span className="font-mono font-extrabold text-emerald-400">
-                      ${matchedCatalogItem.basePrice.toFixed(2)} CAD
-                    </span>{' '}
-                    <span className="text-slate-400 text-[11px]">
-                      ({matchedCatalogItem.baseHours} hrs • {matchedCatalogItem.cleanersCount === 1 ? '1 Cleaner' : '2 Cleaners'} • Deposit: ${matchedCatalogItem.depositRequired})
+                      {matchedCatalogItem.cleanersCount || 2} Cleaner{(matchedCatalogItem.cleanersCount || 2) > 1 ? 's' : ''} ({matchedCatalogItem.quantity ?? matchedCatalogItem.baseHours} × ${(matchedCatalogItem.unitPrice ?? 105).toFixed(2)}) = ${(matchedCatalogItem.total ?? matchedCatalogItem.basePrice).toFixed(2)} CAD
                     </span>
+                  </div>
+                  <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                    1 Cleaner Eq: 1 ({Math.round(((matchedCatalogItem.quantity ?? matchedCatalogItem.baseHours ?? 3) * (matchedCatalogItem.cleanersCount || 2)) * 100) / 100} × $52.50) = ${(matchedCatalogItem.total ?? matchedCatalogItem.basePrice).toFixed(2)} • Deposit: ${matchedCatalogItem.depositRequired}
                   </div>
                 </div>
               </div>
@@ -1661,13 +1673,25 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
             </div>
           </div>
 
-          {/* 2. Cleaner Crew Selection */}
+          {/* 2. Cleaner Crew Selection — Formula: Number of Cleaners ( QTY × Unit Price ) = Total */}
           <div className="space-y-2">
-            <span className="block font-semibold text-slate-300 text-xs">Cleaners &amp; Hourly Rate:</span>
+            <div className="flex items-center justify-between">
+              <span className="block font-semibold text-slate-300 text-xs">
+                Cleaners &amp; Unit Price:
+              </span>
+              <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                {crewSelection === '2_CLEANERS' ? '2 Cleaners' : '1 Cleaner'} ({hours} × ${hourlyRate.toFixed(2)}) = ${calculations.labor.toFixed(2)}
+              </span>
+            </div>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => setCrewSelection('1_CLEANER')}
+                onClick={() => {
+                  if (crewSelection === '2_CLEANERS') {
+                    setHours((prev) => Math.round(prev * 2 * 100) / 100);
+                  }
+                  setCrewSelection('1_CLEANER');
+                }}
                 className={`p-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer border text-center ${
                   crewSelection === '1_CLEANER'
                     ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white border-pink-500 shadow-md'
@@ -1679,7 +1703,12 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
               </button>
               <button
                 type="button"
-                onClick={() => setCrewSelection('2_CLEANERS')}
+                onClick={() => {
+                  if (crewSelection === '1_CLEANER') {
+                    setHours((prev) => Math.max(1, Math.round((prev / 2) * 100) / 100));
+                  }
+                  setCrewSelection('2_CLEANERS');
+                }}
                 className={`p-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer border text-center ${
                   crewSelection === '2_CLEANERS'
                     ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white border-pink-500 shadow-md'

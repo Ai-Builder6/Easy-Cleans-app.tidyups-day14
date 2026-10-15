@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import {
   X,
   Search,
@@ -12,26 +13,22 @@ import {
   RotateCcw,
   Download,
   Upload,
-  DollarSign,
   Tag,
-  Clock,
   Users,
-  ShieldCheck,
-  Layers,
-  ArrowRight,
-  BedDouble,
-  Bath,
   CheckCircle2,
-  AlertCircle,
-  FileText,
   Link2,
   Calculator,
+  ArrowLeftRight,
 } from 'lucide-react';
 import {
   ServiceCatalogItem,
   CANONICAL_SERVICE_CATALOG,
   parsePastedPriceList,
   parseSpreadsheetBuffer,
+  convertItemForCleanersCount,
+  normalizeAndRepairCatalogItems,
+  buildPriceListWorkbook,
+  generatePriceListSheetRows,
 } from '../data/serviceCatalogData';
 
 interface ServiceCatalogModalProps {
@@ -51,11 +48,16 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
   onSelectForQuote,
   projectId = 'tidyups',
 }) => {
+  const [liveCatalog, setLiveCatalog] = useState<ServiceCatalogItem[]>(() =>
+    normalizeAndRepairCatalogItems(
+      catalog && catalog.length > 0 ? catalog : CANONICAL_SERVICE_CATALOG
+    )
+  );
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pastedText, setPastedText] = useState('');
-  const [importMode, setImportMode] = useState<'REPLACE' | 'APPEND'>('APPEND');
+  const [importMode, setImportMode] = useState<'REPLACE' | 'APPEND'>('REPLACE');
   const [editingItem, setEditingItem] = useState<ServiceCatalogItem | null>(null);
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
@@ -87,7 +89,75 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
   const [formStatus, setFormStatus] = useState('Active');
   const [formIsActive, setFormIsActive] = useState(true);
 
-  const currentItems = catalog && catalog.length > 0 ? catalog : CANONICAL_SERVICE_CATALOG;
+  // Sync when parent catalog prop changes
+  useEffect(() => {
+    if (catalog && catalog.length > 0) {
+      setLiveCatalog(normalizeAndRepairCatalogItems(catalog));
+    }
+  }, [catalog]);
+
+  // Fetch the latest saved price list from backend whenever modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch(`/api/price-list?project=${projectId}&t=${Date.now()}`, {
+      headers: { 'x-project-id': projectId },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.items && Array.isArray(data.items) && data.items.length > 0) {
+          const repaired = normalizeAndRepairCatalogItems(data.items);
+          setLiveCatalog(repaired);
+          onCatalogUpdated(repaired);
+          try {
+            localStorage.setItem('tidyups_service_catalog_live', JSON.stringify(repaired));
+          } catch {}
+        }
+      })
+      .catch(() => {
+        try {
+          const cached = localStorage.getItem('tidyups_service_catalog_live');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const repaired = normalizeAndRepairCatalogItems(parsed);
+              setLiveCatalog(repaired);
+              onCatalogUpdated(repaired);
+            }
+          }
+        } catch {}
+      });
+  }, [isOpen, projectId]);
+
+  const persistCatalogEverywhere = async (nextItems: ServiceCatalogItem[]) => {
+    const repaired = normalizeAndRepairCatalogItems(nextItems);
+    setLiveCatalog(repaired);
+    onCatalogUpdated(repaired);
+    try {
+      localStorage.setItem('tidyups_service_catalog_live', JSON.stringify(repaired));
+    } catch {}
+
+    const res = await fetch(`/api/price-list?project=${projectId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
+      body: JSON.stringify({ items: repaired }),
+    });
+    const data = await res.json();
+    if (data?.items && Array.isArray(data.items)) {
+      const serverItems = normalizeAndRepairCatalogItems(data.items);
+      setLiveCatalog(serverItems);
+      onCatalogUpdated(serverItems);
+      return serverItems;
+    }
+    return repaired;
+  };
+
+  const currentItems = useMemo(
+    () =>
+      liveCatalog && liveCatalog.length > 0
+        ? liveCatalog
+        : normalizeAndRepairCatalogItems(catalog),
+    [liveCatalog, catalog]
+  );
 
   // Filtered catalog list
   const filteredItems = useMemo(() => {
@@ -125,7 +195,32 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     { id: 'HOURLY', label: 'Hourly Rates', count: currentItems.filter((i) => i.category === 'HOURLY').length },
   ];
 
-  // Auto-calculate Total in Add/Edit form whenever Quantity or Unit Price changes
+  // Auto-calculate Total or convert Cleaners in Add/Edit form
+  // Formula: Number of Cleaners ( QTY × Unit Price ) = Total
+  const handleCleanersCountChange = (newCleanersStr: string) => {
+    const prevCleaners = Math.max(1, parseInt(formCleanersCount || '2', 10));
+    const nextCleaners = Math.max(1, parseInt(newCleanersStr || '2', 10));
+    setFormCleanersCount(newCleanersStr);
+
+    const q = parseFloat(formQuantity);
+    const u = parseFloat(formUnitPrice);
+    if (!isNaN(q) && !isNaN(u) && formCategory !== 'ADD_ON' && prevCleaners !== nextCleaners) {
+      const converted = convertItemForCleanersCount(
+        {
+          cleanersCount: prevCleaners,
+          quantity: q,
+          unitPrice: u,
+          total: Math.round(q * u * 100) / 100,
+          isAddon: false,
+        },
+        nextCleaners
+      );
+      setFormQuantity(String(converted.quantity));
+      setFormUnitPrice(converted.unitPrice.toFixed(2));
+      setFormTotal(converted.total.toFixed(2));
+    }
+  };
+
   const handleQuantityChange = (val: string) => {
     setFormQuantity(val);
     const q = parseFloat(val);
@@ -141,6 +236,68 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     const u = parseFloat(val);
     if (!isNaN(q) && !isNaN(u)) {
       setFormTotal((q * u).toFixed(2));
+    }
+  };
+
+  // Toggle a single item between 1 Cleaner (QTY × $52.50) and 2 Cleaners (QTY × $105.00)
+  const handleToggleItemCleaners = async (item: ServiceCatalogItem) => {
+    if (item.isAddon) return;
+    const currentCleaners = Math.max(1, Number(item.cleanersCount) || 2);
+    const targetCleaners = currentCleaners === 2 ? 1 : 2;
+    const conv = convertItemForCleanersCount(item, targetCleaners);
+
+    const nextCatalog = currentItems.map((c) =>
+      c.id === item.id
+        ? {
+            ...c,
+            cleanersCount: conv.cleanersCount,
+            quantity: conv.quantity,
+            unitPrice: conv.unitPrice,
+            total: conv.total,
+            baseHours: conv.quantity,
+            basePrice: conv.total,
+          }
+        : c
+    );
+
+    try {
+      await persistCatalogEverywhere(nextCatalog);
+      setFeedbackNotice(
+        `✓ Updated "${item.name}" to ${conv.cleanersCount} Cleaner${conv.cleanersCount > 1 ? 's' : ''} (${conv.quantity} × $${conv.unitPrice.toFixed(2)}) = $${conv.total.toFixed(2)} CAD`
+      );
+    } catch {
+      setLiveCatalog(nextCatalog);
+      onCatalogUpdated(nextCatalog);
+    }
+  };
+
+  // Convert ALL residential items in the price list to 1 Cleaner or 2 Cleaners
+  const handleConvertAllCleaners = async (targetCleaners: number) => {
+    setIsSaving(true);
+    const nextCatalog = currentItems.map((item) => {
+      if (item.isAddon) return item;
+      const conv = convertItemForCleanersCount(item, targetCleaners);
+      return {
+        ...item,
+        cleanersCount: conv.cleanersCount,
+        quantity: conv.quantity,
+        unitPrice: conv.unitPrice,
+        total: conv.total,
+        baseHours: conv.quantity,
+        basePrice: conv.total,
+      };
+    });
+
+    try {
+      await persistCatalogEverywhere(nextCatalog);
+      setFeedbackNotice(
+        `✓ Converted price list to ${targetCleaners} Cleaner${targetCleaners > 1 ? 's' : ''} formula: ${targetCleaners} Cleaner${targetCleaners > 1 ? 's' : ''} (QTY × Unit Price) = Total!`
+      );
+    } catch {
+      setLiveCatalog(nextCatalog);
+      onCatalogUpdated(nextCatalog);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -176,7 +333,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
         });
       }
     } catch (err: any) {
-      alert(`Could not parse file: ${err.message || 'Invalid spreadsheet file format'}`);
+      setFeedbackNotice(`Could not parse file: ${err.message || 'Invalid spreadsheet file format'}`);
     }
   };
 
@@ -185,10 +342,9 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     if (!googleSheetsUrl.trim()) return;
     setIsFetchingSheet(true);
     try {
-      // Check for spreadsheet ID in URL
       const match = googleSheetsUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
       if (!match) {
-        alert('Please paste a valid Google Sheets URL (e.g., https://docs.google.com/spreadsheets/d/YOUR_ID/edit).');
+        setFeedbackNotice('Please paste a valid Google Sheets URL (e.g., https://docs.google.com/spreadsheets/d/YOUR_ID/edit).');
         return;
       }
       const sheetId = match[1];
@@ -208,7 +364,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
         itemCount: parsed.length,
       });
     } catch (err: any) {
-      alert(`Google Sheets Import Note: ${err.message}\n\nTip: You can also download the Google Sheet as Excel (.xlsx) or CSV, or copy-paste the cells directly into the box below!`);
+      setFeedbackNotice(`Google Sheets Import Note: ${err.message}`);
     } finally {
       setIsFetchingSheet(false);
     }
@@ -236,25 +392,17 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
               ...parsedPreview,
             ];
 
-      const res = await fetch(`/api/price-list?project=${projectId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
-        body: JSON.stringify({ items: nextCatalog }),
-      });
-      const data = await res.json();
-      if (data.success && data.items) {
-        onCatalogUpdated(data.items);
-        setFeedbackNotice(`✓ Successfully imported ${parsedPreview.length} price list items! Quantity, unit price, and totals synced with Jobber.`);
-        setIsImportModalOpen(false);
-        setPastedText('');
-        setAttachedFile(null);
-      } else {
-        onCatalogUpdated(nextCatalog);
-        setFeedbackNotice(`✓ Applied ${parsedPreview.length} items to local catalog.`);
-        setIsImportModalOpen(false);
-      }
+      await persistCatalogEverywhere(nextCatalog);
+      setFeedbackNotice(
+        `✓ Successfully saved ${nextCatalog.length} price list items! Formula: Number of Cleaners (QTY × Unit Price) = Total.`
+      );
+      setIsImportModalOpen(false);
+      setPastedText('');
+      setAttachedFile(null);
     } catch {
-      onCatalogUpdated(importMode === 'REPLACE' ? parsedPreview : [...currentItems, ...parsedPreview]);
+      const fallback = importMode === 'REPLACE' ? parsedPreview : [...currentItems, ...parsedPreview];
+      setLiveCatalog(fallback);
+      onCatalogUpdated(fallback);
       setFeedbackNotice(`✓ Applied ${parsedPreview.length} price items.`);
       setIsImportModalOpen(false);
     } finally {
@@ -263,7 +411,6 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
   };
 
   const handleResetToCanonical = async () => {
-    if (!window.confirm('Reset service catalog back to the official Tidyups Cleaning Service Inc. price list?')) return;
     setIsSaving(true);
     try {
       const res = await fetch(`/api/price-list/reset?project=${projectId}`, {
@@ -271,13 +418,17 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
         headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
       });
       const data = await res.json();
-      if (data.success && data.items) {
-        onCatalogUpdated(data.items);
-        setFeedbackNotice('✓ Service catalog restored to canonical Tidyups prices.');
-      } else {
-        onCatalogUpdated(CANONICAL_SERVICE_CATALOG);
-      }
+      const restored = normalizeAndRepairCatalogItems(
+        data?.items && data.items.length > 0 ? data.items : CANONICAL_SERVICE_CATALOG
+      );
+      setLiveCatalog(restored);
+      onCatalogUpdated(restored);
+      try {
+        localStorage.setItem('tidyups_service_catalog_live', JSON.stringify(restored));
+      } catch {}
+      setFeedbackNotice('✓ Service catalog restored to canonical Tidyups prices (Number of Cleaners × QTY × Unit Price = Total).');
     } catch {
+      setLiveCatalog(CANONICAL_SERVICE_CATALOG);
       onCatalogUpdated(CANONICAL_SERVICE_CATALOG);
     } finally {
       setIsSaving(false);
@@ -293,7 +444,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     const unitPriceNum = Math.round(parseFloat(formUnitPrice || '0') * 100) / 100;
     const totalNum = Math.round(qtyNum * unitPriceNum * 100) / 100;
     const depositNum = Math.round(parseFloat(formDeposit || '50') * 100) / 100;
-    const cleanersNum = parseInt(formCleanersCount || '1', 10);
+    const cleanersNum = Math.max(1, parseInt(formCleanersCount || '2', 10));
 
     const categoryLabel =
       formCategory === 'MOVE_OUT'
@@ -332,7 +483,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
       jobberItemName: formName.trim(),
       description:
         formDescription.trim() ||
-        `${formName.trim()}\n${cleanersNum} Pro Cleaner${cleanersNum > 1 ? 's' : ''}\nQuantity: ${qtyNum} @ $${unitPriceNum}/unit = $${totalNum.toFixed(2)} CAD`,
+        `${formName.trim()}\n${cleanersNum} Cleaner${cleanersNum > 1 ? 's' : ''} (${qtyNum} × $${unitPriceNum.toFixed(2)}) = $${totalNum.toFixed(2)} CAD`,
       isAddon: formCategory === 'ADD_ON',
       status: formStatus,
       isActive: formIsActive,
@@ -347,16 +498,14 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     }
 
     try {
-      await fetch(`/api/price-list?project=${projectId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
-        body: JSON.stringify({ items: nextCatalog }),
-      });
-      onCatalogUpdated(nextCatalog);
-      setFeedbackNotice(`✓ Saved "${newItem.name}" (${newItem.quantity} @ $${newItem.unitPrice.toFixed(2)} = $${newItem.total.toFixed(2)}) to price list.`);
+      await persistCatalogEverywhere(nextCatalog);
+      setFeedbackNotice(
+        `✓ Saved "${newItem.name}": ${cleanersNum} Cleaner${cleanersNum > 1 ? 's' : ''} (${newItem.quantity} × $${newItem.unitPrice.toFixed(2)}) = $${newItem.total.toFixed(2)} CAD`
+      );
       setIsAddItemModalOpen(false);
       setEditingItem(null);
     } catch {
+      setLiveCatalog(nextCatalog);
       onCatalogUpdated(nextCatalog);
       setIsAddItemModalOpen(false);
       setEditingItem(null);
@@ -366,17 +515,12 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
   };
 
   const handleDeleteItem = async (itemId: string, name: string) => {
-    if (!window.confirm(`Delete "${name}" from service catalog?`)) return;
     const nextCatalog = currentItems.filter((i) => i.id !== itemId);
     try {
-      await fetch(`/api/price-list?project=${projectId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
-        body: JSON.stringify({ items: nextCatalog }),
-      });
-      onCatalogUpdated(nextCatalog);
-      setFeedbackNotice(`✓ Removed "${name}" from catalog.`);
+      await persistCatalogEverywhere(nextCatalog);
+      setFeedbackNotice(`✓ Removed "${name}" from price list.`);
     } catch {
+      setLiveCatalog(nextCatalog);
       onCatalogUpdated(nextCatalog);
     }
   };
@@ -388,10 +532,10 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     setFormServiceType(item.serviceType);
     setFormBedrooms(item.bedrooms || item.beds || '2 Bedrooms');
     setFormBathrooms(item.bathrooms || item.baths || '2 Bathrooms');
-    setFormQuantity(String(item.quantity ?? item.baseHours ?? 1));
+    setFormQuantity(String(item.quantity ?? item.baseHours ?? 3));
     setFormUnitPrice(String(item.unitPrice ?? item.basePrice ?? 105));
     setFormTotal(String(item.total ?? item.basePrice ?? 315));
-    setFormCleanersCount(String(item.cleanersCount || 1));
+    setFormCleanersCount(String(item.cleanersCount || 2));
     setFormDeposit(String(item.depositRequired || 0));
     setFormDescription(item.description || '');
     setFormStatus(item.status || 'Active');
@@ -406,7 +550,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     setFormServiceType('Move-Out Cleaning');
     setFormBedrooms('2 Bedrooms');
     setFormBathrooms('2 Bathrooms');
-    setFormQuantity('3.0');
+    setFormQuantity('3');
     setFormUnitPrice('105.00');
     setFormTotal('315.00');
     setFormCleanersCount('2');
@@ -417,96 +561,141 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     setIsAddItemModalOpen(true);
   };
 
-  const handleExportCsv = () => {
-    const headers = [
-      'SERVICE NAME/JOBBER LINE ITEM',
-      'CATEGORY',
-      'BEDS',
-      'BATHS',
-      'QUANTITY',
-      'UNIT PRICE (CAD)',
-      'TOTAL (CAD)',
-      'STATUS',
-      'ACTIVE?',
-    ];
-    const rows = currentItems.map((item) => [
-      `"${item.name.replace(/"/g, '""')}"`,
-      `"${item.categoryLabel || item.category}"`,
-      `"${item.bedrooms || item.beds || ''}"`,
-      `"${item.bathrooms || item.baths || ''}"`,
-      item.quantity ?? item.baseHours ?? 1,
-      (item.unitPrice ?? item.basePrice ?? 0).toFixed(2),
-      (item.total ?? item.basePrice ?? 0).toFixed(2),
-      `"${item.status || 'Active'}"`,
-      item.isActive !== false ? 'Yes' : 'No',
-    ]);
-    const csvContent = [headers.join('\t'), ...rows.map((r) => r.join('\t'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/tab-separated-values;charset=utf-8;' });
+  // Download LIVE Updated Price List as a real Google Sheets (.xlsx) Workbook (3 tabs: Active Live, 2 Cleaners, 1 Cleaner)
+  const handleDownloadGoogleSheetsXlsx = async () => {
+    try {
+      // Ensure latest state is persisted to server before downloading
+      await persistCatalogEverywhere(currentItems);
+    } catch {}
+
+    const wb = buildPriceListWorkbook(currentItems);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `Tidyups_Updated_Price_List_Google_Sheets_${dateStr}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    setFeedbackNotice(
+      `✓ Downloaded "${filename}" (${currentItems.length} updated items with Number of Cleaners × QTY × Unit Price = Total & 1-Cleaner / 2-Cleaner sheets)!`
+    );
+  };
+
+  // Download LIVE Updated Price List as a Google Sheets (.csv) file
+  const handleDownloadGoogleSheetsCsv = async () => {
+    try {
+      await persistCatalogEverywhere(currentItems);
+    } catch {}
+
+    const { headers, rows } = generatePriceListSheetRows(currentItems);
+    const escapeCsv = (val: any) => {
+      const str = String(val ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+    const csvContent = [
+      headers.map(escapeCsv).join(','),
+      ...rows.map((r) => r.map(escapeCsv).join(',')),
+    ].join('\n');
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `Tidyups_Updated_Price_List_Google_Sheets_${dateStr}.csv`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tidyups_service_catalog_price_list_${new Date().toISOString().slice(0, 10)}.tsv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setFeedbackNotice(
+      `✓ Downloaded Google Sheets CSV "${filename}" with ${currentItems.length} live updated items!`
+    );
   };
 
   if (!isOpen) return null;
 
+  // Live preview of formula in Add/Edit modal
+  const formCleanersNum = Math.max(1, parseInt(formCleanersCount || '2', 10));
+  const formQtyNum = parseFloat(formQuantity || '3') || 0;
+  const formUnitNum = parseFloat(formUnitPrice || '105') || 0;
+  const formTotalNum = Math.round(formQtyNum * formUnitNum * 100) / 100;
+  const formAltCleaners = formCleanersNum === 2 ? 1 : 2;
+  const formAltConverted = convertItemForCleanersCount(
+    {
+      cleanersCount: formCleanersNum,
+      quantity: formQtyNum,
+      unitPrice: formUnitNum,
+      total: formTotalNum,
+      isAddon: formCategory === 'ADD_ON',
+    },
+    formAltCleaners
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs font-sans animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-6xl max-h-[94vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-7xl max-h-[95vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-4 sm:p-6 border-b border-slate-200 bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 border-b border-slate-200 bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white shadow-md">
+            <span className="w-10 h-10 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white shadow-md shrink-0">
               <ClipboardList className="w-5 h-5 text-white" />
             </span>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">
                   Service Catalog &amp; Price List
                 </h2>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-400/30">
-                  Jobber Line Items (Qty × Unit Price = Total)
+                <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[11px] font-mono font-bold border border-emerald-400/30">
+                  Number of Cleaners ( QTY × Unit Price ) = Total
                 </span>
               </div>
               <p className="text-xs text-slate-300 mt-0.5">
-                Exact Jobber schema: Service Name, Quantity, Unit Price, and Total. Synced directly with quotes and bookings.
+                Example: 1 Bed 1 Bath Move-Out → <strong className="text-white">2 Cleaners (3 × $105.00) = $315.00</strong> &nbsp;|&nbsp; <strong className="text-emerald-300">1 Cleaner (6 × $52.50) = $315.00</strong>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Download Updated Google Sheets (.xlsx) */}
+            <button
+              onClick={handleDownloadGoogleSheetsXlsx}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title="Download your live updated price list as a Google Sheets (.xlsx) file with 1-Cleaner & 2-Cleaner sheets"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Download Google Sheets (.xlsx)</span>
+            </button>
+
+            {/* Download Updated Google Sheets (.csv) */}
+            <button
+              onClick={handleDownloadGoogleSheetsCsv}
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-white/20 cursor-pointer"
+              title="Download live updated price list as CSV for Google Sheets"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download CSV</span>
+            </button>
+
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="px-3 py-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              className="px-3 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
               title="Upload Excel, CSV, Google Sheets, or paste price list with quantities and unit prices"
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>Attach File / Paste Price List</span>
+              <span>Attach / Paste List</span>
             </button>
 
             <button
               onClick={startAdd}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-white/20 cursor-pointer"
+              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-white/20 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Line Item</span>
-            </button>
-
-            <button
-              onClick={handleExportCsv}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-white/20 cursor-pointer"
-              title="Export Price List to TSV / Excel Spreadsheet"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Export</span>
+              <span>Add Item</span>
             </button>
 
             <button
               onClick={handleResetToCanonical}
-              className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg cursor-pointer"
+              className="p-2 text-slate-400 hover:text-slate-200 rounded-lg cursor-pointer"
               title="Reset to official Tidyups price list"
             >
               <RotateCcw className="w-4 h-4" />
@@ -514,9 +703,49 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg cursor-pointer ml-1"
+              className="p-2 text-slate-400 hover:text-white rounded-lg cursor-pointer ml-1"
             >
               <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Formula & Cleaner Count Conversion Banner */}
+        <div className="px-4 py-2.5 bg-purple-950/5 border-b border-purple-200/80 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 font-extrabold text-purple-950">
+              <Calculator className="w-4 h-4 text-purple-700" />
+              <span>Active Formula:</span>
+            </span>
+            <code className="px-2 py-0.5 rounded bg-purple-100 text-purple-900 font-mono font-extrabold text-xs">
+              Number of Cleaners ( QTY × Unit Price ) = Total
+            </code>
+            <span className="text-slate-600">
+              • <strong>2 Cleaners:</strong> 2 (3 × $105.00) = $315.00 &nbsp;↔&nbsp; <strong>1 Cleaner:</strong> 1 (6 × $52.50) = $315.00
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-600">Convert Catalog Crew Rates:</span>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => handleConvertAllCleaners(2)}
+              className="px-2.5 py-1 rounded-lg bg-purple-700 hover:bg-purple-800 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+              title="Set all residential services to 2 Cleaners (e.g. QTY 3 × $105.00 = $315.00)"
+            >
+              <Users className="w-3 h-3" />
+              <span>2 Cleaners (QTY × $105.00)</span>
+            </button>
+            <button
+              type="button"
+              disabled={isSaving}
+              onClick={() => handleConvertAllCleaners(1)}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+              title="Convert all residential services to 1 Cleaner (e.g. QTY 6 × $52.50 = $315.00)"
+            >
+              <Users className="w-3 h-3" />
+              <span>1 Cleaner (QTY × $52.50)</span>
             </button>
           </div>
         </div>
@@ -525,7 +754,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
         {feedbackNotice && (
           <div className="px-4 py-2 bg-emerald-50 border-b border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>{feedbackNotice}</span>
             </div>
             <button onClick={() => setFeedbackNotice(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer">
@@ -534,9 +763,8 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
           </div>
         )}
 
-        {/* Toolbar: Search & Category Chips */}
+        {/* Toolbar: Search & Category Filter */}
         <div className="p-3 sm:p-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Search Bar */}
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -556,19 +784,27 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
             )}
           </div>
 
-          {/* Stats Badge */}
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
-            <span>Showing {filteredItems.length} of {currentItems.length} items</span>
+          <div className="flex items-center gap-3 text-xs text-slate-600 font-mono">
+            <span>Showing {filteredItems.length} of {currentItems.length} live items</span>
+            <span>•</span>
+            <a
+              href={`/api/price-list/export.xlsx?project=${projectId}&t=${Date.now()}`}
+              download
+              className="text-emerald-700 hover:text-emerald-900 font-sans font-bold underline flex items-center gap-1"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Direct Server .XLSX Link</span>
+            </a>
           </div>
         </div>
 
-        {/* Category Pills */}
+        {/* Category Filter Tabs */}
         <div className="px-3 sm:px-4 py-2 border-b border-slate-200 bg-white flex items-center gap-1.5 overflow-x-auto text-xs font-medium no-scrollbar">
           {categories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1 rounded-lg shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg shrink-0 transition-all cursor-pointer flex items-center gap-1.5 ${
                 selectedCategory === cat.id
                   ? 'bg-purple-600 text-white font-bold shadow-xs'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -576,17 +812,17 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
             >
               <span>{cat.label}</span>
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                  selectedCategory === cat.id ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-700'
+                className={`text-[10px] font-mono ${
+                  selectedCategory === cat.id ? 'text-purple-100' : 'text-slate-500'
                 }`}
               >
-                {cat.count}
+                ({cat.count})
               </span>
             </button>
           ))}
         </div>
 
-        {/* Main Price List Table with exact schema */}
+        {/* Main Price List Table with exact schema: Service Name | Category | Beds/Baths | # Cleaners | Quantity | Unit Price | Formula | Total | Status | Actions */}
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead className="bg-slate-100 text-slate-700 sticky top-0 z-10 border-b border-slate-200 font-extrabold uppercase text-[10px] tracking-wider">
@@ -594,8 +830,10 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                 <th className="py-2.5 px-3">Service Name / Jobber Line Item</th>
                 <th className="py-2.5 px-2.5">Category</th>
                 <th className="py-2.5 px-2.5">Beds / Baths</th>
-                <th className="py-2.5 px-2.5 text-center">Quantity</th>
-                <th className="py-2.5 px-2.5 text-right">Unit Price (CAD)</th>
+                <th className="py-2.5 px-2.5 text-center"># Cleaners</th>
+                <th className="py-2.5 px-2.5 text-center">QTY</th>
+                <th className="py-2.5 px-2.5 text-right">Unit Price</th>
+                <th className="py-2.5 px-3">Number of Cleaners (QTY × Unit Price) = Total</th>
                 <th className="py-2.5 px-3 text-right">Total (CAD)</th>
                 <th className="py-2.5 px-2 text-center">Status</th>
                 <th className="py-2.5 px-3 text-right">Actions</th>
@@ -604,7 +842,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
             <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
               {filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-slate-400">
                     <ClipboardList className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                     <p className="font-bold text-sm text-slate-600">No matching service items found</p>
                     <p className="text-xs mt-1">Try clearing your search or paste a new price list</p>
@@ -612,9 +850,13 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                 </tr>
               ) : (
                 filteredItems.map((item) => {
-                  const qty = item.quantity ?? item.baseHours ?? 1;
-                  const unitPrice = item.unitPrice ?? item.basePrice ?? 0;
-                  const total = item.total ?? (qty * unitPrice);
+                  const cleaners = Math.max(1, Number(item.cleanersCount) || 1);
+                  const qty = Number(item.quantity ?? item.baseHours ?? 1);
+                  const unitPrice = Number(item.unitPrice ?? item.basePrice ?? 0);
+                  const total = Number(item.total ?? Math.round(qty * unitPrice * 100) / 100);
+
+                  const altCleaners = cleaners === 2 ? 1 : 2;
+                  const altConv = convertItemForCleanersCount(item, altCleaners);
 
                   return (
                     <tr
@@ -626,21 +868,19 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                         <div className="font-bold text-slate-900 group-hover:text-purple-900 flex items-center gap-1.5">
                           <span>{item.name}</span>
                           {item.isAddon && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-pink-100 text-pink-700">
-                              Add-on
+                            <span className="text-[10px] font-bold text-pink-700">
+                              · Add-on
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-500 font-mono truncate max-w-sm">
+                        <div className="text-[11px] text-slate-500 font-mono truncate max-w-xs">
                           {item.jobberItemName || item.description}
                         </div>
                       </td>
 
                       {/* Category */}
-                      <td className="py-2.5 px-2.5">
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                          {item.categoryLabel || item.category}
-                        </span>
+                      <td className="py-2.5 px-2.5 text-[11px] text-slate-600">
+                        {item.categoryLabel || item.category}
                       </td>
 
                       {/* Beds / Baths */}
@@ -648,7 +888,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                         {item.bedrooms || item.bathrooms || item.beds || item.baths ? (
                           <div className="flex items-center gap-1">
                             {(item.bedrooms || item.beds) && <span>{item.bedrooms || item.beds}</span>}
-                            {(item.bedrooms || item.beds) && (item.bathrooms || item.baths) && <span>•</span>}
+                            {(item.bedrooms || item.beds) && (item.bathrooms || item.baths) && <span>·</span>}
                             {(item.bathrooms || item.baths) && <span>{item.bathrooms || item.baths}</span>}
                           </div>
                         ) : (
@@ -656,16 +896,53 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                         )}
                       </td>
 
+                      {/* Number of Cleaners with 1-Click Toggle */}
+                      <td className="py-2.5 px-2.5 text-center">
+                        {item.isAddon ? (
+                          <span className="text-[11px] font-mono text-slate-400">1</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleItemCleaners(item)}
+                            title="Click to switch between 2 Cleaners (QTY × $105) and 1 Cleaner (QTY × $52.50)"
+                            className={`px-2 py-1 rounded-lg text-[11px] font-mono font-bold inline-flex items-center gap-1 cursor-pointer transition-colors ${
+                              cleaners >= 2
+                                ? 'bg-purple-100 hover:bg-purple-200 text-purple-900'
+                                : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                            }`}
+                          >
+                            <span>{cleaners} Cln</span>
+                            <ArrowLeftRight className="w-3 h-3 opacity-70" />
+                          </button>
+                        )}
+                      </td>
+
                       {/* Quantity */}
-                      <td className="py-2.5 px-2.5 text-center font-mono font-bold text-slate-800">
-                        <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">
-                          {qty}
-                        </span>
+                      <td className="py-2.5 px-2.5 text-center font-mono font-bold text-slate-900">
+                        {qty}
                       </td>
 
                       {/* Unit Price */}
-                      <td className="py-2.5 px-2.5 text-right font-mono font-bold text-slate-700">
+                      <td className="py-2.5 px-2.5 text-right font-mono font-bold text-slate-800">
                         ${unitPrice.toFixed(2)}
+                      </td>
+
+                      {/* Formula: Number of Cleaners ( QTY × Unit Price ) = Total */}
+                      <td className="py-2.5 px-3 font-mono text-[11px]">
+                        {item.isAddon ? (
+                          <div className="text-slate-700 font-bold">
+                            1 ({qty} × ${unitPrice.toFixed(2)}) = ${total.toFixed(2)}
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-bold text-purple-900">
+                              {cleaners} Cleaner{cleaners > 1 ? 's' : ''} ({qty} × ${unitPrice.toFixed(2)}) = ${total.toFixed(2)}
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              {altCleaners} Cleaner{altCleaners > 1 ? 's' : ''} ({altConv.quantity} × ${altConv.unitPrice.toFixed(2)}) = ${altConv.total.toFixed(2)}
+                            </div>
+                          </div>
+                        )}
                       </td>
 
                       {/* Total = Qty * Unit Price */}
@@ -674,12 +951,8 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                       </td>
 
                       {/* Status */}
-                      <td className="py-2.5 px-2 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          item.isActive !== false
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}>
+                      <td className="py-2.5 px-2 text-center text-[11px] font-semibold">
+                        <span className={item.isActive !== false ? 'text-emerald-700' : 'text-slate-400'}>
                           {item.status || (item.isActive !== false ? 'Active' : 'Draft')}
                         </span>
                       </td>
@@ -693,7 +966,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                                 onSelectForQuote(item);
                                 onClose();
                               }}
-                              className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-bold cursor-pointer"
+                              className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[10px] font-bold cursor-pointer"
                               title="Add this line item to the current quote"
                             >
                               Use
@@ -701,14 +974,14 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                           )}
                           <button
                             onClick={() => startEdit(item)}
-                            className="p-1 text-slate-400 hover:text-purple-600 rounded cursor-pointer"
+                            className="p-1.5 text-slate-500 hover:text-purple-600 rounded cursor-pointer"
                             title="Edit Item"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteItem(item.id, item.name)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer"
+                            className="p-1.5 text-slate-500 hover:text-rose-600 rounded cursor-pointer"
                             title="Delete Item"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -725,17 +998,31 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
 
         {/* Footer */}
         <div className="p-3 sm:p-4 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-extrabold text-slate-800">
               Total Catalog Items: {currentItems.length}
             </span>
-            <span>•</span>
+            <span>·</span>
             <span className="font-mono text-emerald-700 font-bold">
-              Formula: Quantity × Unit Price = Total (CAD)
+              Formula: Number of Cleaners ( QTY × Unit Price ) = Total (CAD)
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleDownloadGoogleSheetsXlsx}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold cursor-pointer transition-all flex items-center gap-1.5"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Download Google Sheets (.xlsx)</span>
+            </button>
+            <button
+              onClick={handleDownloadGoogleSheetsCsv}
+              className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold cursor-pointer transition-all flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download CSV</span>
+            </button>
             <button
               onClick={onClose}
               className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold cursor-pointer transition-all"
@@ -750,7 +1037,6 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
       {isImportModalOpen && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-5 bg-slate-900/70 backdrop-blur-xs font-sans">
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
-            {/* Header */}
             <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white">
@@ -761,7 +1047,7 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                     Attach File or Paste Price List
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Supports Excel (.xlsx / .xls), CSV, Google Sheets, or direct copy-paste with quantities &amp; unit prices
+                    Formula: Number of Cleaners ( QTY × Unit Price ) = Total
                   </p>
                 </div>
               </div>
@@ -774,14 +1060,12 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
             </div>
 
             <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
-              {/* Option 1: Attach File (Excel, CSV, Google Sheets download) */}
               <div>
                 <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
                   1. Attach Spreadsheet File (.xlsx, .xls, .csv, .tsv)
                 </label>
 
                 {attachedFile ? (
-                  /* Persistent File Attached Display Card (Never disappears!) */
                   <div className="p-3.5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 flex items-center justify-between gap-3 shadow-xs">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
@@ -790,12 +1074,12 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                       <div>
                         <div className="font-extrabold text-xs text-emerald-950 flex items-center gap-2">
                           <span>{attachedFile.name}</span>
-                          <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-emerald-200 text-emerald-800">
-                            Attached &amp; Loaded
+                          <span className="text-[10px] font-bold text-emerald-700">
+                            · Attached &amp; Loaded
                           </span>
                         </div>
                         <div className="text-[11px] text-emerald-700 mt-0.5">
-                          {attachedFile.type} • {attachedFile.sizeKb} KB •{' '}
+                          {attachedFile.type} · {attachedFile.sizeKb} KB ·{' '}
                           <span className="font-bold">{attachedFile.itemCount} items detected</span>
                         </div>
                       </div>
@@ -810,7 +1094,6 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                     </button>
                   </div>
                 ) : (
-                  /* File Picker Button & Drop Zone */
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-2 border-dashed border-slate-300 hover:border-purple-500 rounded-2xl bg-slate-50 hover:bg-purple-50/30 transition-all">
                     <div className="flex items-center gap-3 text-center sm:text-left">
                       <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
@@ -841,7 +1124,6 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                 )}
               </div>
 
-              {/* Option 2: Live Google Sheets URL */}
               <div>
                 <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1.5">
                   2. Or Fetch from Google Sheets URL
@@ -868,31 +1150,38 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
                 </div>
               </div>
 
-              {/* Option 3: Direct Paste Box */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider">
                     3. Or Paste Cells from Google Sheets / Excel / Text
                   </label>
                   <span className="text-[10px] text-slate-500 font-mono">
-                    Columns: SERVICE NAME • CATEGORY • BEDS • BATHS • QUANTITY • UNIT PRICE • TOTAL
+                    SERVICE NAME · CATEGORY · BEDS · BATHS · CLEANERS · QUANTITY · UNIT PRICE · TOTAL
                   </span>
                 </div>
                 <textarea
                   rows={6}
-                  placeholder={`SERVICE NAME/JOBBER LINE ITEM	CATEGORY	BEDS	BATHS	QUANTITY	UNIT PRICE (CAD)	TOTAL (CAD)	STATUS	ACTIVE?
-2Bed 2Bath Moveout Cleaning - Online Booking	Move-Out Cleaning	2 Bedrooms	2 Bathrooms	3	105.00	315.00	Active	Yes
-Fuel Surcharge 2	Add-on Services			1	12.50	12.50	Active	Yes
-Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
+                  placeholder={`SERVICE NAME/JOBBER LINE ITEM	CATEGORY	BEDS	BATHS	NUMBER OF CLEANERS	QUANTITY	UNIT PRICE (CAD)	TOTAL (CAD)	STATUS	ACTIVE?
+1Bed 1Bath Moveout Cleaning 2026	Move-Out Cleaning	1 Bedroom	1 Bathroom	2	3	105.00	315.00	Active	Yes
+2Bed 2Bath Moveout Cleaning - Online Booking	Move-Out Cleaning	2 Bedrooms	2 Bathrooms	2	3	105.00	315.00	Active	Yes`}
                   value={pastedText}
                   onChange={(e) => setPastedText(e.target.value)}
                   className="w-full p-3 font-mono text-[11px] bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:border-purple-600"
                 />
               </div>
 
-              {/* Import Mode: Append or Replace */}
               <div className="flex items-center gap-4 text-xs font-bold text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
                 <span className="text-slate-500 text-[11px] uppercase font-mono">Mode:</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    checked={importMode === 'REPLACE'}
+                    onChange={() => setImportMode('REPLACE')}
+                    className="text-purple-600 focus:ring-purple-500"
+                  />
+                  <span>Replace entire catalog with this updated list (Recommended)</span>
+                </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
@@ -903,28 +1192,17 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
                   />
                   <span>Add / Update matching items (Keep existing)</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="importMode"
-                    checked={importMode === 'REPLACE'}
-                    onChange={() => setImportMode('REPLACE')}
-                    className="text-purple-600 focus:ring-purple-500"
-                  />
-                  <span>Replace entire catalog with this list</span>
-                </label>
               </div>
 
-              {/* Live Detection Preview Table */}
               {parsedPreview.length > 0 && (
                 <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-extrabold text-purple-900 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Detected {parsedPreview.length} Price List Items with Quantities &amp; Rates</span>
+                      <span>Detected {parsedPreview.length} Price List Items</span>
                     </span>
                     <span className="text-[11px] font-mono text-purple-700 font-bold">
-                      Total Catalog Value: ${parsedPreview.reduce((acc, p) => acc + (p.total ?? (p.quantity * p.unitPrice)), 0).toFixed(2)} CAD
+                      Formula: Number of Cleaners ( QTY × Unit Price ) = Total
                     </span>
                   </div>
 
@@ -933,9 +1211,10 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
                       <thead className="bg-purple-100/60 text-purple-900 font-bold sticky top-0 text-[10px]">
                         <tr>
                           <th className="p-2">Service Name</th>
-                          <th className="p-2">Beds/Baths</th>
-                          <th className="p-2 text-center">Qty</th>
+                          <th className="p-2 text-center"># Cleaners</th>
+                          <th className="p-2 text-center">QTY</th>
                           <th className="p-2 text-right">Unit Price</th>
+                          <th className="p-2">Formula</th>
                           <th className="p-2 text-right">Total (CAD)</th>
                         </tr>
                       </thead>
@@ -945,18 +1224,17 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
                             <td className="p-2 font-sans font-bold text-slate-800">
                               {item.name}
                             </td>
-                            <td className="p-2 text-slate-500 text-[10px]">
-                              {item.bedrooms || item.beds || item.bathrooms || item.baths ? (
-                                `${item.bedrooms || item.beds || ''} ${item.bathrooms || item.baths || ''}`
-                              ) : (
-                                '—'
-                              )}
+                            <td className="p-2 text-center text-purple-800 font-bold">
+                              {item.cleanersCount || 2}
                             </td>
                             <td className="p-2 text-center text-slate-700 font-bold">
                               {item.quantity}
                             </td>
                             <td className="p-2 text-right text-slate-700">
                               ${item.unitPrice.toFixed(2)}
+                            </td>
+                            <td className="p-2 text-[10px] text-purple-900">
+                              {item.cleanersCount || 2} ({item.quantity} × ${item.unitPrice.toFixed(2)}) = ${item.total.toFixed(2)}
                             </td>
                             <td className="p-2 text-right font-bold text-emerald-700">
                               ${item.total.toFixed(2)}
@@ -970,7 +1248,6 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
               )}
             </div>
 
-            {/* Modal Actions */}
             <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2">
               <button
                 type="button"
@@ -987,7 +1264,7 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
               >
                 <Check className="w-4 h-4" />
                 <span>
-                  {isSaving ? 'Applying to Catalog...' : `Apply ${parsedPreview.length} Items to Service Catalog`}
+                  {isSaving ? 'Saving to Price List...' : `Save ${parsedPreview.length} Items to Service Catalog`}
                 </span>
               </button>
             </div>
@@ -1024,7 +1301,7 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 2Bed 2Bath Moveout Cleaning - Online Booking"
+                  placeholder="e.g. 1Bed 1Bath Moveout Cleaning 2026"
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-purple-600 font-semibold"
@@ -1109,16 +1386,35 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
                 </div>
               )}
 
-              {/* Exact Jobber Calculation: Quantity * Unit Price = Total */}
-              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200 space-y-2.5">
-                <div className="flex items-center gap-1.5 text-purple-900 font-extrabold text-[11px]">
-                  <Calculator className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Jobber Formula: Quantity × Unit Price = Total</span>
+              {/* Formula Calculation: Number of Cleaners ( QTY × Unit Price ) = Total */}
+              <div className="p-3.5 bg-purple-50/70 rounded-2xl border border-purple-200 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-1">
+                  <div className="flex items-center gap-1.5 text-purple-900 font-extrabold text-[11px]">
+                    <Calculator className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Formula: Number of Cleaners ( QTY × Unit Price ) = Total</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-purple-700 font-bold">
+                    Switching cleaners auto-adjusts QTY &amp; Unit Price
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Quantity *</label>
+                    <label className="block font-bold text-slate-700 mb-1"># of Cleaners *</label>
+                    <select
+                      value={formCleanersCount}
+                      onChange={(e) => handleCleanersCountChange(e.target.value)}
+                      className="w-full px-2.5 py-2 border border-purple-300 rounded-xl font-bold text-purple-900 bg-white"
+                    >
+                      <option value="1">1 Cleaner ($52.50)</option>
+                      <option value="2">2 Cleaners ($105.00)</option>
+                      <option value="3">3 Cleaners ($157.50)</option>
+                    </select>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Crew size</span>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Quantity (QTY) *</label>
                     <input
                       type="number"
                       step="0.1"
@@ -1126,22 +1422,22 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
                       required
                       value={formQuantity}
                       onChange={(e) => handleQuantityChange(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold bg-white"
+                      className="w-full px-2.5 py-2 border border-slate-300 rounded-xl font-mono font-bold bg-white"
                     />
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Hours or Units</span>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Hours / Units</span>
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Unit Price ($ CAD) *</label>
+                    <label className="block font-bold text-slate-700 mb-1">Unit Price ($) *</label>
                     <input
                       type="number"
                       step="0.01"
                       required
                       value={formUnitPrice}
                       onChange={(e) => handleUnitPriceChange(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono font-bold text-purple-700 bg-white"
+                      className="w-full px-2.5 py-2 border border-slate-300 rounded-xl font-mono font-bold text-purple-700 bg-white"
                     />
-                    <span className="text-[10px] text-slate-500 mt-0.5 block">Per unit or per hour</span>
+                    <span className="text-[10px] text-slate-500 mt-0.5 block">Rate for crew</span>
                   </div>
 
                   <div>
@@ -1152,26 +1448,26 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
                       required
                       value={formTotal}
                       onChange={(e) => setFormTotal(e.target.value)}
-                      className="w-full px-3 py-2 border border-emerald-300 rounded-xl font-mono font-extrabold text-emerald-700 bg-emerald-50/50"
+                      className="w-full px-2.5 py-2 border border-emerald-300 rounded-xl font-mono font-extrabold text-emerald-700 bg-emerald-50/50"
                     />
-                    <span className="text-[10px] text-emerald-600 mt-0.5 block">Synced with Jobber</span>
+                    <span className="text-[10px] text-emerald-600 mt-0.5 block">Jobber Total</span>
                   </div>
+                </div>
+
+                {/* Live Formula Readout */}
+                <div className="p-2.5 rounded-xl bg-white border border-purple-200/80 font-mono text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div className="font-bold text-purple-950">
+                    {formCleanersNum} Cleaner{formCleanersNum > 1 ? 's' : ''} ( {formQtyNum} × ${formUnitNum.toFixed(2)} ) = ${formTotalNum.toFixed(2)} CAD
+                  </div>
+                  {formCategory !== 'ADD_ON' && (
+                    <div className="text-slate-600 text-[10px]">
+                      {formAltCleaners} Cleaner{formAltCleaners > 1 ? 's' : ''} eq: {formAltCleaners} ( {formAltConverted.quantity} × ${formAltConverted.unitPrice.toFixed(2)} ) = ${formAltConverted.total.toFixed(2)}
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Cleaners Crew</label>
-                  <select
-                    value={formCleanersCount}
-                    onChange={(e) => setFormCleanersCount(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white"
-                  >
-                    <option value="1">1 Solo Cleaner</option>
-                    <option value="2">2 Pro Cleaners (Tandem Crew)</option>
-                    <option value="3">3 Cleaners Crew</option>
-                  </select>
-                </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Deposit Required ($)</label>
                   <input
@@ -1183,6 +1479,17 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono"
                   />
                 </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Active in Catalog?</label>
+                  <select
+                    value={formIsActive ? 'yes' : 'no'}
+                    onChange={(e) => setFormIsActive(e.target.value === 'yes')}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white"
+                  >
+                    <option value="yes">Yes (Active)</option>
+                    <option value="no">No (Hidden)</option>
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -1191,7 +1498,7 @@ Discount $10 Facebook Ad	Add-on Services			1	-10.00	-10.00	Active	Yes`}
                 </label>
                 <textarea
                   rows={2}
-                  placeholder={`2Bed 2Bath Moveout Cleaning\n2 Pro Cleaners\nIncludes Fuel Surcharge`}
+                  placeholder={`1Bed 1Bath Moveout Cleaning 2026\n2 Cleaners (3 × $105.00) = $315.00 CAD`}
                   value={formDescription}
                   onChange={(e) => setFormDescription(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-[11px]"

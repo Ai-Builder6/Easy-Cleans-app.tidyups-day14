@@ -972,12 +972,13 @@ export function App() {
           if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices);
           if (data.quoCallLogs && data.quoCallLogs.length > 0) setQuoCallsList(data.quoCallLogs);
           if (data.adLeads && data.adLeads.length > 0) setLeadsList(data.adLeads);
+          if (data.serviceCatalog && data.serviceCatalog.length > 0) setServiceCatalog(data.serviceCatalog);
         }
       })
       .catch((err) => console.warn('Could not load persistent store:', err));
   }, [activeProjectId]);
 
-  // Unified persistent auto-save: preserves all user entries, clients, quotes, invoices, and jobs across refreshes per project
+  // Unified persistent auto-save: preserves all user entries, clients, quotes, invoices, serviceCatalog, and jobs across refreshes per project
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -989,14 +990,16 @@ export function App() {
           clients: clientsList,
           quotes: quotesList,
           invoices: invoicesList,
+          serviceCatalog,
           lastSavedAt: new Date().toISOString(),
         };
         localStorage.setItem(`${activeProjectId}_dispatch_data`, JSON.stringify(payload));
+        localStorage.setItem('tidyups_service_catalog_live', JSON.stringify(serviceCatalog));
       }
     } catch (err) {
       console.warn('Auto-save error:', err);
     }
-  }, [activeProjectId, tickets, technicians, scheduledJobsList, unscheduledJobsList, clientsList, quotesList, invoicesList]);
+  }, [activeProjectId, tickets, technicians, scheduledJobsList, unscheduledJobsList, clientsList, quotesList, invoicesList, serviceCatalog]);
 
   // Save tickets to local persistent database whenever updated
   const saveStateToStore = useCallback((updatedTickets: ServiceTicket[]) => {

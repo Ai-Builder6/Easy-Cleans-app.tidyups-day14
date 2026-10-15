@@ -163,11 +163,15 @@ export function saveStore(store: AppPersistentStore, projectId?: string): boolea
     const merged: AppPersistentStore = {
       ...existing,
       ...store,
-      // Ensure nested API and phone configurations are never erased if not explicitly provided
+      // Ensure nested API, phone configurations, and custom serviceCatalog are never erased if not explicitly provided
       spamShieldConfig: store.spamShieldConfig || existing.spamShieldConfig,
       jobberConfig: store.jobberConfig || existing.jobberConfig,
       quoConfig: store.quoConfig || existing.quoConfig,
       apiKeys: store.apiKeys || existing.apiKeys,
+      serviceCatalog:
+        Array.isArray(store.serviceCatalog) && store.serviceCatalog.length > 0
+          ? store.serviceCatalog
+          : existing.serviceCatalog,
       lastSavedAt: new Date().toISOString(),
     };
 

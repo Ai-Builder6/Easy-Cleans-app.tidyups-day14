@@ -28,6 +28,7 @@ import {
   FileArchive,
   CloudUpload,
   Tag,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { Technician } from '../types/dispatch';
 
@@ -238,23 +239,33 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
             <div>
               <div className="flex items-center justify-between">
                 <h3 className="font-black text-lg text-white">Service Catalog &amp; Price List</h3>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-pink-950 text-pink-300 border border-pink-800">
-                  {catalogCount || 28} Active Items
+                <span className="text-xs font-mono font-bold text-pink-300">
+                  {catalogCount || 46} Items
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Standard prices, line items, and bedroom/bathroom configurations. Paste custom price lists and auto-sync line items with Jobber quotes.
+                Formula: <strong className="text-slate-200 font-mono">Number of Cleaners (QTY × Unit Price) = Total</strong>. 2 Cleaners (3 × $105) = $315 ↔ 1 Cleaner (6 × $52.50) = $315.
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onOpenPriceList}
-            className="w-full py-2.5 px-4 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-95 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md group-hover:translate-x-0.5"
-          >
-            <span>Open Service Catalog &amp; Price List</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={onOpenPriceList}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-95 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md group-hover:translate-x-0.5"
+            >
+              <span>Open Service Catalog &amp; Price List</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+            <a
+              href="/api/price-list/export.xlsx?project=tidyups"
+              download
+              className="w-full py-2 px-4 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Download Live Google Sheets (.xlsx)</span>
+            </a>
+          </div>
         </div>
 
         {/* 2. Invoices & Billing */}
