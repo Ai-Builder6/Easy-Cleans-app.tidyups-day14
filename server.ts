@@ -65,6 +65,12 @@ import * as dbSchema from "./src/db/schema";
 import { requireAuth, AuthRequest } from "./src/middleware/auth";
 import { getOrCreateUser, getUserByUid } from "./src/db/users";
 import { eq } from "drizzle-orm";
+import {
+  CANONICAL_SERVICE_CATALOG,
+  ServiceCatalogItem,
+  parsePastedPriceList,
+  matchCatalogItem,
+} from "./src/data/serviceCatalogData";
 
 dotenv.config();
 
@@ -2301,6 +2307,32 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
           q.googleSheetUrl = googleSheetUrl;
           mutated = true;
         }
+        if (!q.lineItems || q.lineItems.length === 0) {
+          const match = matchCatalogItem(q.service, q.bedrooms, q.bathrooms);
+          if (match) {
+            q.lineItems = [
+              {
+                description: match.name,
+                quantity: 1,
+                unitPrice: match.basePrice,
+                total: match.basePrice,
+              },
+            ];
+            mutated = true;
+          } else if (q.total) {
+            q.lineItems = [
+              {
+                description: `${q.service || "Residential Cleaning"}${
+                  q.bedrooms ? ` (${q.bedrooms}${q.bathrooms ? `, ${q.bathrooms}` : ""})` : ""
+                }`,
+                quantity: 1,
+                unitPrice: q.total,
+                total: q.total,
+              },
+            ];
+            mutated = true;
+          }
+        }
       }
     }
 
@@ -2370,6 +2402,35 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
           inv.jobberWebUri = fixedUri;
           mutated = true;
         }
+      }
+    }
+  }
+
+  // 5. Ensure Service Catalog Price List is initialized
+  if (!Array.isArray(store.serviceCatalog) || store.serviceCatalog.length === 0) {
+    store.serviceCatalog = [...CANONICAL_SERVICE_CATALOG];
+    mutated = true;
+  }
+
+  // 6. Ensure every quote has complete line items matching the service catalog
+  if (Array.isArray(store.quotes)) {
+    for (const q of store.quotes) {
+      if (!Array.isArray(q.lineItems) || q.lineItems.length === 0) {
+        const matched = matchCatalogItem(q.service || "", q.bedrooms, q.bathrooms, store.serviceCatalog || CANONICAL_SERVICE_CATALOG);
+        const totalVal = Number(q.total) || 280;
+        const unitPrice = matched ? matched.basePrice : Math.round((totalVal / 1.05) * 100) / 100;
+        const itemDesc = matched
+          ? matched.jobberItemName
+          : `${q.service || "Residential Cleaning"} (${q.bedrooms || "3 Bed"}, ${q.bathrooms || "2 Bath"})`;
+        q.lineItems = [
+          {
+            description: itemDesc,
+            quantity: 1,
+            unitPrice,
+            total: unitPrice,
+          },
+        ];
+        mutated = true;
       }
     }
   }
@@ -2486,6 +2547,127 @@ function upsertJobberClientAndLeadFromQuote(store: AppPersistentStore, quote: an
 
   return matchedClient;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service Catalog & Price List Endpoints (Jobber Line Items & Prices)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/price-list: Retrieve live service catalog price list
+app.get("/api/price-list", (req, res) => {
+  const projectId = getProjectId(req);
+  const currentStore = loadStore(projectId);
+  if (currentStore && repairAndSyncStoreData(currentStore)) {
+    saveStore(currentStore, projectId);
+  }
+  const items =
+    currentStore?.serviceCatalog && currentStore.serviceCatalog.length > 0
+      ? currentStore.serviceCatalog
+      : CANONICAL_SERVICE_CATALOG;
+  res.json({
+    success: true,
+    items,
+    count: items.length,
+    activeProjectId: projectId,
+  });
+});
+
+// POST /api/price-list: Save updated or custom price list items
+app.post("/api/price-list", (req, res) => {
+  const projectId = getProjectId(req);
+  const { items } = req.body || {};
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ error: "items array is required" });
+  }
+  const currentStore = loadStore(projectId) || {
+    version: 1,
+    lastSavedAt: new Date().toISOString(),
+    tickets: INITIAL_TICKETS,
+    cleanerOverrides: {},
+    scheduledVisits: generateHistoricAndFutureVisits(),
+    unscheduledJobs: INITIAL_UNSCHEDULED_JOBS,
+    quotes: generateJobberQuotes(),
+    invoices: generateJobberInvoices(),
+    clients: INITIAL_CLIENTS,
+    adLeads: INITIAL_AD_LEADS,
+  };
+  currentStore.serviceCatalog = items;
+  currentStore.lastSavedAt = new Date().toISOString();
+  saveStore(currentStore, projectId);
+  res.json({
+    success: true,
+    message: `Successfully saved ${items.length} service catalog price list items.`,
+    items,
+    count: items.length,
+    activeProjectId: projectId,
+  });
+});
+
+// POST /api/price-list/import: Parse and import pasted price list text, CSV, or spreadsheet rows
+app.post("/api/price-list/import", (req, res) => {
+  const projectId = getProjectId(req);
+  const { text, mode } = req.body || {};
+  if (!text || typeof text !== "string") {
+    return res.status(400).json({ error: "text parameter is required" });
+  }
+  const parsed = parsePastedPriceList(text);
+  if (parsed.length === 0) {
+    return res.status(400).json({
+      error:
+        "Could not detect any valid price items. Make sure entries include service titles and dollar figures ($XXX or XXX.XX).",
+    });
+  }
+  const currentStore = loadStore(projectId) || {
+    version: 1,
+    lastSavedAt: new Date().toISOString(),
+    tickets: INITIAL_TICKETS,
+    cleanerOverrides: {},
+    scheduledVisits: generateHistoricAndFutureVisits(),
+    unscheduledJobs: INITIAL_UNSCHEDULED_JOBS,
+    quotes: generateJobberQuotes(),
+    invoices: generateJobberInvoices(),
+    clients: INITIAL_CLIENTS,
+    adLeads: INITIAL_AD_LEADS,
+  };
+  const existing = currentStore.serviceCatalog || CANONICAL_SERVICE_CATALOG;
+  const nextItems =
+    mode === "REPLACE"
+      ? parsed
+      : [
+          ...existing.filter(
+            (e: any) => !parsed.some((p) => p.name.toLowerCase() === e.name.toLowerCase())
+          ),
+          ...parsed,
+        ];
+  currentStore.serviceCatalog = nextItems;
+  currentStore.lastSavedAt = new Date().toISOString();
+  saveStore(currentStore, projectId);
+  res.json({
+    success: true,
+    message: `Successfully imported ${parsed.length} price list items!`,
+    items: nextItems,
+    importedCount: parsed.length,
+    totalCount: nextItems.length,
+    activeProjectId: projectId,
+  });
+});
+
+// POST /api/price-list/reset: Restore canonical Tidyups Cleaning Service Inc. price list
+app.post("/api/price-list/reset", (req, res) => {
+  const projectId = getProjectId(req);
+  const currentStore = loadStore(projectId);
+  if (currentStore) {
+    currentStore.serviceCatalog = [...CANONICAL_SERVICE_CATALOG];
+    currentStore.lastSavedAt = new Date().toISOString();
+    saveStore(currentStore, projectId);
+  }
+  res.json({
+    success: true,
+    message: "Service catalog restored to canonical Tidyups prices.",
+    items: CANONICAL_SERVICE_CATALOG,
+    count: CANONICAL_SERVICE_CATALOG.length,
+    activeProjectId: projectId,
+  });
+});
 
 // POST /api/database/quotes: Step 1 Create Client in Jobber -> Step 2 Create Property -> Step 3 Create Draft Quote & Sync Google Sheets
 app.post("/api/database/quotes", async (req, res) => {
@@ -3042,7 +3224,7 @@ app.get("/api/store", async (req, res) => {
 
 const handleSaveStore = (req: any, res: any) => {
   const projectId = getProjectId(req);
-  const { tickets, cleanerOverrides, scheduledVisits, unscheduledJobs, staffRoster, quotes, invoices, clients } = req.body || {};
+  const { tickets, cleanerOverrides, scheduledVisits, unscheduledJobs, staffRoster, quotes, invoices, clients, serviceCatalog } = req.body || {};
   const current = loadStore(projectId) || {
     version: 1,
     lastSavedAt: new Date().toISOString(),
@@ -3069,6 +3251,7 @@ const handleSaveStore = (req: any, res: any) => {
     clients: clients || current.clients,
     quotes: quotes || current.quotes,
     invoices: invoices || current.invoices,
+    serviceCatalog: serviceCatalog || current.serviceCatalog,
   };
 
   const ok = saveStore(updated, projectId);

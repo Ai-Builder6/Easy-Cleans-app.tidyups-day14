@@ -1094,6 +1094,9 @@ export function generateJobberQuotes(): JobberQuote[] {
       verdict: 'Good lead',
       jobberWebUri: 'https://secure.getjobber.com/quotes/67087068',
       notes: '4Bed 3Bath Deep Cleaning 2026 at 1015 Burns Close NW, Edmonton, AB.',
+      lineItems: [
+        { description: '4Bed 3Bath Deep Cleaning 2026', quantity: 1, unitPrice: 439.29, total: 439.29 },
+      ],
     },
     {
       id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDg2ODY4',
@@ -1112,6 +1115,9 @@ export function generateJobberQuotes(): JobberQuote[] {
       verdict: 'Good lead',
       jobberWebUri: 'https://secure.getjobber.com/quotes/67086868',
       notes: '2Bed 2Bath Deep Cleaning 2026.',
+      lineItems: [
+        { description: '2Bed 2Bath Deep Cleaning 2026', quantity: 1, unitPrice: 197.5, total: 197.5 },
+      ],
     },
     {
       id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDI4MDIx',
@@ -1132,6 +1138,9 @@ export function generateJobberQuotes(): JobberQuote[] {
       verdict: 'Good lead',
       jobberWebUri: 'https://secure.getjobber.com/quotes/67028021',
       notes: '2Bed 2Bath Move Out Cleaning requested for October 22.',
+      lineItems: [
+        { description: '2Bed 2Bath Move Out Cleaning 2026', quantity: 1, unitPrice: 317.5, total: 317.5 },
+      ],
     },
     {
       id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDIyNTc1',
@@ -1150,6 +1159,9 @@ export function generateJobberQuotes(): JobberQuote[] {
       verdict: 'Client',
       jobberWebUri: 'https://secure.getjobber.com/quotes/67022575',
       notes: 'Initial Basic Cleaning at 839 Drysdale Run NW, Edmonton, AB.',
+      lineItems: [
+        { description: '2Bed 2Bath Initial Basic Cleaning', quantity: 1, unitPrice: 198.5, total: 198.5 },
+      ],
     },
     {
       id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODEyMTA5',
@@ -1169,6 +1181,9 @@ export function generateJobberQuotes(): JobberQuote[] {
       verdict: 'Good lead',
       jobberWebUri: 'https://secure.getjobber.com/quotes/66812109',
       notes: '1900 sq ft, 3 bed, 2.5 bath Deep cleaning in Chappelle. Preferred schedule: October 17 morning.',
+      lineItems: [
+        { description: '3Bed 2.5Bath Deep Cleaning 2026', quantity: 1, unitPrice: 198.5, total: 198.5 },
+      ],
     },
   ];
 

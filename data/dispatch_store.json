@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSavedAt": "2026-10-15T02:00:21.342Z",
+  "lastSavedAt": "2026-10-15T17:23:41.540Z",
   "tickets": [
     {
       "id": "ticket-mv8tq0ul",
@@ -2445,6 +2445,14 @@
       "verdict": "Good lead",
       "jobberWebUri": "https://secure.getjobber.com/quotes/67087068",
       "notes": "4Bed 3Bath Deep Cleaning 2026 at 1015 Burns Close NW, Edmonton, AB.",
+      "lineItems": [
+        {
+          "description": "4Bed 3Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 439.29,
+          "total": 439.29
+        }
+      ],
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
     },
@@ -2465,6 +2473,14 @@
       "verdict": "Good lead",
       "jobberWebUri": "https://secure.getjobber.com/quotes/67086868",
       "notes": "2Bed 2Bath Deep Cleaning 2026.",
+      "lineItems": [
+        {
+          "description": "2Bed 2Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 197.5,
+          "total": 197.5
+        }
+      ],
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
     },
@@ -2487,6 +2503,14 @@
       "verdict": "Good lead",
       "jobberWebUri": "https://secure.getjobber.com/quotes/67028021",
       "notes": "2Bed 2Bath Move Out Cleaning requested for October 22.",
+      "lineItems": [
+        {
+          "description": "2Bed 2Bath Move Out Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 317.5,
+          "total": 317.5
+        }
+      ],
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
     },
@@ -2507,6 +2531,14 @@
       "verdict": "Client",
       "jobberWebUri": "https://secure.getjobber.com/quotes/67022575",
       "notes": "Initial Basic Cleaning at 839 Drysdale Run NW, Edmonton, AB.",
+      "lineItems": [
+        {
+          "description": "2Bed 2Bath Initial Basic Cleaning",
+          "quantity": 1,
+          "unitPrice": 198.5,
+          "total": 198.5
+        }
+      ],
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
     },
@@ -2528,6 +2560,14 @@
       "verdict": "Good lead",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66812109",
       "notes": "1900 sq ft, 3 bed, 2.5 bath Deep cleaning in Chappelle. Preferred schedule: October 17 morning.",
+      "lineItems": [
+        {
+          "description": "3Bed 2.5Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 198.5,
+          "total": 198.5
+        }
+      ],
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
     },
@@ -2543,7 +2583,15 @@
       "createdAt": "2026-10-09T17:39:41Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/67058456",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2OTYwNjE5",
@@ -2557,7 +2605,15 @@
       "createdAt": "2026-10-08T01:16:10Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66960619",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2OTM1OTM4",
@@ -2571,7 +2627,15 @@
       "createdAt": "2026-10-07T19:09:53Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66935938",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2OTIwMjI0",
@@ -2585,7 +2649,15 @@
       "createdAt": "2026-10-07T16:41:53Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66920224",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODgzNTQz",
@@ -2599,7 +2671,15 @@
       "createdAt": "2026-10-06T23:28:36Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66883543",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODc5NTM1",
@@ -2613,7 +2693,15 @@
       "createdAt": "2026-10-06T22:18:36Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66879535",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NjY2NTUx",
@@ -2630,7 +2718,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "6105 52 Avenue, Edmonton, AB, T6B 3B2",
       "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms"
+      "bathrooms": "2.5 Bathrooms",
+      "lineItems": [
+        {
+          "description": "Move Out Cleaning Services 2026 (3 Bed / 2.5 Bath)",
+          "quantity": 1,
+          "unitPrice": 407.5,
+          "total": 407.5
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NjE2MTYx",
@@ -2647,7 +2743,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "31 Parkland Gate Road, Spruce Grove, Alberta",
       "bedrooms": "4 Bedrooms",
-      "bathrooms": "1 Bathroom"
+      "bathrooms": "1 Bathroom",
+      "lineItems": [
+        {
+          "description": "3Bed 2Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 210,
+          "total": 210
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NjA2MTA1",
@@ -2662,7 +2766,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/66606105",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "2096 Blackmud Creek Drive Southwest Unit447, Edmonton, Alberta"
+      "serviceAddress": "2096 Blackmud Creek Drive Southwest Unit447, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NDU0MDg1",
@@ -2679,7 +2791,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "2505 22 Ave Nw, Edmonton, AB, T6T 0Y4",
       "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms"
+      "bathrooms": "2.5 Bathrooms",
+      "lineItems": [
+        {
+          "description": "3Bed 2.5Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 223.32,
+          "total": 223.32
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NDQ5OTk4",
@@ -2693,7 +2813,15 @@
       "createdAt": "2026-09-29T15:02:36Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66449998",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NDIxMjk4",
@@ -2707,7 +2835,15 @@
       "createdAt": "2026-09-28T22:51:19Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66421298",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Mzg4NzEw",
@@ -2722,7 +2858,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/66388710",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "170 Century Crossing 336, Spruce Grove, Alberta"
+      "serviceAddress": "170 Century Crossing 336, Spruce Grove, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Mzg4MzM2",
@@ -2737,7 +2881,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/66388336",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "11046 152 Street Northwest, Edmonton, Alberta"
+      "serviceAddress": "11046 152 Street Northwest, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Mzg3MTI1",
@@ -2751,7 +2903,15 @@
       "createdAt": "2026-09-28T17:08:04Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66387125",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzUwMzI2",
@@ -2765,7 +2925,15 @@
       "createdAt": "2026-09-27T22:47:04Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66350326",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzQ3NzI3",
@@ -2779,7 +2947,15 @@
       "createdAt": "2026-09-27T20:13:22Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66347727",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzQ1NjU0",
@@ -2794,7 +2970,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/66345654",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "Twin Brooks Court Northwest 1006, Edmonton, Alberta"
+      "serviceAddress": "Twin Brooks Court Northwest 1006, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Initial Basic Cleaning",
+          "quantity": 1,
+          "unitPrice": 155,
+          "total": 155
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzM4NDM1",
@@ -2811,7 +2995,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "31 Parkland Gate Road, Spruce Grove, Alberta",
       "bedrooms": "4 Bedrooms",
-      "bathrooms": "1 Bathroom"
+      "bathrooms": "1 Bathroom",
+      "lineItems": [
+        {
+          "description": "3Bed 2Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 210,
+          "total": 210
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzMzNjA4",
@@ -2825,7 +3017,15 @@
       "createdAt": "2026-09-26T19:15:49Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66333608",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzE3NDgx",
@@ -2842,7 +3042,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "4470 Prowse Road SW, unit 63, Edmonton, AB, T6W 3A2",
       "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms"
+      "bathrooms": "2.5 Bathrooms",
+      "lineItems": [
+        {
+          "description": "3Bed 2.5Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 223.32,
+          "total": 223.32
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzE3MzA2",
@@ -2856,7 +3064,15 @@
       "createdAt": "2026-09-25T23:10:24Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66317306",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzA0OTUy",
@@ -2870,7 +3086,15 @@
       "createdAt": "2026-09-25T19:49:29Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66304952",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Mjg3NTY1",
@@ -2887,7 +3111,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "Edmonton West (T6M 1M4), Edmonton, AB, T6M 1M4",
       "bedrooms": "4 Bedrooms",
-      "bathrooms": "3 Bathrooms"
+      "bathrooms": "3 Bathrooms",
+      "lineItems": [
+        {
+          "description": "4Bed 3Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 439.29,
+          "total": 439.29
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MjQ3MTIz",
@@ -2901,7 +3133,15 @@
       "createdAt": "2026-09-24T23:36:31Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66247123",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MjM4MTg2",
@@ -2915,7 +3155,15 @@
       "createdAt": "2026-09-24T21:09:50Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66238186",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MjExMjA1",
@@ -2932,7 +3180,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "8316 76 Street Northwest, Edmonton, Alberta",
       "bedrooms": "1",
-      "bathrooms": "1"
+      "bathrooms": "1",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MTg1Nzc4",
@@ -2946,7 +3202,15 @@
       "createdAt": "2026-09-24T03:09:15Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66185778",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MTU2MDg1",
@@ -2963,7 +3227,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "1517 Bearspaw Dr E Northwest, Edmonton, AB, Canada, Edmonton, AB",
       "bedrooms": "3",
-      "bathrooms": "2"
+      "bathrooms": "2",
+      "lineItems": [
+        {
+          "description": "3Bed 2Bath Initial Basic Cleaning",
+          "quantity": 1,
+          "unitPrice": 215,
+          "total": 215
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MDI3ODYw",
@@ -2977,7 +3249,15 @@
       "createdAt": "2026-09-21T21:51:32Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/66027860",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MDAyNjEy",
@@ -2992,7 +3272,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/66002612",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "3511 118 Avenue Northwest Unit 207, Edmonton, Alberta"
+      "serviceAddress": "3511 118 Avenue Northwest Unit 207, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MDAxNTg4",
@@ -3007,7 +3295,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/66001588",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "3511 118 Avenue Northwest Unit 207, Edmonton, Alberta"
+      "serviceAddress": "3511 118 Avenue Northwest Unit 207, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MDAwNjMz",
@@ -3022,7 +3318,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/66000633",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "16948 116 Street Northwest, Edmonton, AB, Canada, Edmonton, AB"
+      "serviceAddress": "16948 116 Street Northwest, Edmonton, AB, Canada, Edmonton, AB",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTY0Mzg4",
@@ -3039,7 +3343,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "10-10727 110 St Nw, Edmonton, AB, T5H 3C9",
       "bedrooms": "Studio Apartment",
-      "bathrooms": "1 Bathroom"
+      "bathrooms": "1 Bathroom",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTYyMDYy",
@@ -3054,7 +3366,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/65962062",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "10215 95 Street, Edmonton, Alberta"
+      "serviceAddress": "10215 95 Street, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTQ4Mzky",
@@ -3068,7 +3388,15 @@
       "createdAt": "2026-09-19T22:02:41Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65948392",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTM4NzM0",
@@ -3083,7 +3411,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/65938734",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "16 Carriere Crescent, Beaumont, Alberta"
+      "serviceAddress": "16 Carriere Crescent, Beaumont, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTIzOTg0",
@@ -3097,7 +3433,15 @@
       "createdAt": "2026-09-18T21:28:54Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65923984",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTExNzkw",
@@ -3114,7 +3458,15 @@
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
       "serviceAddress": "7210 144 ave nw, Edmonton, AB, T5C 2R7",
       "bedrooms": "Clinic",
-      "bathrooms": "3 Bathrooms"
+      "bathrooms": "3 Bathrooms",
+      "lineItems": [
+        {
+          "description": "3Bed 2Bath Initial Basic Cleaning",
+          "quantity": 1,
+          "unitPrice": 215,
+          "total": 215
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTAxNjQ5",
@@ -3128,7 +3480,15 @@
       "createdAt": "2026-09-18T17:11:52Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65901649",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1ODQxODk1",
@@ -3143,7 +3503,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/65841895",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "7443 Chivers Crescent Southwest, Edmonton, Alberta"
+      "serviceAddress": "7443 Chivers Crescent Southwest, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NzEwMjIw",
@@ -3157,7 +3525,15 @@
       "createdAt": "2026-09-15T20:21:41Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65710220",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NjUwNzQy",
@@ -3171,7 +3547,15 @@
       "createdAt": "2026-09-15T00:13:07Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65650742",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NTY4MjQy",
@@ -3185,7 +3569,15 @@
       "createdAt": "2026-09-13T15:55:56Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65568242",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NTYxNTAz",
@@ -3200,7 +3592,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/65561503",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "4614 53 Avenue, Calmar, Alberta"
+      "serviceAddress": "4614 53 Avenue, Calmar, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NTU3MTM5",
@@ -3214,7 +3614,15 @@
       "createdAt": "2026-09-12T18:58:43Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65557139",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NDc0MzE4",
@@ -3229,7 +3637,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/65474318",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "4614 53 Avenue, Calmar, Alberta"
+      "serviceAddress": "4614 53 Avenue, Calmar, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NDY5NDMy",
@@ -3244,7 +3660,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/65469432",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "16948 116 Street Northwest, Edmonton, AB, Canada, Edmonton, AB"
+      "serviceAddress": "16948 116 Street Northwest, Edmonton, AB, Canada, Edmonton, AB",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1Mzc1MDIw",
@@ -3258,7 +3682,15 @@
       "createdAt": "2026-09-09T18:27:17Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65375020",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MzYzMjQ1",
@@ -3272,7 +3704,15 @@
       "createdAt": "2026-09-09T16:42:27Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65363245",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MzE4MjMx",
@@ -3287,7 +3727,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/65318231",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "23 Greenbury Crescent, Spruce Grove, Alberta"
+      "serviceAddress": "23 Greenbury Crescent, Spruce Grove, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Initial Basic Cleaning",
+          "quantity": 1,
+          "unitPrice": 155,
+          "total": 155
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MzA5ODM2",
@@ -3301,7 +3749,15 @@
       "createdAt": "2026-09-08T20:13:11Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65309836",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MzA5MDI4",
@@ -3316,7 +3772,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/65309028",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "10451 18 Avenue Northwest, Edmonton, Alberta"
+      "serviceAddress": "10451 18 Avenue Northwest, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Initial Basic Cleaning",
+          "quantity": 1,
+          "unitPrice": 155,
+          "total": 155
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjU3NTUz",
@@ -3330,7 +3794,15 @@
       "createdAt": "2026-09-08T01:55:34Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65257553",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjI5MjMz",
@@ -3344,7 +3816,15 @@
       "createdAt": "2026-09-06T21:49:13Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65229233",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjI5MTc0",
@@ -3358,7 +3838,15 @@
       "createdAt": "2026-09-06T21:44:42Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65229174",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjE1NjM3",
@@ -3372,7 +3860,15 @@
       "createdAt": "2026-09-05T19:39:48Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65215637",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjAzNDQz",
@@ -3387,7 +3883,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/65203443",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "1230 Windermere Way Southwest 307, Edmonton, Alberta"
+      "serviceAddress": "1230 Windermere Way Southwest 307, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MTYzOTQy",
@@ -3401,7 +3905,15 @@
       "createdAt": "2026-09-04T15:32:02Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65163942",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MTQ3MzU1",
@@ -3415,7 +3927,15 @@
       "createdAt": "2026-09-04T06:56:25Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65147355",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MDU1MDM2",
@@ -3429,7 +3949,15 @@
       "createdAt": "2026-09-02T20:18:35Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65055036",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MDA0NTE5",
@@ -3443,7 +3971,15 @@
       "createdAt": "2026-09-02T03:33:51Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/65004519",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY0OTYxNDg4",
@@ -3458,7 +3994,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/64961488",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "3315 James Mowatt Trail Southwest, Edmonton, Ab, Edmonton, Alberta"
+      "serviceAddress": "3315 James Mowatt Trail Southwest, Edmonton, Ab, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Initial Basic Cleaning",
+          "quantity": 1,
+          "unitPrice": 155,
+          "total": 155
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY0OTU4Njc5",
@@ -3473,7 +4017,15 @@
       "jobberWebUri": "https://secure.getjobber.com/quotes/64958679",
       "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "serviceAddress": "10924 87 Avenue Northwest, Edmonton, Alberta"
+      "serviceAddress": "10924 87 Avenue Northwest, Edmonton, Alberta",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Moveout Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 265,
+          "total": 265
+        }
+      ]
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY0OTU3MDIy",
@@ -3487,7 +4039,15 @@
       "createdAt": "2026-09-01T16:17:20Z",
       "jobberWebUri": "https://secure.getjobber.com/quotes/64957022",
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ]
     }
   ],
   "invoices": [
@@ -7554,6 +8114,810 @@
       "status": "Dismissed",
       "verdict": "Spam",
       "notes": "Automated contact form marketing spam. Automatically flagged."
+    }
+  ],
+  "serviceCatalog": [
+    {
+      "id": "cat-mo-1b1b",
+      "category": "MOVE_OUT",
+      "categoryLabel": "Move-Out Cleaning 2026",
+      "name": "1Bed 1Bath Moveout Cleaning 2026",
+      "shortName": "1 Bed / 1 Bath Move-Out",
+      "serviceType": "Move-Out Cleaning",
+      "bedrooms": "1 Bedroom",
+      "bathrooms": "1 Bathroom",
+      "baseHours": 2.5,
+      "cleanersCount": 1,
+      "basePrice": 265,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "1Bed 1Bath Moveout Cleaning 2026",
+      "description": "Complete move-out sanitization for 1 Bed / 1 Bath apartment/condo. High-touch surfaces, kitchen, bath, and floors.",
+      "isActive": true,
+      "sortOrder": 10
+    },
+    {
+      "id": "cat-mo-2b1b",
+      "category": "MOVE_OUT",
+      "categoryLabel": "Move-Out Cleaning 2026",
+      "name": "Move Out Cleaning Services 2026 (Basement Suite)",
+      "shortName": "2 Bed / 1 Bath Basement Suite Move-Out",
+      "serviceType": "Move-Out Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "1 Bathroom",
+      "baseHours": 3,
+      "cleanersCount": 1,
+      "basePrice": 315,
+      "depositRequired": 100,
+      "taxable": true,
+      "jobberItemName": "Move Out Cleaning Services 2026 (Basement Suite)",
+      "description": "Comprehensive move-out turnover clean for 2 Bed / 1 Bath basement suite. Kitchen, bath, fixtures, and full sanitization.",
+      "isActive": true,
+      "sortOrder": 20
+    },
+    {
+      "id": "cat-mo-2b2b",
+      "category": "MOVE_OUT",
+      "categoryLabel": "Move-Out Cleaning 2026",
+      "name": "2Bed 2Bath Move Out Cleaning 2026",
+      "shortName": "2 Bed / 2 Bath Move-Out",
+      "serviceType": "Move-Out Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "baseHours": 3.5,
+      "cleanersCount": 1,
+      "basePrice": 325,
+      "depositRequired": 100,
+      "taxable": true,
+      "jobberItemName": "2Bed 2Bath Move Out Cleaning 2026",
+      "description": "Detailed move-out clean for 2 Bed / 2 Bath residence. Both full baths, kitchen surfaces, baseboards wipe, vacuum & mop.",
+      "isActive": true,
+      "sortOrder": 30
+    },
+    {
+      "id": "cat-mo-3b2b-main",
+      "category": "MOVE_OUT",
+      "categoryLabel": "Move-Out Cleaning 2026",
+      "name": "Move Out Cleaning Services 2026 (Main Level)",
+      "shortName": "3 Bed / 2 Bath Main Level Move-Out",
+      "serviceType": "Move-Out Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "baseHours": 3.5,
+      "cleanersCount": 1,
+      "basePrice": 325,
+      "depositRequired": 100,
+      "taxable": true,
+      "jobberItemName": "Move Out Cleaning Services 2026 (Main Level)",
+      "description": "Complete main-level move-out cleaning for 3 Bedrooms & 2 Bathrooms. Kitchen degrease, baths, closets, and floors.",
+      "isActive": true,
+      "sortOrder": 40
+    },
+    {
+      "id": "cat-mo-3b2b-std",
+      "category": "MOVE_OUT",
+      "categoryLabel": "Move-Out Cleaning 2026",
+      "name": "3Bed 2Bath Moveout Cleaning 2026",
+      "shortName": "3 Bed / 2 Bath Move-Out",
+      "serviceType": "Move-Out Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "baseHours": 3.5,
+      "cleanersCount": 1,
+      "basePrice": 325,
+      "depositRequired": 100,
+      "taxable": true,
+      "jobberItemName": "3Bed 2Bath Moveout Cleaning 2026",
+      "description": "Full moveout turnover for 3 Bed / 2 Bath home. Hand-wiped surfaces, kitchen exterior cabinets & appliances, full baths.",
+      "isActive": true,
+      "sortOrder": 50
+    },
+    {
+      "id": "cat-mo-3b25b",
+      "category": "MOVE_OUT",
+      "categoryLabel": "Move-Out Cleaning 2026",
+      "name": "Move Out Cleaning Services 2026 (3 Bed / 2.5 Bath)",
+      "shortName": "3 Bed / 2.5 Bath Move-Out",
+      "serviceType": "Move-Out Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2.5 Bathrooms",
+      "baseHours": 4,
+      "cleanersCount": 2,
+      "basePrice": 407.5,
+      "depositRequired": 125,
+      "taxable": true,
+      "jobberItemName": "Move Out Cleaning Services 2026 (3 Bed / 2.5 Bath)",
+      "description": "Tandem cleaner move-out for 3 Bed / 2.5 Bath two-storey home. Detailed bathrooms, powder room, kitchen, baseboards.",
+      "isActive": true,
+      "sortOrder": 60
+    },
+    {
+      "id": "cat-mo-4b25b",
+      "category": "MOVE_OUT",
+      "categoryLabel": "Move-Out Cleaning 2026",
+      "name": "4Bed 2.5Bath Move Out Cleaning 2026",
+      "shortName": "4 Bed / 2.5 Bath Move-Out",
+      "serviceType": "Move-Out Cleaning",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "2.5 Bathrooms",
+      "baseHours": 4.5,
+      "cleanersCount": 2,
+      "basePrice": 450,
+      "depositRequired": 125,
+      "taxable": true,
+      "jobberItemName": "4Bed 2.5Bath Move Out Cleaning 2026",
+      "description": "Move-out turnover for 4 Bedrooms and 2.5 Bathrooms. Full home detail, stairwells, sanitization, and baseboards.",
+      "isActive": true,
+      "sortOrder": 70
+    },
+    {
+      "id": "cat-mo-4b3b",
+      "category": "MOVE_OUT",
+      "categoryLabel": "Move-Out Cleaning 2026",
+      "name": "4Bed 3Bath Move Out Cleaning 2026",
+      "shortName": "4 Bed / 3 Bath Move-Out",
+      "serviceType": "Move-Out Cleaning",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "baseHours": 5,
+      "cleanersCount": 2,
+      "basePrice": 495,
+      "depositRequired": 150,
+      "taxable": true,
+      "jobberItemName": "4Bed 3Bath Move Out Cleaning 2026",
+      "description": "Comprehensive 4 Bed / 3 Bath home move-out cleaning with team dispatch. All three bathrooms and kitchen deep cleaned.",
+      "isActive": true,
+      "sortOrder": 80
+    },
+    {
+      "id": "cat-mo-5b35b",
+      "category": "MOVE_OUT",
+      "categoryLabel": "Move-Out Cleaning 2026",
+      "name": "5Bed 3.5+Bath Executive Estate Move Out Clean",
+      "shortName": "5+ Bed / 3.5+ Bath Estate Move-Out",
+      "serviceType": "Move-Out Cleaning",
+      "bedrooms": "5 Bedrooms",
+      "bathrooms": "3.5 Bathrooms",
+      "baseHours": 6,
+      "cleanersCount": 2,
+      "basePrice": 585,
+      "depositRequired": 150,
+      "taxable": true,
+      "jobberItemName": "5Bed 3.5+Bath Executive Estate Move Out Clean",
+      "description": "Executive estate move-out turnover clean. Large square footage, master ensuite, bonus room, multiple full bathrooms.",
+      "isActive": true,
+      "sortOrder": 90
+    },
+    {
+      "id": "cat-dc-1b1b",
+      "category": "DEEP_CLEAN",
+      "categoryLabel": "Deep Cleaning Services 2026",
+      "name": "1Bed 1Bath Deep Cleaning 2026",
+      "shortName": "1 Bed / 1 Bath Deep Clean",
+      "serviceType": "Deep Cleaning",
+      "bedrooms": "1 Bedroom",
+      "bathrooms": "1 Bathroom",
+      "baseHours": 2,
+      "cleanersCount": 1,
+      "basePrice": 175,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "1Bed 1Bath Deep Cleaning 2026",
+      "description": "Detailed deep sanitization for 1 Bed / 1 Bath residence. Grout, faucets, stove top, bathroom descaling, high dusting.",
+      "isActive": true,
+      "sortOrder": 100
+    },
+    {
+      "id": "cat-dc-2b1b",
+      "category": "DEEP_CLEAN",
+      "categoryLabel": "Deep Cleaning Services 2026",
+      "name": "2Bed 1Bath Deep Cleaning 2026",
+      "shortName": "2 Bed / 1 Bath Deep Clean",
+      "serviceType": "Deep Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "1 Bathroom",
+      "baseHours": 2.5,
+      "cleanersCount": 1,
+      "basePrice": 185,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "2Bed 1Bath Deep Cleaning 2026",
+      "description": "Deep residential clean for 2 Bed / 1 Bath home. Scrub showers, kitchen backsplash, edge vacuuming, doors & frames.",
+      "isActive": true,
+      "sortOrder": 110
+    },
+    {
+      "id": "cat-dc-2b2b",
+      "category": "DEEP_CLEAN",
+      "categoryLabel": "Deep Cleaning Services 2026",
+      "name": "2Bed 2Bath Deep Cleaning 2026",
+      "shortName": "2 Bed / 2 Bath Deep Clean",
+      "serviceType": "Deep Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "baseHours": 3,
+      "cleanersCount": 1,
+      "basePrice": 197.5,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "2Bed 2Bath Deep Cleaning 2026",
+      "description": "Intensive deep clean for 2 Bed / 2 Bath home. Deep scrubbing of 2 bathrooms, kitchen degrease, baseboards, floor detail.",
+      "isActive": true,
+      "sortOrder": 120
+    },
+    {
+      "id": "cat-dc-3b2b",
+      "category": "DEEP_CLEAN",
+      "categoryLabel": "Deep Cleaning Services 2026",
+      "name": "3Bed 2Bath Deep Cleaning 2026",
+      "shortName": "3 Bed / 2 Bath Deep Clean",
+      "serviceType": "Deep Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "baseHours": 3,
+      "cleanersCount": 1,
+      "basePrice": 210,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "3Bed 2Bath Deep Cleaning 2026",
+      "description": "Deep residential rejuvenation for 3 Bed / 2 Bath house or condo. Living areas, bedrooms, kitchen scrub, bathroom descaling.",
+      "isActive": true,
+      "sortOrder": 130
+    },
+    {
+      "id": "cat-dc-3b25b",
+      "category": "DEEP_CLEAN",
+      "categoryLabel": "Deep Cleaning Services 2026",
+      "name": "3Bed 2.5Bath Deep Cleaning 2026",
+      "shortName": "3 Bed / 2.5 Bath Deep Clean",
+      "serviceType": "Deep Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2.5 Bathrooms",
+      "baseHours": 3.5,
+      "cleanersCount": 1,
+      "basePrice": 223.32,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "3Bed 2.5Bath Deep Cleaning 2026",
+      "description": "Full residential deep cleaning for 3 Bedrooms and 2.5 Bathrooms (approx. 1800-2200 sq ft). Includes powder room & ensuite.",
+      "isActive": true,
+      "sortOrder": 140
+    },
+    {
+      "id": "cat-dc-4b25b",
+      "category": "DEEP_CLEAN",
+      "categoryLabel": "Deep Cleaning Services 2026",
+      "name": "4Bed 2.5Bath Deep Cleaning 2026",
+      "shortName": "4 Bed / 2.5 Bath Deep Clean",
+      "serviceType": "Deep Cleaning",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "2.5 Bathrooms",
+      "baseHours": 4,
+      "cleanersCount": 2,
+      "basePrice": 385,
+      "depositRequired": 100,
+      "taxable": true,
+      "jobberItemName": "4Bed 2.5Bath Deep Cleaning 2026",
+      "description": "Team deep clean for 4 Bed / 2.5 Bath home. Complete kitchen, bathrooms, bedrooms, and high/low detailed dusting.",
+      "isActive": true,
+      "sortOrder": 150
+    },
+    {
+      "id": "cat-dc-4b3b",
+      "category": "DEEP_CLEAN",
+      "categoryLabel": "Deep Cleaning Services 2026",
+      "name": "4Bed 3Bath Deep Cleaning 2026",
+      "shortName": "4 Bed / 3 Bath Deep Clean",
+      "serviceType": "Deep Cleaning",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "baseHours": 4.5,
+      "cleanersCount": 2,
+      "basePrice": 439.29,
+      "depositRequired": 100,
+      "taxable": true,
+      "jobberItemName": "4Bed 3Bath Deep Cleaning 2026",
+      "description": "Comprehensive deep cleaning for large 4 Bed / 3 Bath residence. Triple bathroom scrub, kitchen, living spaces, and floors.",
+      "isActive": true,
+      "sortOrder": 160
+    },
+    {
+      "id": "cat-dc-5b35b",
+      "category": "DEEP_CLEAN",
+      "categoryLabel": "Deep Cleaning Services 2026",
+      "name": "5Bed 3.5+Bath Estate Deep Clean 2026",
+      "shortName": "5+ Bed / 3.5+ Bath Estate Deep Clean",
+      "serviceType": "Deep Cleaning",
+      "bedrooms": "5 Bedrooms",
+      "bathrooms": "3.5 Bathrooms",
+      "baseHours": 5.5,
+      "cleanersCount": 2,
+      "basePrice": 520,
+      "depositRequired": 125,
+      "taxable": true,
+      "jobberItemName": "5Bed 3.5+Bath Estate Deep Clean 2026",
+      "description": "Estate-scale deep cleaning for large family properties. Multi-cleaner crew, bathrooms, chef kitchen, stairs, and living suites.",
+      "isActive": true,
+      "sortOrder": 170
+    },
+    {
+      "id": "cat-sc-1b1b",
+      "category": "STANDARD_CLEAN",
+      "categoryLabel": "Initial Basic / Standard Cleaning 2026",
+      "name": "1Bed 1Bath Initial Basic Cleaning",
+      "shortName": "1 Bed / 1 Bath Standard Clean",
+      "serviceType": "Standard Cleaning",
+      "bedrooms": "1 Bedroom",
+      "bathrooms": "1 Bathroom",
+      "baseHours": 2,
+      "cleanersCount": 1,
+      "basePrice": 155,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "1Bed 1Bath Initial Basic Cleaning",
+      "description": "General residential maintenance clean for 1 Bed / 1 Bath home. Dust surfaces, sanitize bathroom, kitchen counters, vacuum & mop.",
+      "isActive": true,
+      "sortOrder": 180
+    },
+    {
+      "id": "cat-sc-2b1b",
+      "category": "STANDARD_CLEAN",
+      "categoryLabel": "Initial Basic / Standard Cleaning 2026",
+      "name": "2Bed 1Bath Initial Basic Cleaning",
+      "shortName": "2 Bed / 1 Bath Standard Clean",
+      "serviceType": "Standard Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "1 Bathroom",
+      "baseHours": 2.5,
+      "cleanersCount": 1,
+      "basePrice": 175,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "2Bed 1Bath Initial Basic Cleaning",
+      "description": "Standard residential cleaning for 2 Bed / 1 Bath home. Living rooms, kitchen, bathroom sanitization, empty bins, floors.",
+      "isActive": true,
+      "sortOrder": 190
+    },
+    {
+      "id": "cat-sc-2b2b",
+      "category": "STANDARD_CLEAN",
+      "categoryLabel": "Initial Basic / Standard Cleaning 2026",
+      "name": "2Bed 2Bath Initial Basic Cleaning",
+      "shortName": "2 Bed / 2 Bath Standard Clean",
+      "serviceType": "Standard Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "baseHours": 2.5,
+      "cleanersCount": 1,
+      "basePrice": 198.5,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "2Bed 2Bath Initial Basic Cleaning",
+      "description": "Standard initial basic cleaning for 2 Bed / 2 Bath home. Surface wipe down, both bathrooms, kitchen sinks, floors vacuumed/mopped.",
+      "isActive": true,
+      "sortOrder": 200
+    },
+    {
+      "id": "cat-sc-3b2b",
+      "category": "STANDARD_CLEAN",
+      "categoryLabel": "Initial Basic / Standard Cleaning 2026",
+      "name": "3Bed 2Bath Initial Basic Cleaning",
+      "shortName": "3 Bed / 2 Bath Standard Clean",
+      "serviceType": "Standard Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "baseHours": 3,
+      "cleanersCount": 1,
+      "basePrice": 215,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "3Bed 2Bath Initial Basic Cleaning",
+      "description": "Standard residential clean for 3 Bed / 2 Bath residence. Kitchen, bathrooms, bedrooms tidied, dusting, and full floor care.",
+      "isActive": true,
+      "sortOrder": 210
+    },
+    {
+      "id": "cat-sc-3b25b",
+      "category": "STANDARD_CLEAN",
+      "categoryLabel": "Initial Basic / Standard Cleaning 2026",
+      "name": "3Bed 2.5Bath Initial Basic Cleaning",
+      "shortName": "3 Bed / 2.5 Bath Standard Clean",
+      "serviceType": "Standard Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2.5 Bathrooms",
+      "baseHours": 3,
+      "cleanersCount": 1,
+      "basePrice": 235,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "3Bed 2.5Bath Initial Basic Cleaning",
+      "description": "Standard home clean for 3 Bed / 2.5 Bath two-storey home. Kitchen counters & stove, 2.5 baths, dusting, vacuuming and mopping.",
+      "isActive": true,
+      "sortOrder": 220
+    },
+    {
+      "id": "cat-sc-4b25b",
+      "category": "STANDARD_CLEAN",
+      "categoryLabel": "Initial Basic / Standard Cleaning 2026",
+      "name": "4Bed 2.5Bath Initial Basic Cleaning",
+      "shortName": "4 Bed / 2.5 Bath Standard Clean",
+      "serviceType": "Standard Cleaning",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "2.5 Bathrooms",
+      "baseHours": 3.5,
+      "cleanersCount": 1,
+      "basePrice": 285,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "4Bed 2.5Bath Initial Basic Cleaning",
+      "description": "Residential standard cleaning for 4 Bed / 2.5 Bath home. Bedrooms, shared bathrooms, ensuite, kitchen, and common areas.",
+      "isActive": true,
+      "sortOrder": 230
+    },
+    {
+      "id": "cat-sc-4b3b",
+      "category": "STANDARD_CLEAN",
+      "categoryLabel": "Initial Basic / Standard Cleaning 2026",
+      "name": "4Bed 3Bath Initial Basic Cleaning",
+      "shortName": "4 Bed / 3 Bath Standard Clean",
+      "serviceType": "Standard Cleaning",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "baseHours": 4,
+      "cleanersCount": 2,
+      "basePrice": 320,
+      "depositRequired": 75,
+      "taxable": true,
+      "jobberItemName": "4Bed 3Bath Initial Basic Cleaning",
+      "description": "Standard clean for 4 Bed / 3 Bath home. 3 full bathrooms, extensive floor square footage, dusting, kitchen and entrance.",
+      "isActive": true,
+      "sortOrder": 240
+    },
+    {
+      "id": "cat-pc-2b2b",
+      "category": "POST_CONSTRUCTION",
+      "categoryLabel": "MoveIn - Post Construction",
+      "name": "2Bed 2Bath MoveIn - Post Construction Cleaning",
+      "shortName": "2 Bed / 2 Bath Post-Construction",
+      "serviceType": "Post-Construction Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "baseHours": 3.5,
+      "cleanersCount": 1,
+      "basePrice": 295,
+      "depositRequired": 100,
+      "taxable": true,
+      "jobberItemName": "2Bed 2Bath MoveIn - Post Construction Cleaning",
+      "description": "Fine drywall dust wipe down, inside drawers, sticker removal, vacuuming track crevices, sanitized fixtures for new move-in.",
+      "isActive": true,
+      "sortOrder": 250
+    },
+    {
+      "id": "cat-pc-3b25b",
+      "category": "POST_CONSTRUCTION",
+      "categoryLabel": "MoveIn - Post Construction",
+      "name": "MoveIn - Post Construction Cleaning (3 Bed / 2.5 Bath)",
+      "shortName": "3 Bed / 2.5 Bath Post-Construction",
+      "serviceType": "Post-Construction Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2.5 Bathrooms",
+      "baseHours": 4,
+      "cleanersCount": 2,
+      "basePrice": 335,
+      "depositRequired": 100,
+      "taxable": true,
+      "jobberItemName": "MoveIn - Post Construction Cleaning",
+      "description": "Comprehensive post-construction detailing. Drywall dust extraction, fixtures polishing, window sill vacuuming, and floor scrub.",
+      "isActive": true,
+      "sortOrder": 260
+    },
+    {
+      "id": "cat-pc-4b3b",
+      "category": "POST_CONSTRUCTION",
+      "categoryLabel": "MoveIn - Post Construction",
+      "name": "4Bed 3Bath MoveIn - Post Construction Cleaning",
+      "shortName": "4 Bed / 3 Bath Post-Construction",
+      "serviceType": "Post-Construction Cleaning",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "baseHours": 5,
+      "cleanersCount": 2,
+      "basePrice": 425,
+      "depositRequired": 125,
+      "taxable": true,
+      "jobberItemName": "4Bed 3Bath MoveIn - Post Construction Cleaning",
+      "description": "Full new build or renovation detailed turnover. Multiple full bathrooms, kitchen millwork wipe down, baseboards, floor wash.",
+      "isActive": true,
+      "sortOrder": 270
+    },
+    {
+      "id": "cat-rec-biweekly-2b",
+      "category": "RECURRING",
+      "categoryLabel": "Bi-Weekly Recurring Residential Clean",
+      "name": "Bi-Weekly Maintenance Clean (2 Bed / 2 Bath)",
+      "shortName": "Bi-Weekly 2 Bed / 2 Bath",
+      "serviceType": "Recurring Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "baseHours": 2,
+      "cleanersCount": 1,
+      "basePrice": 165,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Bi-Weekly Recurring Residential Clean (2 Bed)",
+      "description": "Recurring bi-weekly maintenance cleaning. Consistent cleaner assigned, high priority rotation, automatic card-on-file billing.",
+      "isActive": true,
+      "sortOrder": 280
+    },
+    {
+      "id": "cat-rec-biweekly-3b",
+      "category": "RECURRING",
+      "categoryLabel": "Bi-Weekly Recurring Residential Clean",
+      "name": "Bi-Weekly Maintenance Clean (3 Bed / 2.5 Bath)",
+      "shortName": "Bi-Weekly 3 Bed / 2.5 Bath",
+      "serviceType": "Recurring Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2.5 Bathrooms",
+      "baseHours": 2.5,
+      "cleanersCount": 1,
+      "basePrice": 195,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Bi-Weekly Recurring Residential Clean (3 Bed)",
+      "description": "Bi-weekly scheduled home maintenance. 3 bedrooms, 2.5 bathrooms, kitchen scrub, vacuuming, mopping, trash removal.",
+      "isActive": true,
+      "sortOrder": 290
+    },
+    {
+      "id": "cat-rec-biweekly-4b",
+      "category": "RECURRING",
+      "categoryLabel": "Bi-Weekly Recurring Residential Clean",
+      "name": "Bi-Weekly Maintenance Clean (4 Bed / 3 Bath)",
+      "shortName": "Bi-Weekly 4 Bed / 3 Bath",
+      "serviceType": "Recurring Cleaning",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "baseHours": 3,
+      "cleanersCount": 1,
+      "basePrice": 245,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Bi-Weekly Recurring Residential Clean (4 Bed)",
+      "description": "Regular recurring bi-weekly home detail for 4 Bed / 3 Bath property. Full sanitization and maintenance.",
+      "isActive": true,
+      "sortOrder": 300
+    },
+    {
+      "id": "cat-hr-1cleaner",
+      "category": "HOURLY",
+      "categoryLabel": "Hourly Crew Rates",
+      "name": "Standard Hourly Rate (1 Cleaner @ $52.50/hr)",
+      "shortName": "1 Cleaner @ $52.50/hr",
+      "serviceType": "Standard Cleaning",
+      "baseHours": 1,
+      "cleanersCount": 1,
+      "basePrice": 52.5,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "Solo Cleaner Hourly Rate ($52.50/hr)",
+      "description": "Billed per labor hour for 1 professional cleaner with all eco-friendly supplies and commercial vacuum equipment.",
+      "isActive": true,
+      "sortOrder": 310
+    },
+    {
+      "id": "cat-hr-2cleaners",
+      "category": "HOURLY",
+      "categoryLabel": "Hourly Crew Rates",
+      "name": "Tandem Crew Rate (2 Cleaners @ $105.00/hr)",
+      "shortName": "2 Cleaners @ $105.00/hr",
+      "serviceType": "Deep Cleaning",
+      "baseHours": 1,
+      "cleanersCount": 2,
+      "basePrice": 105,
+      "depositRequired": 50,
+      "taxable": true,
+      "jobberItemName": "Tandem Crew Hourly Rate ($105.00/hr)",
+      "description": "Billed per clock hour for a 2-cleaner tandem crew (provides 2 person-hours per clock hour of service).",
+      "isActive": true,
+      "sortOrder": 320
+    },
+    {
+      "id": "addon-oven",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Inside Oven Deep Cleaning",
+      "shortName": "Inside Oven",
+      "serviceType": "Add-on",
+      "baseHours": 0.75,
+      "cleanersCount": 1,
+      "basePrice": 45,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Inside Oven Cleaning",
+      "description": "Degrease and scrub inside of oven, racks, interior glass door, and bottom heating elements.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 400
+    },
+    {
+      "id": "addon-fridge",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Inside Refrigerator & Freezer Deep Clean",
+      "shortName": "Inside Fridge",
+      "serviceType": "Add-on",
+      "baseHours": 0.75,
+      "cleanersCount": 1,
+      "basePrice": 45,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Inside Refrigerator Sanitization",
+      "description": "Remove shelves & crispers, wash, sanitize interior walls, wipe seals, and replace items neatly.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 410
+    },
+    {
+      "id": "addon-cabinets",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Inside Kitchen Cabinets & Drawers Detail",
+      "shortName": "Inside Cabinets",
+      "serviceType": "Add-on",
+      "baseHours": 1,
+      "cleanersCount": 1,
+      "basePrice": 55,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Inside Cabinets & Drawers Cleaning",
+      "description": "Vacuum crumbs and wipe down inside shelves and drawers throughout the kitchen.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 420
+    },
+    {
+      "id": "addon-baseboards",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Baseboards Hand-Scrub & Detail",
+      "shortName": "Baseboards Detail",
+      "serviceType": "Add-on",
+      "baseHours": 1,
+      "cleanersCount": 1,
+      "basePrice": 60,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Baseboards Hand-Scrub & Wipe",
+      "description": "Detailed hand wipe and scrub of baseboards throughout the entire home to remove scuffs and dust.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 430
+    },
+    {
+      "id": "addon-windows",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Interior Windows & Tracks (Up to 10 Panes)",
+      "shortName": "Interior Windows",
+      "serviceType": "Add-on",
+      "baseHours": 1,
+      "cleanersCount": 1,
+      "basePrice": 50,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Interior Window Panes & Sills Clean",
+      "description": "Squeegee and polish interior window glass, vacuum and wipe window tracks and sills.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 440
+    },
+    {
+      "id": "addon-basement-living",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Finished Basement Living Area",
+      "shortName": "Basement Area",
+      "serviceType": "Add-on",
+      "baseHours": 1.5,
+      "cleanersCount": 1,
+      "basePrice": 85,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Basement Living Space Cleaning",
+      "description": "Clean finished basement family room, rec space, dust surfaces, vacuum carpets, and mop hard floors.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 450
+    },
+    {
+      "id": "addon-basement-suite",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Full Basement Suite (Kitchenette + Bath)",
+      "shortName": "Basement Suite",
+      "serviceType": "Add-on",
+      "baseHours": 2,
+      "cleanersCount": 1,
+      "basePrice": 125,
+      "depositRequired": 25,
+      "taxable": true,
+      "jobberItemName": "Basement Suite Complete Detail",
+      "description": "Complete clean of basement rental or mother-in-law suite including kitchen/wet bar and full bathroom.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 460
+    },
+    {
+      "id": "addon-pet-hair",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Pet Hair & Heavy Dander Detail Treatment",
+      "shortName": "Pet Hair Detail",
+      "serviceType": "Add-on",
+      "baseHours": 0.5,
+      "cleanersCount": 1,
+      "basePrice": 35,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Pet Hair & Dander Sanitizer Treatment",
+      "description": "Specialized rubber squeegee carpet raking and pet-safe botanical enzyme sanitizer application.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 470
+    },
+    {
+      "id": "addon-blinds",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Blinds Hand-Dusting & Wipe (Per Room)",
+      "shortName": "Blinds Detail",
+      "serviceType": "Add-on",
+      "baseHours": 0.5,
+      "cleanersCount": 1,
+      "basePrice": 40,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Horizontal / Faux-Wood Blinds Detail",
+      "description": "Hand dusting and microfiber wiping of horizontal slats on faux-wood or vinyl window blinds.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 480
+    },
+    {
+      "id": "addon-balcony",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Balcony / Patio Sweep & Glass Clean",
+      "shortName": "Balcony Sweep",
+      "serviceType": "Add-on",
+      "baseHours": 0.5,
+      "cleanersCount": 1,
+      "basePrice": 35,
+      "depositRequired": 0,
+      "taxable": true,
+      "jobberItemName": "Balcony / Deck Sweep & Sliding Glass Door",
+      "description": "Sweep exterior debris, wipe railings, and clean exterior of sliding patio glass doors.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 490
+    },
+    {
+      "id": "addon-fuel",
+      "category": "ADD_ON",
+      "categoryLabel": "Add-on Services",
+      "name": "Fuel & Greater Edmonton Dispatch Surcharge",
+      "shortName": "Fuel Surcharge",
+      "serviceType": "Add-on",
+      "baseHours": 0,
+      "cleanersCount": 1,
+      "basePrice": 12.5,
+      "depositRequired": 0,
+      "taxable": false,
+      "jobberItemName": "Fuel & Mobile Dispatch Surcharge",
+      "description": "Standard mobile van deployment, transit insurance, and equipment sanitization fee.",
+      "isAddon": true,
+      "isActive": true,
+      "sortOrder": 500
     }
   ]
 }

@@ -96,6 +96,7 @@ export interface AppPersistentStore {
     mapsApiKey?: string;
     geminiApiKey?: string;
   };
+  serviceCatalog?: any[];
 }
 
 // Ensure data directory exists

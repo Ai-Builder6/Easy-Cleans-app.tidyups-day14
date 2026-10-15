@@ -17,12 +17,17 @@ import {
   Phone,
   Users,
   Clock,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Tag,
+  ClipboardList,
+  Sparkles,
 } from 'lucide-react';
 import { JobberQuote, extractJobberNumericId } from '../services/jobberSyncModules';
 import { getCustomerIntelligence } from '../services/customerIntelligenceService';
 import { CustomerIntelligenceBadge } from './CustomerIntelligenceBadge';
 import { QuoteDetailModal } from './QuoteDetailModal';
+import { ServiceCatalogModal } from './ServiceCatalogModal';
+import { ServiceCatalogItem, CANONICAL_SERVICE_CATALOG } from '../data/serviceCatalogData';
 
 interface QuotesViewProps {
   quotes: JobberQuote[];
@@ -34,6 +39,8 @@ interface QuotesViewProps {
   visits?: any[];
   clients?: any[];
   projectId?: 'dispatchgeeni' | 'tidyups';
+  serviceCatalog?: ServiceCatalogItem[];
+  onCatalogUpdated?: (newCatalog: ServiceCatalogItem[]) => void;
 }
 
 const AVAILABLE_CLEANERS = [
@@ -64,11 +71,17 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   visits = [],
   clients = [],
   projectId = 'dispatchgeeni',
+  serviceCatalog,
+  onCatalogUpdated,
 }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+
+  // Service Catalog & Price List state
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
+  const [localCatalog, setLocalCatalog] = useState<ServiceCatalogItem[]>(serviceCatalog || CANONICAL_SERVICE_CATALOG);
 
   // Selected Quote for Jobber Detail, Adjustment, Schedule & Text Sender Modal
   const [selectedQuote, setSelectedQuote] = useState<JobberQuote | null>(null);
@@ -90,6 +103,16 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   const [newAssignedCleaners, setNewAssignedCleaners] = useState<string[]>([]);
   const [newNotes, setNewNotes] = useState('');
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
+
+  const handleSelectCatalogItemForNewQuote = (item: ServiceCatalogItem) => {
+    setNewService(item.categoryLabel || item.name);
+    if (item.bedrooms) setNewBedrooms(item.bedrooms);
+    if (item.bathrooms) setNewBathrooms(item.bathrooms);
+    setNewTotal(String(item.basePrice));
+    setNewDeposit(String(item.depositRequired));
+    if (item.description) setNewNotes(item.description);
+    setSyncFeedback(`Applied price list item: ${item.name} ($${item.basePrice.toFixed(2)})`);
+  };
 
   const filteredQuotes = quotes.filter((q) => {
     const qStr = `${q.clientName} ${q.quoteNumber} ${q.service || ''} ${q.serviceAddress || ''} ${q.clientPhone || ''} ${q.bedrooms || ''} ${q.bathrooms || ''}`.toLowerCase();
@@ -263,6 +286,18 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
     setIsSubmittingQuote(true);
 
     try {
+      const totalNum = Number(newTotal) || 280;
+      const unitPrice = Math.max(0, Math.round((totalNum / 1.05) * 100) / 100);
+      const lineItems = [
+        {
+          name: `${newService} (${newBedrooms}, ${newBathrooms})`,
+          description: `${newBedrooms}, ${newBathrooms} • ${newService} — ${newServiceAddress.trim() || 'Edmonton, AB'}`,
+          quantity: 1,
+          unitPrice,
+          total: totalNum,
+        },
+      ];
+
       const res = await fetch(`/api/database/quotes?project=${projectId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
@@ -274,7 +309,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
           service: newService,
           bedrooms: newBedrooms,
           bathrooms: newBathrooms,
-          total: Number(newTotal) || 280,
+          total: totalNum,
           discountAmount: Number(newDiscount) || 0,
           depositRequired: Number(newDeposit) || 0,
           scheduledDate: newScheduledDate || undefined,
@@ -282,6 +317,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
           assignedCleaners: newAssignedCleaners,
           notes: newNotes.trim(),
           quoteStatus: 'DRAFT',
+          lineItems,
         }),
       });
 
@@ -355,6 +391,15 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
           >
             <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? 'Syncing...' : 'Sync from Jobber'}</span>
+          </button>
+
+          <button
+            onClick={() => setIsCatalogModalOpen(true)}
+            className="px-3.5 py-2 text-xs font-bold text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95 flex items-center gap-1.5"
+            title="View or Paste Service Catalog Price List"
+          >
+            <Tag className="w-3.5 h-3.5 text-purple-600" />
+            <span>Price List &amp; Catalog</span>
           </button>
 
           <button
@@ -742,6 +787,38 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
                   );
                 })()}
 
+              {/* Price List & Service Catalog Quick-Fill */}
+              <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-extrabold text-purple-900 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Price List Catalog Match (Auto-Fills Rates &amp; Line Items)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCatalogModalOpen(true)}
+                    className="text-[11px] text-purple-700 hover:text-purple-900 font-bold underline cursor-pointer"
+                  >
+                    Manage Price List →
+                  </button>
+                </div>
+                <select
+                  onChange={(e) => {
+                    const selected = (localCatalog || CANONICAL_SERVICE_CATALOG).find((c) => c.id === e.target.value);
+                    if (selected) handleSelectCatalogItemForNewQuote(selected);
+                  }}
+                  defaultValue=""
+                  className="w-full px-3 py-2 border border-purple-300 rounded-xl focus:outline-none focus:border-purple-600 bg-white font-semibold text-slate-800 text-xs shadow-2xs"
+                >
+                  <option value="" disabled>-- Select a pre-priced line item from Catalog --</option>
+                  {(localCatalog || CANONICAL_SERVICE_CATALOG).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.categoryLabel}: {item.name} — ${item.basePrice.toFixed(2)} CAD (Deposit: ${item.depositRequired})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Step 2: Service Requested, Bedrooms & Bathrooms (Synced to Google Sheets) */}
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
                 <div className="font-extrabold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
@@ -964,6 +1041,22 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Service Catalog & Price List Modal */}
+      <ServiceCatalogModal
+        isOpen={isCatalogModalOpen}
+        onClose={() => setIsCatalogModalOpen(false)}
+        catalog={localCatalog || CANONICAL_SERVICE_CATALOG}
+        onCatalogUpdated={(newCat) => {
+          setLocalCatalog(newCat);
+          if (onCatalogUpdated) onCatalogUpdated(newCat);
+        }}
+        onSelectForQuote={(item) => {
+          handleSelectCatalogItemForNewQuote(item);
+          setIsNewQuoteModalOpen(true);
+        }}
+        projectId={projectId}
+      />
     </div>
   );
 };

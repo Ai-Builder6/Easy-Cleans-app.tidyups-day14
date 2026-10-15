@@ -45,6 +45,8 @@ import { JobberQuote } from '../services/jobberSyncModules';
 import { Technician, ServiceTicket } from '../types/dispatch';
 import { INITIAL_TECHNICIANS } from '../data/cleaningData';
 import { getEdmontonToday, formatDateTime } from '../data/jobberCalendarData';
+import { ServiceCatalogModal } from './ServiceCatalogModal';
+import { ServiceCatalogItem, CANONICAL_SERVICE_CATALOG, matchCatalogItem } from '../data/serviceCatalogData';
 
 function resolveQuickEdmontonCoords(address?: string): { lat: number; lng: number } {
   const norm = (address || '').toLowerCase();
@@ -94,6 +96,8 @@ interface QuickQuoteViewProps {
   onOpenSpamShield?: (num?: string) => void;
   onOpenProjectBackup?: () => void;
   onClientsUpdated?: (clients: any[]) => void;
+  serviceCatalog?: ServiceCatalogItem[];
+  onCatalogUpdated?: (newCatalog: ServiceCatalogItem[]) => void;
 }
 
 const QUICK_ADDON_TAGS = [
@@ -175,7 +179,13 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   onOpenSpamShield,
   onOpenProjectBackup,
   onClientsUpdated,
+  serviceCatalog,
+  onCatalogUpdated,
 }) => {
+  // Service Catalog Price List state
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
+  const [localCatalog, setLocalCatalog] = useState<ServiceCatalogItem[]>(serviceCatalog || CANONICAL_SERVICE_CATALOG);
+
   // 1. Live Voice Dictation state
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [voiceTranscript, setVoiceTranscript] = useState<string>('');
@@ -519,6 +529,22 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
     return parts.join(' | ');
   }, [bedrooms, bathrooms, city, selectedAddons, quoteNotes]);
 
+  // Match live Service Catalog Price List item based on serviceType, bedrooms & bathrooms
+  const matchedCatalogItem = useMemo(() => {
+    return matchCatalogItem(serviceType, bedrooms, bathrooms, localCatalog || CANONICAL_SERVICE_CATALOG);
+  }, [serviceType, bedrooms, bathrooms, localCatalog]);
+
+  const applyCatalogItemToQuote = useCallback((item: ServiceCatalogItem) => {
+    if (item.categoryLabel) setServiceType(item.categoryLabel);
+    if (item.bedrooms) setBedrooms(item.bedrooms);
+    if (item.bathrooms) setBathrooms(item.bathrooms);
+    if (item.baseHours) setHours(item.baseHours);
+    if (item.cleanersCount === 2) setCrewSelection('2_CLEANERS');
+    else if (item.cleanersCount === 1) setCrewSelection('1_CLEANER');
+    if (item.depositRequired !== undefined) setDepositAmount(item.depositRequired);
+    setFeedbackNotice(`✓ Applied Price List Item: "${item.name}" ($${item.basePrice.toFixed(2)})`);
+  }, []);
+
   // Hourly Rate resolution
   const hourlyRate = useMemo(() => {
     if (crewSelection === '1_CLEANER') return 52.50;
@@ -759,26 +785,50 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
     try {
       await syncClientAndQuoteToGoogle();
 
+      const primaryLineItemName = matchedCatalogItem
+        ? matchedCatalogItem.jobberItemName
+        : `${serviceType} — ${bedrooms}, ${bathrooms} (${hours} hrs)`;
+
+      const primaryDescription = `${bedrooms}, ${bathrooms} • ${
+        crewSelection === '1_CLEANER'
+          ? '1 Cleaner @ $52.50/hr'
+          : crewSelection === '2_CLEANERS'
+          ? '2 Cleaners @ $105.00/hr'
+          : `Custom Crew @ $${hourlyRate.toFixed(2)}/hr`
+      } — ${serviceAddress || `${city}, AB`}${
+        selectedAddons.length > 0 ? ` | Add-ons: ${selectedAddons.join(', ')}` : ''
+      }${quoteNotes.trim() ? ` | Notes: ${quoteNotes.trim()}` : ''}`;
+
+      const addonLineItems = selectedAddons.map((addon) => {
+        const matchedAddon = (localCatalog || CANONICAL_SERVICE_CATALOG).find(
+          (c) =>
+            c.isAddon &&
+            (c.name.toLowerCase().includes(addon.toLowerCase()) ||
+              addon.toLowerCase().includes(c.shortName.toLowerCase()))
+        );
+        const price = matchedAddon ? matchedAddon.basePrice : 45.0;
+        return {
+          name: matchedAddon ? matchedAddon.jobberItemName : `${addon} Cleaning Detail`,
+          description: matchedAddon ? matchedAddon.description : `Customer selected add-on: ${addon}`,
+          quantity: 1,
+          unitPrice: price,
+          total: price,
+        };
+      });
+
       const lineItems = [
         {
-          name: `${serviceType} — ${bedrooms}, ${bathrooms} (${hours} hrs)`,
-          description: `${bedrooms}, ${bathrooms} • ${
-            crewSelection === '1_CLEANER'
-              ? '1 Cleaner @ $52.50/hr'
-              : crewSelection === '2_CLEANERS'
-              ? '2 Cleaners @ $105.00/hr'
-              : `Custom Crew @ $${hourlyRate.toFixed(2)}/hr`
-          } — ${serviceAddress || `${city}, AB`}${
-            selectedAddons.length > 0 ? ` | Add-ons: ${selectedAddons.join(', ')}` : ''
-          }${quoteNotes.trim() ? ` | Notes: ${quoteNotes.trim()}` : ''}`,
+          name: primaryLineItemName,
+          description: primaryDescription,
           quantity: hours,
           unitPrice: hourlyRate,
           total: calculations.labor,
         },
+        ...addonLineItems,
         ...(Number(fuelSurcharge) > 0
           ? [
               {
-                name: 'Fuel & Dispatch Surcharge',
+                name: 'Fuel & Mobile Dispatch Surcharge',
                 description: 'Standard Greater Edmonton mobile dispatch fuel surcharge',
                 quantity: 1,
                 unitPrice: Number(fuelSurcharge),
@@ -910,6 +960,15 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
               <span>Intakes Log</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setIsCatalogModalOpen(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-purple-700 to-pink-600 hover:from-purple-600 hover:to-pink-500 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            title="View or Paste Service Catalog Price List"
+          >
+            <Tag className="w-3.5 h-3.5 text-white" />
+            <span>Price List &amp; Catalog</span>
+          </button>
           <button
             onClick={handleReset}
             className="px-3 py-2 bg-[#1b1e2b] hover:bg-[#252a3d] text-slate-300 rounded-xl text-xs font-bold transition-all border border-slate-700/80 cursor-pointer"
@@ -1295,6 +1354,55 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
               </div>
             </div>
           </div>
+
+          {/* Live Service Catalog Price List Match Banner */}
+          {matchedCatalogItem && (
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/80 via-slate-900 to-purple-950/80 border border-purple-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+              <div className="flex items-center gap-3">
+                <span className="w-9 h-9 rounded-xl bg-purple-600/30 text-purple-300 border border-purple-400/30 flex items-center justify-center shrink-0">
+                  <Tag className="w-4 h-4 text-purple-300" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-purple-400 font-extrabold">
+                      Catalog Price List Match
+                    </span>
+                    <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-200 text-[10px] font-bold font-mono">
+                      {matchedCatalogItem.categoryLabel}
+                    </span>
+                  </div>
+                  <div className="text-xs font-bold text-white mt-0.5">
+                    {matchedCatalogItem.name} —{' '}
+                    <span className="font-mono font-extrabold text-emerald-400">
+                      ${matchedCatalogItem.basePrice.toFixed(2)} CAD
+                    </span>{' '}
+                    <span className="text-slate-400 text-[11px]">
+                      ({matchedCatalogItem.baseHours} hrs • {matchedCatalogItem.cleanersCount === 1 ? '1 Cleaner' : '2 Cleaners'} • Deposit: ${matchedCatalogItem.depositRequired})
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => applyCatalogItemToQuote(matchedCatalogItem)}
+                  className="px-3.5 py-1.5 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95 transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Apply Catalog Price</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCatalogModalOpen(true)}
+                  className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white rounded-xl text-xs font-bold border border-white/15 cursor-pointer"
+                  title="Open full price list to select any service or paste price list"
+                >
+                  <span>Browse All</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Timing & Cleaner Assignment Row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
@@ -2458,6 +2566,21 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
           }}
         />
       )}
+
+      {/* Service Catalog & Price List Modal */}
+      <ServiceCatalogModal
+        isOpen={isCatalogModalOpen}
+        onClose={() => setIsCatalogModalOpen(false)}
+        catalog={localCatalog || CANONICAL_SERVICE_CATALOG}
+        onCatalogUpdated={(newCat) => {
+          setLocalCatalog(newCat);
+          if (onCatalogUpdated) onCatalogUpdated(newCat);
+        }}
+        onSelectForQuote={(item) => {
+          applyCatalogItemToQuote(item);
+        }}
+        projectId={projectId}
+      />
     </div>
   );
 };

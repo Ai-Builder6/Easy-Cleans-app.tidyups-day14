@@ -26,7 +26,8 @@ import {
   Mic,
   ClipboardList,
   FileArchive,
-  CloudUpload
+  CloudUpload,
+  Tag,
 } from 'lucide-react';
 import { Technician } from '../types/dispatch';
 
@@ -42,6 +43,8 @@ interface ManagementHubViewProps {
   onNavigateToSpamShield?: () => void;
   onNavigateToLegal: (tab: 'SUPPORT' | 'TERMS' | 'PRIVACY') => void;
   onNavigateToCustomerPortal: () => void;
+  onOpenPriceList?: () => void;
+  catalogCount?: number;
   intakesCount?: number;
   quotesCount?: number;
   invoicesCount?: number;
@@ -66,6 +69,8 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
   onNavigateToSpamShield,
   onNavigateToLegal,
   onNavigateToCustomerPortal,
+  onOpenPriceList,
+  catalogCount = 28,
   intakesCount = 0,
   quotesCount = 0,
   invoicesCount = 0,
@@ -220,6 +225,34 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
             className="w-full py-2.5 px-4 bg-amber-600/90 hover:bg-amber-600 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md group-hover:translate-x-0.5"
           >
             <span>Open Quotes Pipeline (Local DB)</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* 1B. Service Catalog & Price List Card */}
+        <div className="bg-[#151923] border border-slate-800 hover:border-pink-500/50 rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-xl transition-all group">
+          <div className="space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-pink-500/20 text-pink-400 border border-pink-500/30 flex items-center justify-center">
+              <Tag className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-lg text-white">Service Catalog &amp; Price List</h3>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-pink-950 text-pink-300 border border-pink-800">
+                  {catalogCount || 28} Active Items
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Standard prices, line items, and bedroom/bathroom configurations. Paste custom price lists and auto-sync line items with Jobber quotes.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={onOpenPriceList}
+            className="w-full py-2.5 px-4 bg-gradient-to-r from-pink-600 to-purple-600 hover:opacity-95 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md group-hover:translate-x-0.5"
+          >
+            <span>Open Service Catalog &amp; Price List</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

@@ -40,6 +40,8 @@ import { LeadsView } from './components/LeadsView';
 import { QuickQuoteView } from './components/QuickQuoteView';
 import { QuickQuoteModal } from './components/QuickQuoteModal';
 import { QuoteDetailModal } from './components/QuoteDetailModal';
+import { ServiceCatalogModal } from './components/ServiceCatalogModal';
+import { ServiceCatalogItem, CANONICAL_SERVICE_CATALOG } from './data/serviceCatalogData';
 import { TwilioSpamShieldModal } from './components/TwilioSpamShieldModal';
 import { SpamShieldView } from './components/SpamShieldView';
 import { AdLeadItem } from './types/lead';
@@ -117,6 +119,7 @@ import {
   Mic,
   ClipboardList,
   FileArchive,
+  Tag,
 } from 'lucide-react';
 
 // Helper to identify and strip any legacy simulation/mock data items
@@ -382,6 +385,14 @@ export function App() {
   const [isSyncingFirestore, setIsSyncingFirestore] = useState<boolean>(false);
   const [firestoreSyncStatus, setFirestoreSyncStatus] = useState<string | null>(null);
 
+  // Service Catalog & Price List state (Line Items, Rates, Bedrooms/Bathrooms)
+  const [serviceCatalog, setServiceCatalog] = useState<ServiceCatalogItem[]>(() => {
+    return (storedData?.serviceCatalog && storedData.serviceCatalog.length > 0)
+      ? storedData.serviceCatalog
+      : CANONICAL_SERVICE_CATALOG;
+  });
+  const [isServiceCatalogModalOpen, setIsServiceCatalogModalOpen] = useState<boolean>(false);
+
   // Dedicated strictly to TidyUps Cleaning (app.tidyupscleaning.com)
   const [activeBrandId, setActiveBrandId] = useState<'dispatchgeeni' | 'tidyups' | 'easycleans'>('tidyups');
 
@@ -511,6 +522,18 @@ export function App() {
     });
     return unsub;
   }, []);
+
+  // Fetch live Service Catalog Price List on mount and project change
+  useEffect(() => {
+    fetch(`/api/price-list?project=${activeProjectId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.items && data.items.length > 0) {
+          setServiceCatalog(data.items);
+        }
+      })
+      .catch((err) => console.warn('Could not load service catalog:', err));
+  }, [activeProjectId]);
 
   // Toggle scheduled job between COMPLETED and SCHEDULED with dynamic map shading & store persistence
   const handleToggleScheduledJobStatus = (jobId: string, newStatus: 'SCHEDULED' | 'COMPLETED') => {
@@ -1848,6 +1871,17 @@ export function App() {
                     <span className="hidden sm:inline">SMS Replies</span>
                   </button>
 
+                  {/* Service Catalog & Price List Button */}
+                  <button
+                    id="nav-price-list"
+                    onClick={() => setIsServiceCatalogModalOpen(true)}
+                    className="min-h-[34px] px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 shadow-2xs active:scale-95"
+                    title="Service Catalog Price List: View, Add, or Paste / Import Price List items & Jobber line items"
+                  >
+                    <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="hidden sm:inline">Price List</span>
+                  </button>
+
                   {/* Project ZIP Download, Google Drive Backup & AI Build Guide */}
                   <button
                     id="nav-project-backup"
@@ -2210,6 +2244,8 @@ export function App() {
               setActiveTopView('LEGAL');
             }}
             onNavigateToCustomerPortal={() => setActiveTopView('CUSTOMER_PORTAL')}
+            onOpenPriceList={() => setIsServiceCatalogModalOpen(true)}
+            catalogCount={serviceCatalog?.length || 28}
             intakesCount={tickets.length + quotesList.length}
             quotesCount={quotesList.length}
             invoicesCount={invoicesList.length}
@@ -2254,6 +2290,8 @@ export function App() {
             visits={scheduledJobsList}
             clients={clientsList}
             projectId={activeProjectId}
+            serviceCatalog={serviceCatalog}
+            onCatalogUpdated={(newCat) => setServiceCatalog(newCat)}
             onQuotesUpdated={(updated) => setQuotesList(updated)}
             onVisitCreated={(newVisit) => {
               setScheduledJobsList((prev) => [newVisit, ...prev]);
@@ -2334,6 +2372,8 @@ export function App() {
             clients={clientsList}
             quotes={quotesList}
             projectId={activeProjectId}
+            serviceCatalog={serviceCatalog}
+            onCatalogUpdated={(newCat) => setServiceCatalog(newCat)}
             onOpenSpamShield={handleOpenSpamShield}
             onOpenProjectBackup={() => setIsProjectBackupModalOpen(true)}
             onClientsUpdated={(updated) => setClientsList(updated)}
@@ -2856,6 +2896,14 @@ export function App() {
           onClose={() => setIsRoleModalOpen(false)}
           currentUser={currentUser}
           onSelectUser={handleSelectUser}
+        />
+
+        {/* Service Catalog & Price List Modal */}
+        <ServiceCatalogModal
+          isOpen={isServiceCatalogModalOpen}
+          onClose={() => setIsServiceCatalogModalOpen(false)}
+          catalog={serviceCatalog}
+          onCatalogUpdated={(newCat) => setServiceCatalog(newCat)}
         />
 
         {/* Project Backup ZIP, Google Drive Upload, AI Build Workflow & GitHub / Domain Publish Modal */}
