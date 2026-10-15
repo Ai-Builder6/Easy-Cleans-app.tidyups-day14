@@ -946,10 +946,10 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
               type="button"
               onClick={onOpenProjectBackup}
               className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95"
-              title="Download the 3 Separate Domain ZIPs (app.tidyupscleaning.com, dispatchgeeni.com, easycleans.com)"
+              title="Download Complete Project ZIP for app.tidyupscleaning.com"
             >
               <FileArchive className="w-3.5 h-3.5 text-white" />
-              <span>3 Domain ZIPs</span>
+              <span>Project ZIP</span>
             </button>
           )}
           {onOpenSpamShield && (

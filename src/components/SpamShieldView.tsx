@@ -104,7 +104,7 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
 
   const webhookUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/api/twilio/voice`
-    : 'https://dispatchgeeni.com/api/twilio/voice';
+    : 'https://app.tidyupscleaning.com/api/twilio/voice';
 
   // Fetch current config & history
   const fetchSpamShield = async () => {

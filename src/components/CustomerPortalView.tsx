@@ -200,12 +200,7 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
   onOpenSpamShield,
   projectId = 'tidyups',
 }) => {
-  const brandName =
-    projectId === 'tidyups'
-      ? 'TidyUps Cleaning'
-      : projectId === 'easycleans'
-      ? 'EasyCleans'
-      : 'Dispatch Genie';
+  const brandName = 'TidyUps Cleaning';
   // Active selected service for detailed display and pre-filling
   const [selectedService, setSelectedService] = useState<CleaningCategory>('move-out');
   const [formSubmitted, setFormSubmitted] = useState<boolean>(false);

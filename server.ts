@@ -153,7 +153,7 @@ app.post("/api/maps/config", (req, res) => {
   res.json({ success: true, mapsApiKey: cleanKey });
 });
 
-// Unified 3-Site Google Cloud Run & Firestore Mirror Status Endpoint
+// Google Cloud Run & Firestore Status Endpoint (Dedicated to app.tidyupscleaning.com)
 app.get("/api/cloud-sync/status", (req, res) => {
   const store = loadStore();
   res.json({
@@ -161,11 +161,9 @@ app.get("/api/cloud-sync/status", (req, res) => {
     hostingProvider: "Google Cloud Run",
     googleCloudProjectId: "gtm-kvj5cp62-zty5m",
     sharedFirestoreDatabaseId: "ai-studio-cleaningserviced-8a2493ab-cb9d-4c28-a60b-c28e7d08d30e",
-    activeSiteId: getProjectId(req),
+    activeSiteId: "tidyups",
     mirroredSites: [
       { id: "tidyups", name: "TidyUps Cleaning (Primary)", domain: "app.tidyupscleaning.com", cloudRunService: "tidyups-cleaning", synced: true },
-      { id: "dispatchgeeni", name: "Dispatch Geeni (Backup)", domain: "dispatchgeeni.com", cloudRunService: "dispatch-geeni", synced: true },
-      { id: "easycleans", name: "EasyCleans (Backup)", domain: "easycleans.si", cloudRunService: "easy-cleans", synced: true },
     ],
     lastSyncedAt: store?.lastSavedAt || new Date().toISOString(),
     twilioProtectedLinesCount: Object.keys(store?.spamShieldConfig?.lineMappings || {}).length,
@@ -1238,49 +1236,19 @@ function getAppBaseUrl(req: express.Request): string {
   if (envUrl && (envUrl.startsWith("http://") || envUrl.startsWith("https://"))) {
     return envUrl.replace(/\/$/, "");
   }
-  // Jobber strictly requires HTTPS for OAuth redirect URIs
   const forwardedHost = (req.headers["x-forwarded-host"] as string) || req.get("host") || "";
-  if (forwardedHost.includes("dispatchgeeni.com") || forwardedHost.includes("dispatchgenie.com") || forwardedHost.includes("distpatchgeeni.com")) {
-    return "https://dispatchgeeni.com";
-  }
   if (forwardedHost.includes("tidyupscleaning.com")) {
     return "https://app.tidyupscleaning.com";
-  }
-  if (forwardedHost.includes("easycleans.")) {
-    return `https://${forwardedHost}`;
   }
   if (forwardedHost.includes("run.app") || forwardedHost.includes("ais-")) {
     return `https://${forwardedHost}`;
   }
-  // Production domain fallback
-  return "https://dispatchgeeni.com";
+  // Dedicated domain fallback
+  return "https://app.tidyupscleaning.com";
 }
 
-export function getProjectId(req: express.Request): "dispatchgeeni" | "tidyups" | "easycleans" {
-  const queryProj = (((req.query?.project as string) || (req.query?.projectId as string)) || "").trim().toLowerCase();
-  if (queryProj.includes("tidyup")) return "tidyups";
-  if (queryProj.includes("easyclean") || queryProj.includes("easy-clean")) return "easycleans";
-  if (queryProj.includes("dispatch")) return "dispatchgeeni";
-
-  const headerProj = ((req.headers?.["x-project-id"] as string) || "").trim().toLowerCase();
-  if (headerProj.includes("tidyup")) return "tidyups";
-  if (headerProj.includes("easyclean") || headerProj.includes("easy-clean")) return "easycleans";
-  if (headerProj.includes("dispatch")) return "dispatchgeeni";
-
-  const forwardedHost = (req.headers?.["x-forwarded-host"] as string) || req.get?.("host") || "";
-  if (forwardedHost.includes("tidyupscleaning.com")) {
-    return "tidyups";
-  }
-  if (forwardedHost.includes("easycleans.")) {
-    return "easycleans";
-  }
-  if (process.env.ACTIVE_PROJECT_ID === "tidyups") {
-    return "tidyups";
-  }
-  if (process.env.ACTIVE_PROJECT_ID === "easycleans") {
-    return "easycleans";
-  }
-  return "dispatchgeeni";
+export function getProjectId(_req: express.Request): "tidyups" {
+  return "tidyups";
 }
 
 // Jobber Developer App & GraphQL Integration Endpoints (https://developer.getjobber.com/docs)
@@ -1366,7 +1334,7 @@ function getJobberCreds() {
   };
 }
 
-function persistJobberConfigToDisk(projectId?: string) {
+function persistJobberConfigToDisk(_projectId?: string) {
   const cfg = {
     isConnected: jobberConfig.isConnected,
     accountName: jobberConfig.accountName,
@@ -1377,27 +1345,8 @@ function persistJobberConfigToDisk(projectId?: string) {
     lastSyncedAt: jobberConfig.lastSyncedAt,
   };
 
-  // Sync to both isolated project databases
-  for (const pid of ["dispatchgeeni", "tidyups"]) {
-    try {
-      const pStore = loadStore(pid) || {
-        version: 1,
-        lastSavedAt: new Date().toISOString(),
-        tickets: INITIAL_TICKETS,
-        cleanerOverrides: {},
-        scheduledVisits: [],
-        quotes: [],
-        invoices: [],
-      };
-      saveStore({ ...pStore, jobberConfig: cfg }, pid);
-    } catch {
-      // Non-blocking
-    }
-  }
-
-  // Also update default legacy store if present
   try {
-    const curStore = loadStore() || {
+    const pStore = loadStore("tidyups") || {
       version: 1,
       lastSavedAt: new Date().toISOString(),
       tickets: INITIAL_TICKETS,
@@ -1406,7 +1355,7 @@ function persistJobberConfigToDisk(projectId?: string) {
       quotes: [],
       invoices: [],
     };
-    saveStore({ ...curStore, jobberConfig: cfg });
+    saveStore({ ...pStore, jobberConfig: cfg }, "tidyups");
   } catch {
     // Non-blocking
   }
@@ -1436,7 +1385,7 @@ app.get("/api/jobber/config", (req, res) => {
   const baseUrl = getAppBaseUrl(req);
   const canonicalCallback =
     (jobberConfig as any).canonicalRedirectUri ||
-    "https://dispatchgeeni.com/api/jobber/oauth/callback";
+    "https://app.tidyupscleaning.com/api/jobber/oauth/callback";
   res.json({
     isConnected: jobberConfig.isConnected,
     accountName: jobberConfig.accountName,
@@ -1448,7 +1397,6 @@ app.get("/api/jobber/config", (req, res) => {
     redirectUri: `${baseUrl}/api/jobber/oauth/callback`,
     canonicalRedirectUri: canonicalCallback,
     registeredDomains: [
-      "https://dispatchgeeni.com/api/jobber/oauth/callback",
       "https://app.tidyupscleaning.com/api/jobber/oauth/callback"
     ],
   });
@@ -1488,12 +1436,12 @@ app.post("/api/jobber/config", (req, res) => {
       accessToken: jobberConfig.accessToken ? `${jobberConfig.accessToken.slice(0, 8)}...` : "",
       lastSyncedAt: jobberConfig.lastSyncedAt,
       redirectUri,
-      canonicalRedirectUri: (jobberConfig as any).canonicalRedirectUri || "https://dispatchgeeni.com/api/jobber/oauth/callback",
+      canonicalRedirectUri: (jobberConfig as any).canonicalRedirectUri || "https://app.tidyupscleaning.com/api/jobber/oauth/callback",
     },
   });
 });
 
-// GET Jobber OAuth authorization URL for 1-click connect (Supports Universal 3-Domain Relay)
+// GET Jobber OAuth authorization URL for 1-click connect (Dedicated to app.tidyupscleaning.com)
 app.get("/api/jobber/oauth/authorize-url", (req, res) => {
   const baseUrl = getAppBaseUrl(req);
   const sourceOrigin =
@@ -1501,11 +1449,11 @@ app.get("/api/jobber/oauth/authorize-url", (req, res) => {
     (req.headers.origin as string) ||
     baseUrl;
 
-  // Canonical registered callback in Jobber Dev (defaults to dispatchgeeni.com or tidyups)
+  // Canonical registered callback in Jobber Dev for app.tidyupscleaning.com
   const canonicalCallback =
     (req.query.canonicalRedirectUri as string) ||
     (jobberConfig as any).canonicalRedirectUri ||
-    "https://dispatchgeeni.com/api/jobber/oauth/callback";
+    "https://app.tidyupscleaning.com/api/jobber/oauth/callback";
 
   // If client requested direct current domain callback
   const redirectUri = (req.query.useCurrentDomain === "true")
@@ -1574,11 +1522,7 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
   }
 
   const targetReturnUrl = sourceOrigin ? `${sourceOrigin}/?jobber_connected=true` : returnUrl || "/";
-  const sourceLabel = sourceOrigin.includes("tidyups")
-    ? "app.tidyupscleaning.com"
-    : sourceOrigin.includes("dispatchgeeni")
-    ? "dispatchgeeni.com"
-    : "Dispatch Genie";
+  const sourceLabel = "app.tidyupscleaning.com";
 
   if (error) {
     return res.status(400).send(`
@@ -1655,23 +1599,17 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
     jobberConfig.lastSyncedAt = new Date().toISOString();
     persistJobberConfigToDisk();
 
-    // Mirror token to all project database store files so both dispatchgeeni.com and app.tidyupscleaning.com have it immediately
+    // Mirror token to tidyups_cleaning_store.json
     try {
-      const allStorePaths = [
-        path.join(__dirname, "data", "store.json"),
-        path.join(__dirname, "data", "dispatchgeeni_store.json"),
-        path.join(__dirname, "data", "tidyups_store.json"),
-      ];
-      for (const sPath of allStorePaths) {
-        if (fs.existsSync(sPath)) {
-          const sObj = JSON.parse(fs.readFileSync(sPath, "utf-8"));
-          if (!sObj.jobberConfig) sObj.jobberConfig = {};
-          sObj.jobberConfig.accessToken = tokenData.access_token;
-          sObj.jobberConfig.refreshToken = tokenData.refresh_token || "";
-          sObj.jobberConfig.isConnected = true;
-          sObj.jobberConfig.lastSyncedAt = new Date().toISOString();
-          fs.writeFileSync(sPath, JSON.stringify(sObj, null, 2), "utf-8");
-        }
+      const sPath = path.join(__dirname, "data", "tidyups_cleaning_store.json");
+      if (fs.existsSync(sPath)) {
+        const sObj = JSON.parse(fs.readFileSync(sPath, "utf-8"));
+        if (!sObj.jobberConfig) sObj.jobberConfig = {};
+        sObj.jobberConfig.accessToken = tokenData.access_token;
+        sObj.jobberConfig.refreshToken = tokenData.refresh_token || "";
+        sObj.jobberConfig.isConnected = true;
+        sObj.jobberConfig.lastSyncedAt = new Date().toISOString();
+        fs.writeFileSync(sPath, JSON.stringify(sObj, null, 2), "utf-8");
       }
     } catch {}
 
@@ -1700,9 +1638,9 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
         </head>
         <body>
           <div class="card">
-            <div class="badge">Universal 3-Domain OAuth Relay Active</div>
+            <div class="badge">TidyUps Cleaning • app.tidyupscleaning.com</div>
             <h2>Connected to Jobber!</h2>
-            <p>Your Jobber account is authorized and synced. Tokens are active for <strong>app.tidyupscleaning.com</strong> and <strong>dispatchgeeni.com</strong>.</p>
+            <p>Your Jobber account is authorized and synced. Tokens are active for <strong>app.tidyupscleaning.com</strong>.</p>
             <p style="font-size: 12px; color: #64748b;">Returning automatically to ${sourceLabel}...</p>
             <a href="${targetReturnUrl}" class="btn">Return to ${sourceLabel}</a>
           </div>
@@ -2045,7 +1983,79 @@ app.post("/api/jobber/export-booking", async (req, res) => {
   res.json(result);
 });
 
-// POST Master Comprehensive Sync: Runs all 5 Jobber modules with incremental delta merge
+// POST Push All Pending Quotes & Bookings to Jobber (jobberPush module button)
+app.post("/api/jobber/push-all", async (req, res) => {
+  const projectId = getProjectId(req);
+  jobberConfig.lastSyncedAt = new Date().toISOString();
+  const currentStore = loadStore(projectId);
+  if (!currentStore) {
+    return res.status(500).json({ error: "Store not loaded" });
+  }
+
+  let pushedQuotes = 0;
+  let pushedBookings = 0;
+
+  if (Array.isArray(currentStore.quotes)) {
+    for (const q of currentStore.quotes) {
+      if (!q.isLiveSynced && q.clientName) {
+        try {
+          const pushRes = await pushQuoteToJobber(
+            {
+              clientName: q.clientName,
+              clientPhone: q.clientPhone,
+              clientEmail: q.clientEmail,
+              serviceAddress: q.serviceAddress,
+              service: q.service || "Cleaning Service",
+              bedrooms: q.bedrooms,
+              bathrooms: q.bathrooms,
+              total: Number(q.total) || 280,
+              depositRequired: Number(q.depositRequired) || 50,
+              notes: q.notes,
+              lineItems: q.lineItems,
+            },
+            jobberConfig.accessToken,
+            getJobberCreds()
+          );
+          if (pushRes.success) {
+            q.isLiveSynced = Boolean(pushRes.isLiveSynced);
+            if (pushRes.jobberQuoteId) q.jobberQuoteId = pushRes.jobberQuoteId;
+            if (pushRes.jobberWebUri) q.jobberWebUri = pushRes.jobberWebUri;
+            pushedQuotes++;
+          }
+        } catch {}
+      }
+    }
+  }
+
+  if (Array.isArray(currentStore.tickets)) {
+    for (const t of currentStore.tickets) {
+      if (!t.jobberJobId && t.customerName) {
+        try {
+          const bRes = await pushBookingToJobber(t, jobberConfig.accessToken);
+          if (bRes.success) {
+            t.jobberJobId = bRes.jobberJobId;
+            t.jobberVisitId = bRes.jobberVisitId;
+            pushedBookings++;
+          }
+        } catch {}
+      }
+    }
+  }
+
+  currentStore.lastSavedAt = new Date().toISOString();
+  saveStore(currentStore, projectId);
+
+  res.json({
+    success: true,
+    pushedQuotes,
+    pushedBookings,
+    totalPushed: pushedQuotes + pushedBookings,
+    message: `Auto-Push complete! Synced ${pushedQuotes} quotes and ${pushedBookings} bookings directly to Jobber.`,
+    lastSyncedAt: jobberConfig.lastSyncedAt,
+  });
+});
+
+// POST Master Comprehensive Sync: Runs all 5 Jobber modules (including automatic outbound push) with incremental delta merge
 app.post("/api/jobber/sync-all-comprehensive", async (req, res) => {
   const projectId = getProjectId(req);
   jobberConfig.lastSyncedAt = new Date().toISOString();
@@ -2063,19 +2073,16 @@ app.post("/api/jobber/sync-all-comprehensive", async (req, res) => {
   const isLive = Boolean(jobberConfig.accessToken && jobberConfig.isConnected);
   const summary = await runComprehensiveJobberSync(jobberConfig.accessToken, getJobberCreds(), currentStore);
 
-  // If live Jobber sync pulled new data, save store
-  if (isLive) {
-    currentStore.lastSavedAt = new Date().toISOString();
-    saveStore(currentStore, projectId);
-  }
+  currentStore.lastSavedAt = new Date().toISOString();
+  saveStore(currentStore, projectId);
 
   res.json({
     success: true,
     isLiveJobber: isLive,
     summary,
     message: isLive
-      ? "Comprehensive incremental sync complete. All visits, quotes, and invoices updated in local database."
-      : "Showing local dispatch database records (~60 days past through ~60 days forward). Local database copy is active and instantaneous.",
+      ? "Comprehensive 5-module sync & auto-push complete! All pending quotes, bookings, visits, clients, and invoices are synced with Jobber."
+      : "Auto-push & 5-module sync staged in local database for app.tidyupscleaning.com.",
     lastSyncedAt: jobberConfig.lastSyncedAt,
     activeProjectId: projectId,
   });
@@ -3994,17 +4001,16 @@ app.post("/api/jobber/create-invoice", async (req, res) => {
   });
 });
 
-// GET /api/domain-status: Live domain connection verification and multi-project metadata
+// GET /api/domain-status: Live domain connection verification dedicated to app.tidyupscleaning.com
 app.get("/api/domain-status", (req, res) => {
   const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "";
-  const isTidyups = host.includes("tidyupscleaning");
   
   res.json({
     connected: true,
     detectedHost: host,
     protocol: req.headers["x-forwarded-proto"] || req.protocol || "https",
-    activeDomain: isTidyups ? "https://app.tidyupscleaning.com" : "https://dispatchgeeni.com",
-    activeProject: isTidyups ? "TidyUps Cleaning Operations" : "Dispatch Genie",
+    activeDomain: "https://app.tidyupscleaning.com",
+    activeProject: "TidyUps Cleaning Operations",
     cloudProject: {
       projectId: "gtm-kvj5cp62-zty5m",
       projectNumber: 230358145142,
@@ -4014,17 +4020,6 @@ app.get("/api/domain-status", (req, res) => {
       runContainerUrl: "https://ais-dev-2jvzwakvityygyeyjp5ysi-460696821435.us-east5.run.app",
     },
     projects: [
-      {
-        id: "dispatchgeeni",
-        name: "Dispatch Genie",
-        domain: "https://dispatchgeeni.com",
-        registrar: "Hostinger",
-        status: "CONNECTED_AND_SERVING",
-        ssl: "ACTIVE_TLS",
-        jobberRedirectUri: "https://dispatchgeeni.com/api/jobber/oauth/callback",
-        downloadArchive: "/dispatch-genie-v1.zip",
-        supportEmail: "support@dispatchgeeni.com",
-      },
       {
         id: "tidyups",
         name: "TidyUps Cleaning Service Inc",
@@ -4639,18 +4634,6 @@ app.get("/api/project/export-metadata", (_req, res) => {
           brandName: "TidyUps Cleaning Service Inc",
           zipFilename: `app.tidyupscleaning.com-complete-project.zip`,
         },
-        {
-          id: "dispatchgeeni",
-          domain: "dispatchgeeni.com",
-          brandName: "Dispatch Geeni Operations",
-          zipFilename: `dispatchgeeni.com-complete-project.zip`,
-        },
-        {
-          id: "easycleans",
-          domain: "easycleans.com",
-          brandName: "Easy Cleans Residential & Commercial",
-          zipFilename: `easycleans.com-complete-project.zip`,
-        },
       ],
       readme: readmeText,
       aiWorkflow: workflowText,
@@ -4661,62 +4644,21 @@ app.get("/api/project/export-metadata", (_req, res) => {
   }
 });
 
-app.get("/api/project/export-zip", async (req, res) => {
+app.get("/api/project/export-zip", async (_req, res) => {
   try {
-    const domainParam = String(req.query.domain || "tidyups").toLowerCase();
-    const domainMeta =
-      domainParam === "dispatchgeeni"
-        ? {
-            id: "dispatchgeeni",
-            domain: "dispatchgeeni.com",
-            brandTitle: "Dispatch Geeni — Edmonton Cleaning & Fleet Dispatch Console",
-            projectSlug: "dispatchgeeni.com-complete-project",
-            projectId: "dispatchgeeni",
-          }
-        : domainParam === "easycleans"
-        ? {
-            id: "easycleans",
-            domain: "easycleans.com",
-            brandTitle: "Easy Cleans — Edmonton Residential & Commercial Cleaning",
-            projectSlug: "easycleans.com-complete-project",
-            projectId: "tidyups",
-          }
-        : {
-            id: "tidyups",
-            domain: "app.tidyupscleaning.com",
-            brandTitle: "TidyUps Cleaning — Voice Dictation, Quick Quote & Live Dispatch (app.tidyupscleaning.com)",
-            projectSlug: "app.tidyupscleaning.com-complete-project",
-            projectId: "tidyups",
-          };
+    const domainMeta = {
+      id: "tidyups",
+      domain: "app.tidyupscleaning.com",
+      brandTitle: "TidyUps Cleaning — Voice Dictation, Quick Quote & Live Dispatch (app.tidyupscleaning.com)",
+      projectSlug: "app.tidyupscleaning.com-complete-project",
+      projectId: "tidyups",
+    };
 
     const zip = new JSZip();
     const rootDir = process.cwd();
     addDirectoryToZip(zip, rootDir, "");
 
-    // Customize standalone domain configuration inside the ZIP so each of the 3 ZIPs is pre-configured for its exact domain
     try {
-      const appTsxPath = path.join(rootDir, "src/App.tsx");
-      if (fs.existsSync(appTsxPath)) {
-        let appTsx = fs.readFileSync(appTsxPath, "utf-8");
-        appTsx = appTsx.replace(
-          /const \[activeBrandId, setActiveBrandId\] = useState<'dispatchgeeni' \| 'tidyups' \| 'easycleans'>\('tidyups'\);/,
-          `const [activeBrandId, setActiveBrandId] = useState<'dispatchgeeni' | 'tidyups' | 'easycleans'>('${domainMeta.id}');`
-        );
-        appTsx = appTsx.replace(
-          /const activeProjectId: 'dispatchgeeni' \| 'tidyups' = 'tidyups';/,
-          `const activeProjectId: 'dispatchgeeni' | 'tidyups' = '${domainMeta.projectId}';`
-        );
-        appTsx = appTsx.replace(/app\.tidyupscleaning\.com/g, domainMeta.domain);
-        zip.file("src/App.tsx", appTsx);
-      }
-
-      const indexHtmlPath = path.join(rootDir, "index.html");
-      if (fs.existsSync(indexHtmlPath)) {
-        let indexHtml = fs.readFileSync(indexHtmlPath, "utf-8");
-        indexHtml = indexHtml.replace(/<title>.*?<\/title>/, `<title>${domainMeta.brandTitle}</title>`);
-        zip.file("index.html", indexHtml);
-      }
-
       zip.file(
         "DOMAIN_CONFIG.json",
         JSON.stringify(
@@ -6013,19 +5955,6 @@ app.post("/api/twilio/spam-shield", (req, res) => {
   store.lastSavedAt = new Date().toISOString();
   saveStore(store, projectId);
 
-  // Sync config across both store files (tidyups and dispatchgeeni) so webhooks always match
-  try {
-    const otherProject = projectId === "tidyups" ? "dispatchgeeni" : "tidyups";
-    const otherStore = loadStore(otherProject);
-    if (otherStore) {
-      otherStore.spamShieldConfig = JSON.parse(JSON.stringify(store.spamShieldConfig));
-      otherStore.lastSavedAt = new Date().toISOString();
-      saveStore(otherStore, otherProject);
-    }
-  } catch (syncErr) {
-    console.warn("Could not sync spam shield config to alternate store:", syncErr);
-  }
-
   res.json({
     success: true,
     message: "Twilio & Quo Spam Shield configuration updated!",
@@ -6208,15 +6137,8 @@ const handleTwilioVoiceWebhook = (req: express.Request, res: express.Response) =
   let store = loadStore(projectId);
   let config = store?.spamShieldConfig || DEFAULT_SPAM_SHIELD_CONFIG;
 
-  // Fallback to alternate project store or default mappings if lineMappings is empty
   if (!config.lineMappings || Object.keys(config.lineMappings).length === 0) {
-    const alternateStore = loadStore(projectId === "tidyups" ? "dispatchgeeni" : "tidyups");
-    if (alternateStore?.spamShieldConfig?.lineMappings && Object.keys(alternateStore.spamShieldConfig.lineMappings).length > 0) {
-      config = alternateStore.spamShieldConfig;
-      store = alternateStore;
-    } else {
-      config = { ...DEFAULT_SPAM_SHIELD_CONFIG, ...config };
-    }
+    config = { ...DEFAULT_SPAM_SHIELD_CONFIG, ...config };
   }
 
   const rawFrom = req.body?.From || req.query?.From || req.body?.Caller || req.query?.Caller || "Unknown";

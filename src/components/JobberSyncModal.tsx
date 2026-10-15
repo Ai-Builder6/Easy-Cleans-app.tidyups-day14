@@ -43,7 +43,7 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
   onClose,
   tickets,
   onDataUpdated,
-  projectId = 'dispatchgeeni',
+  projectId = 'tidyups',
 }) => {
   const [activeProjectTab, setActiveProjectTab] = useState<'dispatchgeeni' | 'tidyups'>(projectId);
 
@@ -51,9 +51,8 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     setActiveProjectTab(projectId);
   }, [projectId]);
 
-  // Canonical Registered Callback in Jobber Developer Center
-  const CANONICAL_JOBBER_CALLBACK = 'https://dispatchgeeni.com/api/jobber/oauth/callback';
-  const ALTERNATE_JOBBER_CALLBACK = 'https://app.tidyupscleaning.com/api/jobber/oauth/callback';
+  // Dedicated Registered Callback in Jobber Developer Center for app.tidyupscleaning.com
+  const CANONICAL_JOBBER_CALLBACK = 'https://app.tidyupscleaning.com/api/jobber/oauth/callback';
 
   const previewRedirectUri = typeof window !== 'undefined'
     ? `${window.location.origin.replace(/^http:\/\//i, 'https://')}/api/jobber/oauth/callback`
@@ -639,83 +638,32 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                   </p>
                 </div>
 
-                {/* Step 1: Universal 3-Domain OAuth Relay */}
-                <div className="p-3.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-purple-50/70 border-2 border-blue-300 rounded-xl space-y-3">
+                {/* Step 1: Dedicated app.tidyupscleaning.com Callback */}
+                <div className="p-3.5 bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-blue-50/70 border-2 border-emerald-300 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center font-bold">1</span>
-                      <span>Single Jobber Dev Callback (Works for All 3 Domains)</span>
+                    <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] flex items-center justify-center font-bold">1</span>
+                      <span>Jobber Dev Callback URI (app.tidyupscleaning.com)</span>
                     </span>
                     <button
-                      onClick={() => handleCopyRedirectUri()}
-                      className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                      onClick={() => handleCopyRedirectUri(CANONICAL_JOBBER_CALLBACK)}
+                      className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                     >
                       <Copy className="w-3 h-3" />
-                      <span>{copiedRedirectUri ? 'Copied!' : 'Copy Registered URI'}</span>
+                      <span>{copiedRedirectUri ? 'Copied!' : 'Copy Callback URI'}</span>
                     </button>
                   </div>
 
-                  <div className="p-2.5 bg-white/90 border border-blue-200 rounded-lg text-[11px] text-slate-800 space-y-1">
-                    <div className="font-extrabold text-blue-950 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span>Why You Only Need ONE Callback URI in Jobber Developer Center:</span>
+                  <div className="p-2.5 bg-white/90 border border-emerald-200 rounded-lg text-[11px] text-slate-800 space-y-1">
+                    <div className="font-extrabold text-emerald-950 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Dedicated to app.tidyupscleaning.com:</span>
                     </div>
                     <p className="text-slate-600 leading-relaxed">
-                      Jobber Developer Center only allows 1 callback URI. By setting your Jobber app's Callback URL to <code className="bg-blue-100 text-blue-950 px-1 py-0.5 rounded font-mono font-bold">https://dispatchgeeni.com/api/jobber/oauth/callback</code>, our built-in <strong>Universal OAuth Relay</strong> automatically handles authorization from <strong className="text-emerald-700">app.tidyupscleaning.com</strong>, <strong className="text-purple-700">dispatchgeeni.com</strong>, and preview instances without you ever having to change your Jobber Dev settings again!
+                      This project is strictly connected to <strong className="text-emerald-700">app.tidyupscleaning.com</strong>. Set your Jobber Developer App Callback URL to:
                     </p>
-                  </div>
-
-                  {/* Registered Callback Selector */}
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                      Registered Callback in your Jobber Dev App (Select whichever you have in Jobber):
-                    </span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setRedirectUri(CANONICAL_JOBBER_CALLBACK)}
-                        className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                          redirectUri === CANONICAL_JOBBER_CALLBACK
-                            ? 'bg-purple-700 text-white border-purple-800 shadow-2xs font-semibold'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold flex items-center gap-1">
-                            <Globe className="w-3 h-3" />
-                            <span>dispatchgeeni.com (Recommended)</span>
-                          </span>
-                          {redirectUri === CANONICAL_JOBBER_CALLBACK && (
-                            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">PRIMARY</span>
-                          )}
-                        </div>
-                        <div className="font-mono text-[10px] break-all mt-1 opacity-90">
-                          https://dispatchgeeni.com/api/jobber/oauth/callback
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setRedirectUri(ALTERNATE_JOBBER_CALLBACK)}
-                        className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                          redirectUri === ALTERNATE_JOBBER_CALLBACK
-                            ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs font-semibold'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold flex items-center gap-1">
-                            <Globe className="w-3 h-3" />
-                            <span>app.tidyupscleaning.com (Alternate)</span>
-                          </span>
-                          {redirectUri === ALTERNATE_JOBBER_CALLBACK && (
-                            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">PRIMARY</span>
-                          )}
-                        </div>
-                        <div className="font-mono text-[10px] break-all mt-1 opacity-90">
-                          https://app.tidyupscleaning.com/api/jobber/oauth/callback
-                        </div>
-                      </button>
+                    <div className="font-mono text-xs font-bold text-emerald-900 bg-emerald-50 px-2.5 py-1.5 rounded border border-emerald-200 break-all">
+                      https://app.tidyupscleaning.com/api/jobber/oauth/callback
                     </div>
                   </div>
                 </div>
@@ -1214,21 +1162,33 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
 
                 {/* 5. Jobber Outbound Push (Full Width) */}
                 <div className="md:col-span-2 bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-3.5 rounded-xl border border-slate-800 shadow-md">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-white/10 text-emerald-400 rounded-lg">
                         <Send className="w-4 h-4" />
                       </div>
-                      <span className="font-bold text-xs">jobberPush (Outbound Booking Creator)</span>
+                      <span className="font-bold text-xs">jobberPush (Automatic Outbound Quote &amp; Booking Creator)</span>
                     </div>
-                    <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-400/30">Auto-Push Ready</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-400/30">
+                        Auto-Push Active on Sync
+                      </span>
+                      <button
+                        onClick={() => handleSyncModule('/api/jobber/push-all', 'PUSH', 'Auto-pushed all pending quotes (with Service Name, QTY, Unit Price & Total) and bookings to Jobber!')}
+                        disabled={isSyncing !== null}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isSyncing === 'PUSH' ? 'animate-spin' : ''}`} />
+                        <span>Push Pending to Jobber Now</span>
+                      </button>
+                    </div>
                   </div>
                   <p className="text-[11px] text-slate-300 mb-3 leading-relaxed">
-                    Whenever an AI voice dictation booking or manual cleaning booking is confirmed in this dispatch board, <code>pushBookingToJobber</code> automatically calls Jobber's GraphQL mutation to mint a new Job and Scheduled Visit with idempotency tags.
+                    <strong>Automatic Two-Way Push:</strong> Whenever you create a Quote or Booking in the app — OR whenever you click <strong>"Run All 5 Jobber Syncs"</strong> above — <code>jobberPush</code> automatically pushes your quotes (with exact <code>Service Name</code>, <code>Quantity</code>, <code>Unit Price</code>, and <code>Total</code> line items) and scheduled visits directly to Jobber without any extra steps needed.
                   </p>
                   <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/10">
-                    <span>Mutation: <code>jobCreate(input: &#123; title, clientId, scheduledAt &#125;)</code></span>
-                    <span className="text-emerald-400 font-mono font-bold">14 Bookings Linked</span>
+                    <span>Mutations: <code>quoteCreate</code> &amp; <code>jobCreate</code> (with QTY × Unit Price = Total)</span>
+                    <span className="text-emerald-400 font-mono font-bold">{moduleStats.push.pushedCount} Records Auto-Pushed</span>
                   </div>
                 </div>
               </div>

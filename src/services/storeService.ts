@@ -5,49 +5,16 @@ const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCT
 const BUNDLED_DATA_DIR = path.join(process.cwd(), "data");
 const DATA_DIR = IS_SERVERLESS ? "/tmp" : path.join(process.cwd(), "data");
 
-export type SupportedProjectId = "dispatchgeeni" | "tidyups" | "easycleans";
+export type SupportedProjectId = "tidyups";
 
-const ALL_STORE_FILENAMES = [
-  "dispatch_geeni_store.json",
-  "tidyups_cleaning_store.json",
-  "easy_cleans_store.json",
-  "dispatch_store.json",
-];
+const PRIMARY_STORE_FILENAME = "tidyups_cleaning_store.json";
 
-export function resolveStoreFilePath(projectId?: string): string {
-  const norm = (projectId || "").toLowerCase();
-  if (norm.includes("tidyup")) {
-    return path.join(DATA_DIR, "tidyups_cleaning_store.json");
-  }
-  if (norm.includes("easyclean") || norm.includes("easy-clean") || norm.includes("easy_clean")) {
-    return path.join(DATA_DIR, "easy_cleans_store.json");
-  }
-  if (norm.includes("dispatch")) {
-    return path.join(DATA_DIR, "dispatch_geeni_store.json");
-  }
-  const defaultFile = path.join(DATA_DIR, "dispatch_geeni_store.json");
-  if (fs.existsSync(defaultFile)) {
-    return defaultFile;
-  }
-  return path.join(DATA_DIR, "dispatch_store.json");
+export function resolveStoreFilePath(_projectId?: string): string {
+  return path.join(DATA_DIR, PRIMARY_STORE_FILENAME);
 }
 
-export function resolveBundledStoreFilePath(projectId?: string): string {
-  const norm = (projectId || "").toLowerCase();
-  if (norm.includes("tidyup")) {
-    return path.join(BUNDLED_DATA_DIR, "tidyups_cleaning_store.json");
-  }
-  if (norm.includes("easyclean") || norm.includes("easy-clean") || norm.includes("easy_clean")) {
-    return path.join(BUNDLED_DATA_DIR, "easy_cleans_store.json");
-  }
-  if (norm.includes("dispatch")) {
-    return path.join(BUNDLED_DATA_DIR, "dispatch_geeni_store.json");
-  }
-  const defaultFile = path.join(BUNDLED_DATA_DIR, "dispatch_geeni_store.json");
-  if (fs.existsSync(defaultFile)) {
-    return defaultFile;
-  }
-  return path.join(BUNDLED_DATA_DIR, "dispatch_store.json");
+export function resolveBundledStoreFilePath(_projectId?: string): string {
+  return path.join(BUNDLED_DATA_DIR, PRIMARY_STORE_FILENAME);
 }
 
 export interface AppPersistentStore {
@@ -109,19 +76,14 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 /**
- * Loads stored data from disk — unified across all 3 mirrored sites (dispatchgeeni, tidyups, easycleans)
+ * Loads stored data from disk exclusively for TidyUps Cleaning (app.tidyupscleaning.com)
  */
-export function loadStore(projectId?: string): AppPersistentStore | null {
-  const targetFile = resolveStoreFilePath(projectId);
-  const bundledFile = resolveBundledStoreFilePath(projectId);
+export function loadStore(_projectId?: string): AppPersistentStore | null {
+  const targetFile = resolveStoreFilePath();
+  const bundledFile = resolveBundledStoreFilePath();
 
   try {
-    // Check all candidate store files and return the one with the latest saved state (or targetFile)
-    const candidateFiles = [
-      targetFile,
-      ...ALL_STORE_FILENAMES.map((f) => path.join(DATA_DIR, f)),
-      bundledFile,
-    ];
+    const candidateFiles = [targetFile, bundledFile];
 
     let newestStore: AppPersistentStore | null = null;
     let newestTime = 0;
@@ -151,14 +113,13 @@ export function loadStore(projectId?: string): AppPersistentStore | null {
 }
 
 /**
- * Atomically writes and mirrors data across ALL 3 site copies (dispatchgeeni, tidyups, easycleans)
- * so all 3 sites stay 100% synchronized at all times.
+ * Atomically writes and persists store data exclusively for TidyUps Cleaning (app.tidyupscleaning.com)
  */
-export function saveStore(store: AppPersistentStore, projectId?: string): boolean {
-  const targetFile = resolveStoreFilePath(projectId);
+export function saveStore(store: AppPersistentStore, _projectId?: string): boolean {
+  const targetFile = resolveStoreFilePath();
 
   try {
-    const existing = loadStore(projectId) || ({} as Partial<AppPersistentStore>);
+    const existing = loadStore() || ({} as Partial<AppPersistentStore>);
 
     const merged: AppPersistentStore = {
       ...existing,
@@ -177,27 +138,15 @@ export function saveStore(store: AppPersistentStore, projectId?: string): boolea
 
     const json = JSON.stringify(merged, null, 2);
 
-    // Write to all 3 site store files in DATA_DIR so all 3 copies stay 100% synced
-    for (const filename of ALL_STORE_FILENAMES) {
-      try {
-        fs.writeFileSync(path.join(DATA_DIR, filename), json, "utf-8");
-      } catch {
-        // ignore individual mirror error
-      }
-    }
+    fs.writeFileSync(targetFile, json, "utf-8");
 
-    // Also mirror to standalone sub-project folders if present
-    const subProjectStores = [
-      path.join(process.cwd(), "projects", "tidyupscleaning", "data", "tidyups_cleaning_store.json"),
-      path.join(process.cwd(), "projects", "dispatchgeeni", "data", "dispatch_geeni_store.json"),
-    ];
-    for (const subFile of subProjectStores) {
-      if (fs.existsSync(path.dirname(subFile))) {
-        try {
-          fs.writeFileSync(subFile, json, "utf-8");
-        } catch {
-          // ignore
-        }
+    // Also mirror to standalone sub-project folder if present
+    const subFile = path.join(process.cwd(), "projects", "tidyupscleaning", "data", PRIMARY_STORE_FILENAME);
+    if (fs.existsSync(path.dirname(subFile))) {
+      try {
+        fs.writeFileSync(subFile, json, "utf-8");
+      } catch {
+        // ignore
       }
     }
 

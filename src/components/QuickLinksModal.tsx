@@ -455,49 +455,24 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
                 </div>
                 <div>
                   <p className="font-extrabold text-indigo-950 flex items-center gap-2 flex-wrap">
-                    <span>Two Separate Standalone Projects &amp; Archives</span>
+                    <span>Dedicated Standalone Project Archive (app.tidyupscleaning.com)</span>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-200 text-emerald-950 font-bold border border-emerald-300">
-                      Isolated Databases
+                      Single Domain Connected
                     </span>
                   </p>
                   <p className="text-[11px] text-indigo-700 mt-0.5 leading-relaxed">
-                    The codebase is decoupled into two complete, independent projects with separate persistent stores and distinct Jobber OAuth configurations.
+                    This project is strictly dedicated to TidyUps Cleaning Operations (app.tidyupscleaning.com) with its own persistent store and Jobber OAuth configuration.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Project 1: dispatchgeeni.com */}
-            <div className="p-3 bg-white/90 rounded-xl border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">🚀</span>
-                  <span className="font-extrabold text-purple-950 text-xs">Project 1: Dispatch Genie</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-100 text-purple-800 font-bold">
-                    dispatchgeeni.com
-                  </span>
-                </div>
-                <span className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                  Store: data/dispatch_geeni_store.json • Jobber: https://dispatchgeeni.com/api/jobber/oauth/callback
-                </span>
-              </div>
-              <a
-                href="/dispatch-genie-v1.zip"
-                download="dispatch-genie-v1.zip"
-                className="px-3.5 py-1.5 bg-gradient-to-r from-purple-700 to-pink-600 hover:opacity-95 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer shrink-0 active:scale-95 text-xs self-start sm:self-auto"
-                title="Download dispatch-genie-v1.zip standalone project archive"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>dispatch-genie-v1.zip</span>
-              </a>
-            </div>
-
-            {/* Project 2: app.tidyupscleaning.com */}
+            {/* Dedicated Project: app.tidyupscleaning.com */}
             <div className="p-3 bg-white/90 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="text-sm">✨</span>
-                  <span className="font-extrabold text-emerald-950 text-xs">Project 2: TidyUps Cleaning Operations</span>
+                  <span className="font-extrabold text-emerald-950 text-xs">TidyUps Cleaning Operations</span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-100 text-emerald-800 font-bold">
                     app.tidyupscleaning.com
                   </span>
@@ -520,16 +495,6 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
             {/* Daily Version Checkpoints Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-indigo-200/60">
               <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider">Next Checkpoints:</span>
-              <a
-                href="/api/download-zip?name=dispatch-genie-v2"
-                download="dispatch-genie-v2.zip"
-                className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer text-[11px] active:scale-95"
-                title="Generate dispatch-genie-v2 archive"
-              >
-                <Download className="w-3 h-3 text-indigo-600" />
-                <span>dispatch-genie-v2</span>
-              </a>
-
               <a
                 href="/api/download-zip?name=tidyups-cleaning-v2"
                 download="tidyups-cleaning-v2.zip"

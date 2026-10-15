@@ -59,7 +59,7 @@ export const QuoModal: React.FC<QuoModalProps> = ({
   onVisitCreated,
   clients = [],
   visits = [],
-  projectId = 'dispatchgeeni',
+  projectId = 'tidyups',
 }) => {
   const [activeTab, setActiveTab] = useState<'LINES' | 'TRANSCRIPTS' | 'CONTACTS'>('TRANSCRIPTS');
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -109,7 +109,7 @@ export const QuoModal: React.FC<QuoModalProps> = ({
   const [isSpamShieldModalOpen, setIsSpamShieldModalOpen] = useState(false);
   const [spamBlockNumber, setSpamBlockNumber] = useState('');
 
-  const prodWebhookUrl = 'https://dispatchgeeni.com/api/quo/webhook';
+  const prodWebhookUrl = 'https://app.tidyupscleaning.com/api/quo/webhook';
   const devWebhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/quo/webhook` : prodWebhookUrl;
 
   const fetchQuoStatus = () => {

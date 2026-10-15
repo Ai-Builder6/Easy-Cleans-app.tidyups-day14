@@ -461,16 +461,10 @@ export function App() {
       .catch((err) => console.warn('Leads fetch error:', err));
   }, [activeProjectId]);
 
-  // Sync document title dynamically according to domain / activeBrandId
+  // Sync document title to TidyUps Cleaning (app.tidyupscleaning.com)
   useEffect(() => {
     if (typeof document !== 'undefined') {
-      if (activeBrandId === 'tidyups') {
-        document.title = 'TidyUps Cleaning – Edmonton Residential & Move-Out Cleaning (app.tidyupscleaning.com)';
-      } else if (activeBrandId === 'easycleans') {
-        document.title = 'EasyCleans – Professional Home & Commercial Cleaning (easycleans.si)';
-      } else {
-        document.title = 'Dispatch Genie – Smart Field Service Dispatch & Scheduling (dispatchgeeni.com)';
-      }
+      document.title = 'TidyUps Cleaning – Edmonton Residential & Move-Out Cleaning (app.tidyupscleaning.com)';
     }
   }, [activeBrandId]);
 
@@ -2642,28 +2636,12 @@ export function App() {
               <span>Fleet Health: <span className="text-emerald-400 font-bold">Optimal</span></span>
               <span>Cleaners: <span className="text-slate-200 font-mono">15 Active Cleaners</span></span>
               <a
-                href={
-                  activeBrandId === 'tidyups'
-                    ? 'https://app.tidyupscleaning.com'
-                    : activeBrandId === 'easycleans'
-                    ? 'https://easycleans.si'
-                    : 'https://dispatchgeeni.com'
-                }
+                href="https://app.tidyupscleaning.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`hidden lg:inline font-mono font-semibold ${
-                  activeBrandId === 'tidyups'
-                    ? 'text-emerald-400 hover:text-emerald-300'
-                    : activeBrandId === 'easycleans'
-                    ? 'text-sky-400 hover:text-sky-300'
-                    : 'text-purple-400 hover:text-purple-300'
-                }`}
+                className="hidden lg:inline font-mono font-semibold text-emerald-400 hover:text-emerald-300"
               >
-                {activeBrandId === 'tidyups'
-                  ? 'app.tidyupscleaning.com'
-                  : activeBrandId === 'easycleans'
-                  ? 'easycleans.si'
-                  : 'dispatchgeeni.com'}
+                app.tidyupscleaning.com
               </a>
               <span className="hidden xl:inline text-pink-400 font-mono font-bold">1-833-TIDYUPS</span>
               <div className="hidden sm:flex items-center gap-2 border-l border-slate-700 pl-3">

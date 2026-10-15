@@ -158,7 +158,7 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
       setStatusBanner({
         type: 'success',
         message: isDomainOrRefererError
-          ? 'Direct local ZIP downloads are ready below for all 3 domains (app.tidyupscleaning.com, dispatchgeeni.com, and easycleans.com)!'
+          ? 'Direct local ZIP download is ready below for app.tidyupscleaning.com!'
           : (err?.message || 'Google Sign-In was cancelled or blocked by popup settings.'),
       });
     } finally {
@@ -174,22 +174,16 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
     setDriveFiles([]);
   };
 
-  // 1. Download Complete Project .ZIP to Local Computer (Supports all 3 separate domains)
-  const handleDownloadProjectZip = async (domainKey: 'tidyups' | 'dispatchgeeni' | 'easycleans' = 'tidyups') => {
+  // 1. Download Complete Project .ZIP to Local Computer (Dedicated to app.tidyupscleaning.com)
+  const handleDownloadProjectZip = async (_domainKey: 'tidyups' = 'tidyups') => {
     setIsDownloadingZip(true);
     setStatusBanner(null);
     try {
-      const res = await fetch(`/api/project/export-zip?domain=${domainKey}`);
+      const res = await fetch(`/api/project/export-zip?domain=tidyups`);
       if (!res.ok) throw new Error('Failed to generate project ZIP archive.');
       const blob = await res.blob();
       const dateStr = new Date().toISOString().slice(0, 10);
-      const slug =
-        domainKey === 'dispatchgeeni'
-          ? 'dispatchgeeni.com-complete-project'
-          : domainKey === 'easycleans'
-          ? 'easycleans.com-complete-project'
-          : 'app.tidyupscleaning.com-complete-project';
-      const filename = `${slug}-${dateStr}.zip`;
+      const filename = `app.tidyupscleaning.com-complete-project-${dateStr}.zip`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -200,7 +194,7 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
       URL.revokeObjectURL(url);
       setStatusBanner({
         type: 'success',
-        message: `Downloaded ${filename} (${(blob.size / 1024).toFixed(0)} KB) — pre-configured standalone copy!`,
+        message: `Downloaded ${filename} (${(blob.size / 1024).toFixed(0)} KB) — pre-configured for app.tidyupscleaning.com!`,
       });
     } catch (err: any) {
       setStatusBanner({
@@ -210,18 +204,6 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
     } finally {
       setIsDownloadingZip(false);
     }
-  };
-
-  const handleDownloadAllThreeDomainZips = async () => {
-    await handleDownloadProjectZip('tidyups');
-    await new Promise((r) => setTimeout(r, 450));
-    await handleDownloadProjectZip('dispatchgeeni');
-    await new Promise((r) => setTimeout(r, 450));
-    await handleDownloadProjectZip('easycleans');
-    setStatusBanner({
-      type: 'success',
-      message: '✓ Downloaded all 3 standalone domain ZIP archives (app.tidyupscleaning.com, dispatchgeeni.com, and easycleans.com)!',
-    });
   };
 
   // 2. Upload Complete Project .ZIP + AI_BUILD_WORKFLOW.md to Google Drive
@@ -442,102 +424,39 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
 
           {activeTab === 'BACKUP_DRIVE' && (
             <div className="space-y-6">
-              {/* 3 Dedicated Standalone Domain ZIP Download Cards */}
-              <div className="bg-[#171b29] border border-pink-500/30 rounded-3xl p-5 space-y-4">
+              {/* Dedicated Standalone Domain ZIP Download Card for app.tidyupscleaning.com */}
+              <div className="bg-[#171b29] border border-emerald-500/30 rounded-3xl p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
                   <div>
                     <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider block">
-                      Separated Domain Packages • 3 Exact Standalone Copies
+                      Dedicated Domain Package • Single Connected Domain
                     </span>
                     <h3 className="text-base font-black text-white">
-                      Download Individual Domain .ZIP Files (1 for Each Domain)
+                      app.tidyupscleaning.com — Complete Standalone Project .ZIP
                     </h3>
                   </div>
                   <button
                     type="button"
                     disabled={isDownloadingZip}
-                    onClick={handleDownloadAllThreeDomainZips}
+                    onClick={() => handleDownloadProjectZip('tidyups')}
                     className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center gap-2 shadow-lg cursor-pointer shrink-0 disabled:opacity-50"
                   >
                     <Download className="w-4 h-4" />
-                    <span>Download All 3 Domain ZIPs</span>
+                    <span>Download app.tidyupscleaning.com ZIP</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* Copy 1: app.tidyupscleaning.com */}
-                  <div className="p-4 rounded-2xl bg-[#11141f] border border-emerald-500/40 flex flex-col justify-between space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase">
-                          Primary Active App
-                        </span>
-                        <span className="text-xs">✨</span>
-                      </div>
-                      <div className="font-mono font-black text-sm text-white">app.tidyupscleaning.com</div>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Standalone TidyUps Cleaning package pre-configured for <code className="text-emerald-300">app.tidyupscleaning.com</code>.
-                      </p>
+                <div className="p-4 rounded-2xl bg-[#11141f] border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase">
+                        Primary Active Domain
+                      </span>
+                      <span className="font-mono font-black text-sm text-white">app.tidyupscleaning.com</span>
                     </div>
-                    <button
-                      type="button"
-                      disabled={isDownloadingZip}
-                      onClick={() => handleDownloadProjectZip('tidyups')}
-                      className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download tidyupscleaning ZIP</span>
-                    </button>
-                  </div>
-
-                  {/* Copy 2: dispatchgeeni.com */}
-                  <div className="p-4 rounded-2xl bg-[#11141f] border border-purple-500/40 flex flex-col justify-between space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 text-[10px] font-black uppercase">
-                          Domain Copy #2
-                        </span>
-                        <span className="text-xs">🧞‍♂️</span>
-                      </div>
-                      <div className="font-mono font-black text-sm text-white">dispatchgeeni.com</div>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Standalone Dispatch Geeni package pre-configured for <code className="text-purple-300">dispatchgeeni.com</code>.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={isDownloadingZip}
-                      onClick={() => handleDownloadProjectZip('dispatchgeeni')}
-                      className="w-full py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download dispatchgeeni ZIP</span>
-                    </button>
-                  </div>
-
-                  {/* Copy 3: easycleans.com */}
-                  <div className="p-4 rounded-2xl bg-[#11141f] border border-pink-500/40 flex flex-col justify-between space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="px-2 py-0.5 rounded-md bg-pink-500/20 text-pink-300 text-[10px] font-black uppercase">
-                          Domain Copy #3
-                        </span>
-                        <span className="text-xs">🧹</span>
-                      </div>
-                      <div className="font-mono font-black text-sm text-white">easycleans.com</div>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Standalone Easy Cleans package pre-configured for <code className="text-pink-300">easycleans.com</code>.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={isDownloadingZip}
-                      onClick={() => handleDownloadProjectZip('easycleans')}
-                      className="w-full py-2.5 px-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download easycleans ZIP</span>
-                    </button>
+                    <p className="text-[11px] text-slate-400">
+                      This project is strictly dedicated and aligned to <code className="text-emerald-300">app.tidyupscleaning.com</code> with all other domain references removed.
+                    </p>
                   </div>
                 </div>
               </div>

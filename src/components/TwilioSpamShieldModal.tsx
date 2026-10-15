@@ -87,7 +87,7 @@ const PRESET_SPAM_PREFIXES = [
 export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
   isOpen,
   onClose,
-  projectId = 'dispatchgeeni',
+  projectId = 'tidyups',
   preFillNumber = '',
 }) => {
   const [activeTab, setActiveTab] = useState<'PREFIXES' | 'COUNTRIES' | 'NUMBERS' | 'LOGS' | 'TEST' | 'COST_LINES'>('PREFIXES');
@@ -129,7 +129,7 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
 
   const webhookUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/api/twilio/voice`
-    : 'https://dispatchgeeni.com/api/twilio/voice';
+    : 'https://app.tidyupscleaning.com/api/twilio/voice';
 
   // Fetch current config & history
   const fetchSpamShield = async () => {
