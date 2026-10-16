@@ -1260,11 +1260,11 @@ const isValidTokenFormat = Boolean(storedToken && !storedToken.includes("...") &
 
 let jobberConfig = {
   isConnected: isValidTokenFormat,
-  accountName: initialStored?.jobberConfig?.accountName || "Tidyups Cleaning Service Inc (Jobber)",
+  accountName: initialStored?.jobberConfig?.accountName || "Tidyups Cleaning Service Inc",
   clientId: initialStored?.jobberConfig?.clientId || process.env.JOBBER_CLIENT_ID || "27966135-e33e-4c2e-8dc3-ad7ba06dabb8",
-  clientSecret: initialStored?.jobberConfig?.clientSecret || process.env.JOBBER_CLIENT_SECRET || "",
-  accessToken: storedToken,
-  refreshToken: initialStored?.jobberConfig?.refreshToken || process.env.JOBBER_REFRESH_TOKEN || "",
+  clientSecret: initialStored?.jobberConfig?.clientSecret || process.env.JOBBER_CLIENT_SECRET || "65534ce762fe3ec20a5c1447794dabee0ac03f2caf1048c8686377d4e754a36a",
+  accessToken: isValidTokenFormat ? storedToken : "",
+  refreshToken: initialStored?.jobberConfig?.refreshToken || process.env.JOBBER_REFRESH_TOKEN || "fb6cc6a384c3c9811ef1925325e00043",
   lastSyncedAt: initialStored?.jobberConfig?.lastSyncedAt || new Date().toISOString(),
   environment: "Jobber GraphQL API (v2025-04-16)",
 };
@@ -1280,8 +1280,8 @@ setJobberTokenRefreshListener((tokens) => {
   console.log("Jobber OAuth access token was automatically refreshed and saved to disk.");
 });
 
-// Auto-activate live Jobber connection if refresh token exists on boot
-if ((!jobberConfig.accessToken || !jobberConfig.isConnected) && jobberConfig.refreshToken && jobberConfig.clientId && jobberConfig.clientSecret) {
+// Auto-activate or refresh live Jobber connection if refresh token exists on boot
+if (jobberConfig.refreshToken && jobberConfig.clientId && jobberConfig.clientSecret) {
   console.log("Jobber credentials present on startup. Activating live OAuth connection...");
   refreshJobberAccessToken(jobberConfig.clientId, jobberConfig.clientSecret, jobberConfig.refreshToken)
     .then(async (newAccessToken) => {
@@ -1413,8 +1413,10 @@ app.post("/api/jobber/config", (req, res) => {
   if (clientSecret !== undefined && clientSecret !== null && String(clientSecret).trim().length > 0) {
     jobberConfig.clientSecret = String(clientSecret).trim();
   }
-  if (accessToken) {
-    jobberConfig.accessToken = String(accessToken).trim().replace(/^Bearer\s+/i, "");
+  const cleanIncomingToken = accessToken ? String(accessToken).trim().replace(/^Bearer\s+/i, "") : "";
+  // Never overwrite the real access token with a masked preview string containing "..."
+  if (cleanIncomingToken && !cleanIncomingToken.includes("...") && cleanIncomingToken.length > 20) {
+    jobberConfig.accessToken = cleanIncomingToken;
     jobberConfig.isConnected = true;
   }
   if (accountName) jobberConfig.accountName = String(accountName).trim();
@@ -1829,16 +1831,95 @@ app.post("/api/jobber/sync-visits", async (_req, res) => {
   });
 });
 
+// POST 1-Click Instant Connect / Refresh Live Token directly from server (No browser popup or "Allow" button needed)
+app.post("/api/jobber/oauth/refresh-now", async (req, res) => {
+  const { clientId, clientSecret } = req.body || {};
+  if (clientId && String(clientId).trim()) jobberConfig.clientId = String(clientId).trim();
+  if (clientSecret && String(clientSecret).trim()) jobberConfig.clientSecret = String(clientSecret).trim();
+
+  try {
+    let activeToken = jobberConfig.accessToken;
+    if (jobberConfig.refreshToken && jobberConfig.clientId && jobberConfig.clientSecret) {
+      const refreshed = await refreshJobberAccessToken(
+        jobberConfig.clientId,
+        jobberConfig.clientSecret,
+        jobberConfig.refreshToken
+      );
+      if (refreshed) {
+        activeToken = refreshed;
+        jobberConfig.accessToken = refreshed;
+        jobberConfig.isConnected = true;
+        jobberConfig.lastSyncedAt = new Date().toISOString();
+        persistJobberConfigToDisk();
+      }
+    }
+
+    const verifyRes = await verifyJobberConnection(activeToken, getJobberCreds());
+    if (verifyRes.isValid) {
+      jobberConfig.isConnected = true;
+      jobberConfig.accountName = verifyRes.accountName || "Tidyups Cleaning Service Inc";
+      jobberConfig.lastSyncedAt = new Date().toISOString();
+      persistJobberConfigToDisk();
+
+      // Also trigger background pull of quotes/visits/invoices
+      try {
+        syncJobberQuotes(jobberConfig.accessToken, getJobberCreds()).catch(() => {});
+        syncJobberCalendar(jobberConfig.accessToken, getJobberCreds()).catch(() => {});
+        syncJobberInvoices(jobberConfig.accessToken, getJobberCreds()).catch(() => {});
+      } catch {}
+
+      return res.json({
+        success: true,
+        isConnected: true,
+        accountName: jobberConfig.accountName,
+        message: `Connected live to ${jobberConfig.accountName} in Jobber!`,
+        config: {
+          isConnected: true,
+          accountName: jobberConfig.accountName,
+          clientId: jobberConfig.clientId,
+          hasSecret: Boolean(jobberConfig.clientSecret),
+          clientSecretMasked: jobberConfig.clientSecret ? `${jobberConfig.clientSecret.slice(0, 8)}...${jobberConfig.clientSecret.slice(-4)}` : "",
+          accessToken: jobberConfig.accessToken ? `${jobberConfig.accessToken.slice(0, 8)}...${jobberConfig.accessToken.slice(-4)}` : "",
+          lastSyncedAt: jobberConfig.lastSyncedAt,
+        },
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      error: verifyRes.error || "Could not verify Jobber token.",
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST verify Jobber token with Jobber GraphQL API live
 app.post("/api/jobber/verify-token", async (req, res) => {
   const { accessToken } = req.body || {};
-  const tokenToTest = (accessToken ? String(accessToken).trim() : jobberConfig.accessToken).replace(/^Bearer\s+/i, "");
+  const incomingToken = accessToken ? String(accessToken).trim().replace(/^Bearer\s+/i, "") : "";
+  // Ignore masked preview strings like "eyJhbGci...PQj8" and use the full stored server token
+  let tokenToTest =
+    incomingToken && !incomingToken.includes("...") && incomingToken.length > 20
+      ? incomingToken
+      : jobberConfig.accessToken;
+
+  if ((!tokenToTest || tokenToTest.includes("...")) && jobberConfig.refreshToken && jobberConfig.clientId && jobberConfig.clientSecret) {
+    const refreshed = await refreshJobberAccessToken(jobberConfig.clientId, jobberConfig.clientSecret, jobberConfig.refreshToken);
+    if (refreshed) {
+      tokenToTest = refreshed;
+      jobberConfig.accessToken = refreshed;
+    }
+  }
+
   const result = await verifyJobberConnection(tokenToTest, getJobberCreds());
 
   if (result.isValid && result.accountName) {
     jobberConfig.isConnected = true;
     jobberConfig.accountName = result.accountName;
-    if (accessToken) jobberConfig.accessToken = tokenToTest;
+    if (tokenToTest && !tokenToTest.includes("...")) {
+      jobberConfig.accessToken = tokenToTest;
+    }
     jobberConfig.lastSyncedAt = new Date().toISOString();
     persistJobberConfigToDisk();
   }

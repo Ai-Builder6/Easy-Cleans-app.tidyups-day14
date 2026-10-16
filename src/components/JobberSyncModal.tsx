@@ -109,19 +109,7 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
   const computedAuthUrl = React.useMemo(() => {
     const cId = (clientIdInput || config.clientId || '27966135-e33e-4c2e-8dc3-ad7ba06dabb8').trim();
     const rUri = (redirectUri || CANONICAL_JOBBER_CALLBACK).trim();
-    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://app.tidyupscleaning.com';
-    const statePayload = {
-      redirectUri: rUri,
-      sourceOrigin: currentOrigin,
-      returnUrl: typeof window !== 'undefined' ? window.location.href : currentOrigin,
-      nonce: Math.random().toString(36).substring(2, 10),
-      timestamp: Date.now(),
-    };
-    let stateParam = 'tidyups_auth';
-    try {
-      stateParam = btoa(JSON.stringify(statePayload));
-    } catch {}
-    return `https://api.getjobber.com/api/oauth/authorize?response_type=code&client_id=${encodeURIComponent(cId)}&redirect_uri=${encodeURIComponent(rUri)}&state=${encodeURIComponent(stateParam)}`;
+    return `https://api.getjobber.com/api/oauth/authorize?response_type=code&client_id=${encodeURIComponent(cId)}&redirect_uri=${encodeURIComponent(rUri)}&state=tidyups_auth`;
   }, [clientIdInput, config.clientId, redirectUri]);
 
   const fetchConfig = () => {
@@ -131,18 +119,9 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
         if (data) {
           setConfig(data);
           if (data.clientId) setClientIdInput(data.clientId);
-          if (data.accessToken && !accessTokenInput) {
+          // Never populate accessTokenInput with a masked preview string containing "..."
+          if (data.accessToken && !String(data.accessToken).includes('...') && !accessTokenInput) {
             setAccessTokenInput(data.accessToken);
-          } else if (!data.accessToken) {
-            const localSavedToken = typeof window !== 'undefined' ? localStorage.getItem('tidyups_jobber_token') : null;
-            if (localSavedToken) {
-              setAccessTokenInput(localSavedToken);
-              fetch('/api/jobber/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accessToken: localSavedToken }),
-              }).catch(() => {});
-            }
           }
         }
       })
@@ -404,7 +383,8 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
       if (clientSecretInput.trim()) {
         payload.clientSecret = clientSecretInput.trim();
       }
-      if (accessTokenInput.trim()) {
+      // Only send accessToken if user pasted a real full token (never send masked "..." preview)
+      if (accessTokenInput.trim() && !accessTokenInput.includes('...')) {
         payload.accessToken = accessTokenInput.trim();
       }
       const res = await fetch('/api/jobber/config', {
@@ -422,34 +402,65 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     }
   };
 
-  const handleVerifyToken = async () => {
-    if (!accessTokenInput.trim()) {
-      setSyncNotice('Please paste your Jobber Access Token first.');
-      return;
+  // 1-Click Instant Server Connect & Token Refresh (No Browser Popup or "Allow" Button Needed)
+  const handleInstantServerConnect = async () => {
+    setIsSyncing('INSTANT_CONNECT');
+    setSyncNotice('Connecting directly to Jobber using your stored Client ID, Secret & Refresh Token...');
+    try {
+      const res = await fetch('/api/jobber/oauth/refresh-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: (clientIdInput || config.clientId || '27966135-e33e-4c2e-8dc3-ad7ba06dabb8').trim(),
+          ...(clientSecretInput.trim() ? { clientSecret: clientSecretInput.trim() } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.isConnected) {
+        if (data.config) setConfig(data.config);
+        setTokenVerificationMsg({
+          isValid: true,
+          text: `✓ Connected Live to "${data.accountName || 'Tidyups Cleaning Service Inc'}"! No browser popup or 'Allow' screen needed.`,
+        });
+        setSyncNotice(`✓ Live Jobber Connection Verified for "${data.accountName || 'Tidyups Cleaning Service Inc'}"! Running full 5-module sync...`);
+        await handleComprehensiveSync();
+        if (onDataUpdated) onDataUpdated();
+      } else {
+        setSyncNotice(data.error || 'Could not auto-refresh token. Please check credentials.');
+      }
+    } catch {
+      setSyncNotice('Network error while connecting to Jobber.');
+    } finally {
+      setIsSyncing(null);
     }
+  };
+
+  const handleVerifyToken = async () => {
     setIsVerifyingToken(true);
     setTokenVerificationMsg(null);
     try {
+      const cleanInput = accessTokenInput.trim();
+      const bodyPayload = cleanInput && !cleanInput.includes('...') ? { accessToken: cleanInput } : {};
       const res = await fetch('/api/jobber/verify-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: accessTokenInput.trim() }),
+        body: JSON.stringify(bodyPayload),
       });
       const data = await res.json();
       if (data.isValid) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('tidyups_jobber_token', accessTokenInput.trim().replace(/^Bearer\s+/i, ''));
+        if (typeof window !== 'undefined' && cleanInput && !cleanInput.includes('...')) {
+          localStorage.setItem('tidyups_jobber_token', cleanInput.replace(/^Bearer\s+/i, ''));
         }
         setTokenVerificationMsg({
           isValid: true,
-          text: `Success! Valid Jobber Token for Account: "${data.accountName || 'Tidyups Cleaning Service Inc'}".`,
+          text: `Success! Valid Live Jobber Token for Account: "${data.accountName || 'Tidyups Cleaning Service Inc'}".`,
         });
         fetchConfig();
         if (onDataUpdated) onDataUpdated();
       } else {
         setTokenVerificationMsg({
           isValid: false,
-          text: data.error || 'Jobber rejected this token. Check scopes or generate a fresh token at developer.getjobber.com.',
+          text: data.error || 'Jobber rejected this token. Click "Instant Connect & Verify Live Jobber" above to refresh automatically.',
         });
       }
     } catch {
@@ -791,16 +802,40 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                   </div>
                 </div>
 
-                {/* Step 3: Authorize Button */}
+                {/* Step 3: Instant Server Connect + Browser Authorize */}
                 <div className="pt-3 border-t border-slate-200 space-y-3">
+                  {/* Why "Allow Access" doesn't show up again + 1-Click Direct Server Activation */}
+                  <div className="p-3.5 bg-emerald-50 border-2 border-emerald-400 rounded-xl space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Why &quot;Allow Access&quot; Doesn&apos;t Show Up When Jobber Opens:</span>
+                        </div>
+                        <p className="text-[11px] text-emerald-800 mt-1 leading-relaxed">
+                          Because you <strong>already approved</strong> app <code className="font-mono bg-emerald-100 px-1 rounded">27966135...</code> once in Jobber, Jobber remembers your approval and skips the &quot;Allow Access&quot; screen! Your live Refresh Token &amp; Secret (<code className="font-mono bg-emerald-100 px-1 rounded">65534ce7...a36a</code>) are already stored on the server. Click below to verify &amp; sync right now without needing any popup:
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleInstantServerConnect}
+                        disabled={isSyncing === 'INSTANT_CONNECT'}
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-4 h-4 shrink-0 ${isSyncing === 'INSTANT_CONNECT' ? 'animate-spin' : ''}`} />
+                        <span>{isSyncing === 'INSTANT_CONNECT' ? 'Connecting & Syncing...' : '⚡ 1-Click Instant Connect & Sync Jobber Now'}</span>
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] flex items-center justify-center font-bold">3</span>
-                        <span>Click to Open Jobber &amp; Approve Access</span>
+                        <span className="w-5 h-5 rounded-full bg-slate-700 text-white text-[11px] flex items-center justify-center font-bold">3</span>
+                        <span>Re-Open Jobber OAuth in Browser (Only if Connecting a Brand-New Account)</span>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        Opens Jobber's authorization screen so you can log in and click <strong>"Allow Access"</strong>.
+                        Only needed if you disconnected the app inside Jobber Settings &rarr; Connected Apps.
                       </p>
                     </div>
 
@@ -810,53 +845,21 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                         type="button"
                         id="jobber-direct-auth-button"
                         onClick={handleDirectAuthClick}
-                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer hover:shadow-emerald-200 hover:scale-[1.01] active:scale-[0.99]"
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                       >
-                        <ExternalLink className="w-4 h-4 shrink-0" />
-                        <span>Open Jobber in New Tab (Direct) →</span>
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                        <span>Open Jobber in New Tab →</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={handleOpenPopup}
                         disabled={isAuthorizing}
-                        className="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                        className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                       >
                         <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                         <span>Open as Popup</span>
                       </button>
-                    </div>
-                  </div>
-
-                  {/* Direct Link Verification and Copy helper */}
-                  <div className="p-3 bg-slate-100/80 border border-slate-200 rounded-xl space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                        <Globe className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                        <span>Direct Jobber OAuth Approval URL:</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleCopyAuthLink}
-                        className="px-2 py-0.5 bg-white hover:bg-slate-50 border border-slate-300 rounded text-[11px] font-semibold text-blue-700 flex items-center gap-1 cursor-pointer transition-colors"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span>{copiedAuthLink ? 'Copied!' : 'Copy Direct Link'}</span>
-                      </button>
-                    </div>
-                    <div className="font-mono text-[10px] text-slate-600 bg-white p-2 rounded-lg border border-slate-200 break-all select-all leading-relaxed">
-                      {computedAuthUrl}
-                    </div>
-                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-[11px] space-y-1">
-                      <div className="font-bold flex items-center gap-1.5">
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                        <span>What to do when Jobber opens (Important):</span>
-                      </div>
-                      <ol className="list-decimal list-inside space-y-1 text-amber-800 text-[11px] leading-relaxed">
-                        <li><strong>Jobber approval is NOT a popup dialog</strong> — it opens as a full webpage.</li>
-                        <li>If prompted, <strong>enter your Jobber email and password</strong> to sign in.</li>
-                        <li>On the permissions page, <strong>scroll down to the very bottom</strong> and click the green <strong>"Allow Access"</strong> button!</li>
-                      </ol>
                     </div>
                   </div>
                 </div>

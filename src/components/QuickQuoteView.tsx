@@ -726,13 +726,13 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
     }
   };
 
-  // 1-Click Send to Booking System & Dispatch Job (Saves Bedrooms, Bathrooms, Custom Discount & Deposit + Google Sync)
+  // 1-Click Send to Booking System, Jobber Client+Quote & Dispatch Job (Saves Bedrooms, Bathrooms, Custom Discount & Deposit + Clean Google Sheet Sync)
   const handleSendToBookingAndDispatch = async () => {
     setIsSubmitting(true);
     setFeedbackNotice(null);
     try {
-      // 1. Sync exact layout & prices to Google
-      await syncClientAndQuoteToGoogle();
+      // 1. Create Client + Property + Quote in Jobber & Sync to Clean Google Sheet
+      await handleSaveJobberQuote(false);
 
       // 2. Send to Booking System (/api/public/book) with bedrooms, bathrooms, discount & deposit
       const bookRes = await fetch('/api/public/book', {
@@ -777,16 +777,7 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
       });
       const data = await res.json();
       if (data.success && data.newVisit) {
-        const crewText =
-          assignedCleaners.length > 0
-            ? `to ${assignedCleaners.join(' & ')}`
-            : 'with No Cleaner Assigned Yet (Unassigned)';
-        setFeedbackNotice(
-          `✓ Synced to Google (Total $${calculations.total.toFixed(2)}, Deposit $${depositAmount}, Discount -$${discountAmount}) & Created Job #${data.newVisit.visitNumber || 'VISIT'} ${crewText}!`
-        );
         if (onVisitCreated) onVisitCreated(data.newVisit);
-      } else {
-        setFeedbackNotice(data.error || 'Saved to booking system & synced to Google.');
       }
     } catch (err: any) {
       setFeedbackNotice(`Error: ${err.message}`);
