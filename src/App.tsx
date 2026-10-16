@@ -29,6 +29,7 @@ import {
 } from './services/staffRosterService';
 import { 
   generateHistoricAndFutureVisits, 
+  mergeWithBaseScheduledVisits,
   INITIAL_UNSCHEDULED_JOBS, 
   UnscheduledJobItem,
   INITIAL_JOBBER_QUOTES,
@@ -320,7 +321,7 @@ export function App() {
   } | null>(null);
   const [activeLegalTab, setActiveLegalTab] = useState<LegalPageType>('SUPPORT');
   const [scheduledJobsList, setScheduledJobsList] = useState<ScheduledJobItem[]>(() => {
-    const raw = (storedData?.scheduledVisits && storedData.scheduledVisits.length > 0) ? storedData.scheduledVisits : generateHistoricAndFutureVisits();
+    const raw = mergeWithBaseScheduledVisits(storedData?.scheduledVisits);
     return raw
       .filter((v: any) => !isFakeSimulationItem(v))
       .map((v: any) => {
@@ -914,7 +915,7 @@ export function App() {
           if (cleanTickets.length > 0) setTickets(cleanTickets);
           if (data.scheduledVisits && data.scheduledVisits.length > 0) {
             setScheduledJobsList(
-              data.scheduledVisits
+              mergeWithBaseScheduledVisits(data.scheduledVisits)
                 .filter((v: any) => !isFakeSimulationItem(v))
                 .map((v: any, idx: number) => {
                   const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);
@@ -2212,7 +2213,7 @@ export function App() {
               fetch('/api/store')
                 .then((r) => r.json())
                 .then((data) => {
-                  if (data?.scheduledVisits) setScheduledJobsList(data.scheduledVisits);
+                  if (data?.scheduledVisits) setScheduledJobsList(mergeWithBaseScheduledVisits(data.scheduledVisits));
                   if (data?.unscheduledJobs) setUnscheduledJobsList(data.unscheduledJobs);
                 });
             }}
@@ -2221,7 +2222,7 @@ export function App() {
                 .then((r) => r.json())
                 .then((data) => {
                   if (data?.visits && data.visits.length > 0) {
-                    setScheduledJobsList(data.visits);
+                    setScheduledJobsList(mergeWithBaseScheduledVisits(data.visits));
                   }
                 })
                 .catch(() => {
@@ -2229,7 +2230,7 @@ export function App() {
                     .then((r) => r.json())
                     .then((data) => {
                       if (data?.scheduledVisits && data.scheduledVisits.length > 0) {
-                        setScheduledJobsList(data.scheduledVisits);
+                        setScheduledJobsList(mergeWithBaseScheduledVisits(data.scheduledVisits));
                       }
                       if (data?.unscheduledJobs && data.unscheduledJobs.length > 0) {
                         setUnscheduledJobsList(data.unscheduledJobs);
@@ -2767,7 +2768,7 @@ export function App() {
                 if (data.tickets && data.tickets.length > 0) setTickets(data.tickets.filter((t: any) => !isFakeSimulationItem(t)));
                 if (data.scheduledVisits && data.scheduledVisits.length > 0) {
                   setScheduledJobsList(
-                    data.scheduledVisits
+                    mergeWithBaseScheduledVisits(data.scheduledVisits)
                       .filter((v: any) => !isFakeSimulationItem(v))
                       .map((v: any) => {
                         const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);
@@ -2791,7 +2792,7 @@ export function App() {
                 if (!data) return;
                 if (data.scheduledVisits && data.scheduledVisits.length > 0) {
                   setScheduledJobsList(
-                    data.scheduledVisits
+                    mergeWithBaseScheduledVisits(data.scheduledVisits)
                       .filter((v: any) => !isFakeSimulationItem(v))
                       .map((v: any) => {
                         const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);

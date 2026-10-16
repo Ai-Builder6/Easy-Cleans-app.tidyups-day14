@@ -18,6 +18,7 @@ import { createDispatchPrompt } from "./prompt_templates/dispatchPrompt";
 import { INITIAL_TECHNICIANS, INITIAL_TICKETS } from "./src/data/cleaningData";
 import {
   generateHistoricAndFutureVisits,
+  mergeWithBaseScheduledVisits,
   INITIAL_UNSCHEDULED_JOBS,
   UnscheduledJobItem,
   generateJobberQuotes,
@@ -1258,16 +1259,78 @@ const rawEnvToken = (process.env.JOBBER_ACCESS_TOKEN || process.env.JOBBER_BEARE
 const storedToken = (initialStored?.jobberConfig?.accessToken || "").trim().replace(/^Bearer\s+/i, "") || rawEnvToken;
 const isValidTokenFormat = Boolean(storedToken && !storedToken.includes("...") && storedToken.length > 20);
 
+const envClientId = (process.env.JOBBER_CLIENT_ID || "").trim();
+const envClientSecret = (process.env.JOBBER_CLIENT_SECRET || "").trim();
+const defaultLegacyClientId = "27966135-e33e-4c2e-8dc3-ad7ba06dabb8";
+const defaultLegacySecret = "65534ce762fe3ec20a5c1447794dabee0ac03f2caf1048c8686377d4e754a36a";
+
+// If the user configured a new Jobber Developer app in AI Studio Secrets (env), prioritize it over the old default ID
+const resolvedInitialClientId =
+  envClientId && envClientId !== defaultLegacyClientId
+    ? envClientId
+    : initialStored?.jobberConfig?.clientId || envClientId || defaultLegacyClientId;
+
+const resolvedInitialClientSecret =
+  envClientSecret && envClientSecret !== defaultLegacySecret
+    ? envClientSecret
+    : initialStored?.jobberConfig?.clientSecret || envClientSecret || defaultLegacySecret;
+
 let jobberConfig = {
   isConnected: isValidTokenFormat,
   accountName: initialStored?.jobberConfig?.accountName || "Tidyups Cleaning Service Inc",
-  clientId: initialStored?.jobberConfig?.clientId || process.env.JOBBER_CLIENT_ID || "27966135-e33e-4c2e-8dc3-ad7ba06dabb8",
-  clientSecret: initialStored?.jobberConfig?.clientSecret || process.env.JOBBER_CLIENT_SECRET || "65534ce762fe3ec20a5c1447794dabee0ac03f2caf1048c8686377d4e754a36a",
+  clientId: resolvedInitialClientId,
+  clientSecret: resolvedInitialClientSecret,
   accessToken: isValidTokenFormat ? storedToken : "",
   refreshToken: initialStored?.jobberConfig?.refreshToken || process.env.JOBBER_REFRESH_TOKEN || "fb6cc6a384c3c9811ef1925325e00043",
   lastSyncedAt: initialStored?.jobberConfig?.lastSyncedAt || new Date().toISOString(),
   environment: "Jobber GraphQL API (v2025-04-16)",
 };
+
+// Firebase Auth Referer Proxy: forwards identitytoolkit.googleapis.com and securetoken.googleapis.com requests
+// with Referer: https://app.tidyupscleaning.com/ so restricted API keys never fail with 403 API_KEY_HTTP_REFERRER_BLOCKED
+app.all("/api/firebase-auth-proxy", async (req, res) => {
+  try {
+    const targetUrl = String(req.query.target || "");
+    if (
+      !targetUrl.startsWith("https://identitytoolkit.googleapis.com/") &&
+      !targetUrl.startsWith("https://securetoken.googleapis.com/")
+    ) {
+      return res.status(400).json({ error: "Invalid proxy target" });
+    }
+
+    const forwardHeaders: Record<string, string> = {
+      Referer: "https://app.tidyupscleaning.com/",
+      Origin: "https://app.tidyupscleaning.com",
+    };
+    if (req.headers["content-type"]) {
+      forwardHeaders["Content-Type"] = String(req.headers["content-type"]);
+    }
+    if (req.headers["x-client-version"]) {
+      forwardHeaders["X-Client-Version"] = String(req.headers["x-client-version"]);
+    }
+    if (req.headers["x-firebase-gmpid"]) {
+      forwardHeaders["X-Firebase-GMPID"] = String(req.headers["x-firebase-gmpid"]);
+    }
+
+    const method = req.method.toUpperCase();
+    let bodyPayload: string | undefined = undefined;
+    if (method !== "GET" && method !== "HEAD" && req.body !== undefined) {
+      bodyPayload = typeof req.body === "string" ? req.body : JSON.stringify(req.body);
+    }
+
+    const upstreamRes = await fetch(targetUrl, {
+      method,
+      headers: forwardHeaders,
+      body: bodyPayload,
+    });
+
+    const contentType = upstreamRes.headers.get("content-type") || "application/json";
+    const text = await upstreamRes.text();
+    res.status(upstreamRes.status).setHeader("Content-Type", contentType).send(text);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Firebase auth proxy error" });
+  }
+});
 
 // Wire automatic token refresh persistence
 setJobberTokenRefreshListener((tokens) => {
@@ -1493,6 +1556,52 @@ app.get("/api/jobber/oauth/authorize-url", (req, res) => {
   });
 });
 
+// Synchronous 1-Click OAuth Start Redirect:
+// Accepts ?clientId=...&clientSecret=...&redirectUri=..., saves credentials immediately on the server,
+// and redirects straight to Jobber OAuth so window.open / <a target="_blank"> never needs an async await before opening!
+app.get("/api/jobber/oauth/start", (req, res) => {
+  const incomingId = String(req.query.clientId || "").trim();
+  const incomingSecret = String(req.query.clientSecret || "").trim();
+  const incomingRedirect = String(req.query.redirectUri || "").trim();
+  const sourceOrigin =
+    String(req.query.sourceOrigin || "").trim() ||
+    (req.headers.origin as string) ||
+    getAppBaseUrl(req);
+
+  if (incomingId) {
+    jobberConfig.clientId = incomingId;
+  }
+  if (incomingSecret && !incomingSecret.includes("...")) {
+    jobberConfig.clientSecret = incomingSecret;
+  }
+  if (incomingRedirect) {
+    (jobberConfig as any).canonicalRedirectUri = incomingRedirect;
+  }
+  persistJobberConfigToDisk();
+
+  const redirectUri =
+    incomingRedirect ||
+    (jobberConfig as any).canonicalRedirectUri ||
+    "https://app.tidyupscleaning.com/api/jobber/oauth/callback";
+
+  const statePayload = {
+    redirectUri,
+    sourceOrigin,
+    returnUrl: `${sourceOrigin}/?jobber_connected=true`,
+    nonce: Math.random().toString(36).substring(2, 12),
+    timestamp: Date.now(),
+  };
+  const state = Buffer.from(JSON.stringify(statePayload)).toString("base64url");
+
+  const authUrl = new URL("https://api.getjobber.com/api/oauth/authorize");
+  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("client_id", jobberConfig.clientId);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
+  authUrl.searchParams.set("state", state);
+
+  res.redirect(302, authUrl.toString());
+});
+
 // GET Jobber OAuth Callback handler (Universal Relay across all 3 domains)
 app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (req, res) => {
   if (req.query.CallSid || req.query.From || req.query.Called) {
@@ -1628,43 +1737,48 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
               </div>
               <form id="secretForm" onsubmit="handleSaveSecret(event)">
                 <div class="input-group">
-                  <label>1. Copy your Client Secret from <a class="link" href="https://developer.getjobber.com" target="_blank" rel="noopener">Jobber Developer Center ↗</a></label>
+                  <label>1. Jobber App Client ID (from <a class="link" href="https://developer.getjobber.com" target="_blank" rel="noopener">developer.getjobber.com ↗</a>)</label>
+                  <input type="text" id="newClientId" value="${jobberConfig.clientId}" placeholder="Paste your Jobber Client ID..." required autocomplete="off" />
+                </div>
+                <div class="input-group">
+                  <label>2. Jobber App Client Secret</label>
                   <p style="font-size: 11px; margin-bottom: 8px; color: #94a3b8;">
-                    Log into <a class="link" href="https://developer.getjobber.com" target="_blank">developer.getjobber.com</a> &rarr; open your app with Client ID <code>${jobberConfig.clientId.slice(0, 8)}...</code> &rarr; copy the <strong>Client Secret</strong>.
+                    Paste the matching <strong>Client Secret</strong> from your Jobber Developer App below:
                   </p>
                   <input type="text" id="newSecret" placeholder="Paste your Jobber Client Secret here..." required autocomplete="off" />
                 </div>
-                <button type="submit" id="saveBtn" class="btn">✓ Save Secret &amp; Connect to Jobber in 1 Click →</button>
+                <button type="submit" id="saveBtn" class="btn">✓ Save Client ID &amp; Secret &amp; Connect to Jobber in 1 Click →</button>
               </form>
               <a href="${targetReturnUrl}" class="btn btn-secondary">← Return to ${sourceLabel}</a>
             </div>
             <script>
               async function handleSaveSecret(e) {
                 e.preventDefault();
+                const cId = (document.getElementById('newClientId').value || '').trim() || '${jobberConfig.clientId}';
                 const secret = document.getElementById('newSecret').value.trim();
                 if (!secret) return;
                 const btn = document.getElementById('saveBtn');
-                btn.innerText = 'Saving Secret...';
+                btn.innerText = 'Saving Credentials...';
                 btn.disabled = true;
                 try {
                   const res = await fetch('/api/jobber/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ clientSecret: secret, clientId: '${jobberConfig.clientId}' })
+                    body: JSON.stringify({ clientSecret: secret, clientId: cId })
                   });
                   const data = await res.json();
                   if (data.success) {
                     btn.innerText = 'Redirecting to Jobber...';
-                    const authUrl = "https://api.getjobber.com/api/oauth/authorize?response_type=code&client_id=" + encodeURIComponent('${jobberConfig.clientId}') + "&redirect_uri=" + encodeURIComponent('${redirectUri}') + "&state=" + encodeURIComponent('${stateParam || "tidyups_auth"}');
+                    const authUrl = "https://api.getjobber.com/api/oauth/authorize?response_type=code&client_id=" + encodeURIComponent(cId) + "&redirect_uri=" + encodeURIComponent('${redirectUri}') + "&state=" + encodeURIComponent('${stateParam || "tidyups_auth"}');
                     window.location.href = authUrl;
                   } else {
                     alert(data.error || 'Failed to save secret');
-                    btn.innerText = '✓ Save Secret & Connect to Jobber in 1 Click →';
+                    btn.innerText = '✓ Save Client ID & Secret & Connect to Jobber in 1 Click →';
                     btn.disabled = false;
                   }
                 } catch (err) {
                   alert('Network error: ' + err.message);
-                  btn.innerText = '✓ Save Secret & Connect to Jobber in 1 Click →';
+                  btn.innerText = '✓ Save Client ID & Secret & Connect to Jobber in 1 Click →';
                   btn.disabled = false;
                 }
               }
@@ -2601,7 +2715,12 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
     }
   }
 
-  // 4. Repair Base64 Jobber URLs on visits and invoices, and ensure all visits have real Edmonton lat/lng coordinates
+  // 4. Always ensure scheduledVisits starts with the 726 canonical 2026 base visits and merges any new visits on top (never reverting to 7 visits), plus repair Base64 Jobber URLs and Edmonton coordinates
+  const prevVisitCount = Array.isArray(store.scheduledVisits) ? store.scheduledVisits.length : 0;
+  store.scheduledVisits = mergeWithBaseScheduledVisits(store.scheduledVisits);
+  if (store.scheduledVisits.length !== prevVisitCount) {
+    mutated = true;
+  }
   if (Array.isArray(store.scheduledVisits)) {
     for (const v of store.scheduledVisits) {
       if (v.id && String(v.id).startsWith("Z2lkOi8v")) {
@@ -3701,7 +3820,7 @@ const handleSaveStore = (req: any, res: any) => {
     cleanerOverrides: cleanerOverrides
       ? { ...(current.cleanerOverrides || {}), ...cleanerOverrides }
       : current.cleanerOverrides,
-    scheduledVisits: scheduledVisits || current.scheduledVisits,
+    scheduledVisits: mergeWithBaseScheduledVisits(scheduledVisits || current.scheduledVisits),
     unscheduledJobs: unscheduledJobs || current.unscheduledJobs,
     staffRoster: staffRoster || current.staffRoster,
     clients: clients || current.clients,

@@ -1,4 +1,5 @@
 import { JobberQuote, JobberInvoice } from '../services/jobberSyncModules';
+import baseJobberSeed from './baseJobberStoreSeed.json';
 
 export interface ScheduledJobItem {
   id: string;
@@ -264,11 +265,68 @@ export const JOBBER_TEAM_MEMBERS: JobberTeamMember[] = [
   { id: 'tm-15', name: 'Sergine Ngongang wetie', jobberLinkedName: 'Sergine Ngongang wetie', isLinked: true, role: 'Cleaner', color: '#D946EF', vanUnit: 'Unit 10', phone: '(418) 261-4689', email: 'tatiwetie@gmail.com', address: '17115 61 Ave NW, Edmonton, AB' },
 ];
 
+const BASE_SCHEDULED_VISITS: ScheduledJobItem[] = ((baseJobberSeed as any)?.scheduledVisits || []) as ScheduledJobItem[];
+const BASE_JOBBER_QUOTES: JobberQuote[] = ((baseJobberSeed as any)?.quotes || []) as JobberQuote[];
+const BASE_JOBBER_INVOICES: JobberInvoice[] = ((baseJobberSeed as any)?.invoices || []) as JobberInvoice[];
+
 /**
- * Clean starting state - populated strictly from real Jobber API & persistent database store
+ * Canonical 2026 Base Schedule (726 real Jobber visits starting Jan 1, 2026 through Dec 31, 2026).
+ * Served up as the immutable base so any new visits add onto this base and never revert to 7 visits.
  */
 export function generateHistoricAndFutureVisits(): ScheduledJobItem[] {
-  return [];
+  return BASE_SCHEDULED_VISITS.map((v) => ({ ...v }));
+}
+
+/**
+ * Merges any incoming or existing visits onto the 726 canonical 2026 base visits.
+ * - Starts with all 726 base visits.
+ * - Applies any status/cleaner/detail updates to matching base visits.
+ * - Appends any newly created or newly synced visits on top of the base.
+ */
+export function mergeWithBaseScheduledVisits(incoming?: any[] | null): ScheduledJobItem[] {
+  const map = new Map<string, ScheduledJobItem>();
+  for (const baseVisit of BASE_SCHEDULED_VISITS) {
+    const key = baseVisit.id || `${baseVisit.visitNumber}_${baseVisit.startAt}`;
+    map.set(key, { ...baseVisit });
+  }
+
+  if (Array.isArray(incoming) && incoming.length > 0) {
+    for (const raw of incoming) {
+      if (!raw || typeof raw !== 'object') continue;
+      // Skip legacy mock/simulation items
+      const nameLower = String(raw.clientName || raw.title || '').toLowerCase();
+      if (
+        nameLower.includes('vance') ||
+        nameLower.includes('lindqvist') ||
+        nameLower.includes('heritage pointe') ||
+        nameLower.includes('al-mansoor') ||
+        nameLower.includes('simulation')
+      ) {
+        continue;
+      }
+
+      const key = raw.id || `${raw.visitNumber || 'VISIT'}_${raw.startAt || ''}`;
+      const existing = map.get(key);
+      if (existing) {
+        map.set(key, {
+          ...existing,
+          ...raw,
+          lat: raw.lat || existing.lat,
+          lng: raw.lng || existing.lng,
+          assignedCleaners:
+            Array.isArray(raw.assignedCleaners) && raw.assignedCleaners.length > 0
+              ? raw.assignedCleaners
+              : existing.assignedCleaners,
+        });
+      } else {
+        map.set(key, { ...raw } as ScheduledJobItem);
+      }
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) =>
+    String(a.startAt || '').localeCompare(String(b.startAt || ''))
+  );
 }
 
 export interface UnscheduledJobItem {
@@ -296,12 +354,13 @@ export interface UnscheduledJobItem {
 export const INITIAL_UNSCHEDULED_JOBS: UnscheduledJobItem[] = [];
 
 export function generateJobberQuotes(): JobberQuote[] {
-  return [];
+  return BASE_JOBBER_QUOTES.map((q) => ({ ...q }));
 }
 
 export function generateJobberInvoices(): JobberInvoice[] {
-  return [];
+  return BASE_JOBBER_INVOICES.map((inv) => ({ ...inv }));
 }
 
-export const INITIAL_JOBBER_QUOTES: JobberQuote[] = [];
-export const INITIAL_JOBBER_INVOICES: JobberInvoice[] = [];
+export const INITIAL_JOBBER_QUOTES: JobberQuote[] = BASE_JOBBER_QUOTES;
+export const INITIAL_JOBBER_INVOICES: JobberInvoice[] = BASE_JOBBER_INVOICES;
+

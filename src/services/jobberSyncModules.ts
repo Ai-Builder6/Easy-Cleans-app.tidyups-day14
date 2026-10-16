@@ -4,6 +4,8 @@
  * Target Account: Clean YEG Operations (Tidyups Cleaning Service Inc)
  */
 
+import { mergeWithBaseScheduledVisits } from "../data/jobberCalendarData";
+
 export const JOBBER_GRAPHQL_URL = "https://api.getjobber.com/api/graphql";
 export const JOBBER_GRAPHQL_VERSION = "2025-04-16";
 const JOBBER_REQUEST_TIMEOUT_MS = 25_000;
@@ -470,7 +472,12 @@ export async function syncJobberCalendar(
       }
 
       if (nodes.length > 0) {
+        const basePlusExisting = mergeWithBaseScheduledVisits(existingVisits) as unknown as JobberVisit[];
         const visitsMap = new Map<string, JobberVisit>();
+        for (const v of basePlusExisting) {
+          const k = v.id || `${v.visitNumber}_${v.startAt}`;
+          visitsMap.set(k, { ...v });
+        }
         let newCount = 0;
         let updatedCount = 0;
 
@@ -505,25 +512,46 @@ export async function syncJobberCalendar(
           const visitNumber = node.job?.jobNumber
             ? `JOB-${node.job.jobNumber}`
             : `VISIT-${numericVisitId.slice(-5) || (visitsMap.size + 1)}`;
-          const key = node.id || visitNumber;
+          const key = node.id || `${visitNumber}_${localStart}`;
+          const prev = visitsMap.get(key) || visitsMap.get(node.id);
 
-          visitsMap.set(key, {
-            id: node.id,
-            visitNumber,
-            title: node.job?.title ? `${clientName} - ${node.job.title}` : (node.title || `${clientName} - ${serviceType}`),
-            clientName,
-            clientPhone,
-            serviceAddress,
-            startAt: localStart,
-            endAt: localEnd,
-            assignedCleaners: assigned.length > 0 ? assigned : ["Cindy Guay"],
-            serviceType,
-            status: visitStatus,
-            jobberWebUri: resolveJobberWebUri("visits", node.id),
-            quoteTotal: typeof node.job?.total === "number" ? node.job.total : undefined,
-            syncedAt: new Date().toISOString(),
-          });
-          newCount++;
+          if (prev) {
+            visitsMap.set(prev.id || key, {
+              ...prev,
+              visitNumber: visitNumber || prev.visitNumber,
+              title: node.job?.title ? `${clientName} - ${node.job.title}` : (node.title || prev.title || `${clientName} - ${serviceType}`),
+              clientName: clientName || prev.clientName,
+              clientPhone: clientPhone || prev.clientPhone,
+              serviceAddress: serviceAddress || prev.serviceAddress,
+              startAt: localStart || prev.startAt,
+              endAt: localEnd || prev.endAt,
+              assignedCleaners: assigned.length > 0 ? assigned : (prev.assignedCleaners?.length ? prev.assignedCleaners : ["Cindy Guay"]),
+              serviceType,
+              status: visitStatus,
+              jobberWebUri: resolveJobberWebUri("visits", node.id),
+              quoteTotal: typeof node.job?.total === "number" ? node.job.total : prev.quoteTotal,
+              syncedAt: new Date().toISOString(),
+            });
+            updatedCount++;
+          } else {
+            visitsMap.set(key, {
+              id: node.id,
+              visitNumber,
+              title: node.job?.title ? `${clientName} - ${node.job.title}` : (node.title || `${clientName} - ${serviceType}`),
+              clientName,
+              clientPhone,
+              serviceAddress,
+              startAt: localStart,
+              endAt: localEnd,
+              assignedCleaners: assigned.length > 0 ? assigned : ["Cindy Guay"],
+              serviceType,
+              status: visitStatus,
+              jobberWebUri: resolveJobberWebUri("visits", node.id),
+              quoteTotal: typeof node.job?.total === "number" ? node.job.total : undefined,
+              syncedAt: new Date().toISOString(),
+            });
+            newCount++;
+          }
         }
 
         const mergedVisits = Array.from(visitsMap.values()).sort((a, b) => a.startAt.localeCompare(b.startAt));
@@ -539,7 +567,7 @@ export async function syncJobberCalendar(
             totalCount: mergedVisits.length,
             newCount,
             updatedCount,
-            unchangedCount: 0,
+            unchangedCount: Math.max(0, mergedVisits.length - newCount - updatedCount),
             durationMs: Date.now() - startTime,
             syncedAt: new Date().toISOString(),
           },
@@ -551,18 +579,19 @@ export async function syncJobberCalendar(
     }
   }
 
-  // Fast database fallback: return existing visits cached in local database
-  const crew1 = existingVisits.filter(v => v.assignedCleaners.includes("Joel MBATCHOU") || v.assignedCleaners.includes("Melissa Clarke")).length;
+  // Fast database fallback: return base 726 visits + any existing added visits cached in local database
+  const mergedFallback = mergeWithBaseScheduledVisits(existingVisits) as unknown as JobberVisit[];
+  const crew1 = mergedFallback.filter(v => v.assignedCleaners.includes("Joel MBATCHOU") || v.assignedCleaners.includes("Melissa Clarke")).length;
   return {
-    visits: existingVisits,
-    syncedVisitsCount: existingVisits.length,
+    visits: mergedFallback,
+    syncedVisitsCount: mergedFallback.length,
     assignedToCrew1: crew1,
-    assignedToCrew2: existingVisits.length - crew1,
+    assignedToCrew2: mergedFallback.length - crew1,
     delta: {
-      totalCount: existingVisits.length,
+      totalCount: mergedFallback.length,
       newCount: 0,
       updatedCount: 0,
-      unchangedCount: existingVisits.length,
+      unchangedCount: mergedFallback.length,
       durationMs: Date.now() - startTime,
       syncedAt: new Date().toISOString(),
     },

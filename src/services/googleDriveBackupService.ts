@@ -1,5 +1,5 @@
 import { User } from 'firebase/auth';
-import { getAccessToken, googleSignIn } from '../lib/firebase';
+import { getAccessTokenSync, googleSignIn } from '../lib/firebase';
 
 export const TIDYUPS_DRIVE_FOLDER_NAME = 'TidyUps Cleaning App Backup Zips';
 
@@ -33,19 +33,22 @@ let cachedFolderInfo: DriveFolderInfo | null = null;
  * Ensures we have an active Google OAuth access token.
  * If not yet signed in, triggers the Google Sign-In popup directly from the user's click.
  */
-export async function ensureDriveAuthToken(): Promise<{ accessToken: string; user?: User | null }> {
-  const existingToken = await getAccessToken();
+export function ensureDriveAuthToken(): Promise<{ accessToken: string; user?: User | null }> {
+  const existingToken = getAccessTokenSync();
   if (existingToken) {
-    return { accessToken: existingToken };
+    return Promise.resolve({ accessToken: existingToken });
   }
-  const signInResult = await googleSignIn();
-  if (!signInResult?.accessToken) {
-    throw new Error('Google Drive authorization is required to upload to your Drive folder.');
-  }
-  return {
-    accessToken: signInResult.accessToken,
-    user: signInResult.user,
-  };
+  // Invoke googleSignIn() synchronously on the user click tick!
+  const signInPromise = googleSignIn();
+  return signInPromise.then((signInResult) => {
+    if (!signInResult?.accessToken) {
+      throw new Error('Google Drive authorization is required to upload to your Drive folder.');
+    }
+    return {
+      accessToken: signInResult.accessToken,
+      user: signInResult.user,
+    };
+  });
 }
 
 /**
@@ -178,9 +181,11 @@ export async function uploadAppFileToTidyUpsDriveFolder(params: {
   description?: string;
   accessToken?: string | null;
 }): Promise<{ folder: DriveFolderInfo; file: DriveBackupFileItem }> {
-  let token = params.accessToken || (await getAccessToken());
+  let token = params.accessToken || getAccessTokenSync();
   if (!token) {
-    const authRes = await ensureDriveAuthToken();
+    // Trigger Google Sign-In synchronously on the click tick before any await
+    const authPromise = ensureDriveAuthToken();
+    const authRes = await authPromise;
     token = authRes.accessToken;
   }
 
@@ -282,11 +287,13 @@ export async function uploadWholeProjectZipToDriveFolder(options?: {
   accessToken?: string | null;
   aiWorkflowContent?: string;
 }): Promise<DriveUploadResult> {
-  let token = options?.accessToken || (await getAccessToken());
+  let token = options?.accessToken || getAccessTokenSync();
   let userEmail: string | null = null;
 
   if (!token) {
-    const authRes = await ensureDriveAuthToken();
+    // Trigger Google Sign-In synchronously on the click tick before any await
+    const authPromise = ensureDriveAuthToken();
+    const authRes = await authPromise;
     token = authRes.accessToken;
     userEmail = authRes.user?.email || null;
   }
