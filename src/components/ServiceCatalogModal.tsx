@@ -31,6 +31,7 @@ import {
   generatePriceListSheetRows,
 } from '../data/serviceCatalogData';
 import { saveServiceCatalogToFirestore } from '../services/firestoreSyncService';
+import { downloadFileFromApiWithoutNavigation } from '../services/googleDriveBackupService';
 
 interface ServiceCatalogModalProps {
   isOpen: boolean;
@@ -801,14 +802,19 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
           <div className="flex items-center gap-3 text-xs text-slate-600 font-mono">
             <span>Showing {filteredItems.length} of {currentItems.length} live items</span>
             <span>•</span>
-            <a
-              href={`/api/price-list/export.xlsx?project=${projectId}&t=${Date.now()}`}
-              download
-              className="text-emerald-700 hover:text-emerald-900 font-sans font-bold underline flex items-center gap-1"
+            <button
+              type="button"
+              onClick={() =>
+                downloadFileFromApiWithoutNavigation(
+                  `/api/price-list/export.xlsx?project=${projectId}&t=${Date.now()}`,
+                  `TidyUps_Service_Catalog_Price_List_${new Date().toISOString().slice(0, 10)}.xlsx`
+                )
+              }
+              className="text-emerald-700 hover:text-emerald-900 font-sans font-bold underline flex items-center gap-1 cursor-pointer"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Direct Server .XLSX Link</span>
-            </a>
+              <span>Download .XLSX File</span>
+            </button>
           </div>
         </div>
 

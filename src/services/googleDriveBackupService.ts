@@ -359,3 +359,232 @@ export async function uploadWholeProjectZipToDriveFolder(options?: {
     userEmail,
   };
 }
+
+export interface LiveDriveSheetResult {
+  spreadsheetId: string;
+  sheetUrl: string;
+  sheetName: string;
+  folder: DriveFolderInfo;
+  userEmail?: string | null;
+}
+
+/**
+ * 1-Click: Creates a brand-new native multi-tab Google Sheet inside the user's
+ * "TidyUps Cleaning App Backup Zips" folder in Google Drive (pre-formatted with
+ * "FB Leads", "Google Leads", "Voice & Quick Quotes", "Pasted Leads", and the
+ * 20-column "ScrubbyBuilder Leads" schema for Facebook Lead Ads & Google Ads),
+ * and immediately saves it as the active Clean Google Sheet URL across the app.
+ */
+export async function createNewCleanLeadsSheetInDrive(options?: {
+  sheetTitle?: string;
+  accessToken?: string | null;
+}): Promise<LiveDriveSheetResult> {
+  let token = options?.accessToken || getAccessTokenSync();
+  let userEmail: string | null = null;
+
+  if (!token) {
+    const authPromise = ensureDriveAuthToken();
+    const authRes = await authPromise;
+    token = authRes.accessToken;
+    userEmail = authRes.user?.email || null;
+  }
+
+  let folder: DriveFolderInfo;
+  try {
+    folder = await ensureTidyUpsDriveFolder(token);
+  } catch (err: any) {
+    if (err?.message === 'AUTH_EXPIRED') {
+      const freshAuth = await googleSignIn();
+      if (!freshAuth?.accessToken) {
+        throw new Error('Google Drive re-authentication required.');
+      }
+      token = freshAuth.accessToken;
+      userEmail = freshAuth.user?.email || null;
+      folder = await ensureTidyUpsDriveFolder(token);
+    } else {
+      throw err;
+    }
+  }
+
+  // Fetch the multi-tab XLSX buffer from the server (contains All Clean Leads, FB Leads, Google Leads, Voice & Quick Quotes, Pasted Leads, ScrubbyBuilder Leads)
+  const xlsxRes = await fetch('/api/leads/export.xlsx?project=tidyups');
+  if (!xlsxRes.ok) {
+    throw new Error('Could not build Clean Leads multi-tab workbook from server.');
+  }
+  const xlsxBlob = await xlsxRes.blob();
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const sheetName =
+    options?.sheetTitle || `TidyUps Clean Leads & Ads Hub (FB & Google Ads) - ${dateStr}`;
+
+  // Upload with target mimeType = application/vnd.google-apps.spreadsheet so Google Drive natively converts the multi-tab XLSX into a live Google Sheet!
+  const createMeta = {
+    name: sheetName,
+    mimeType: 'application/vnd.google-apps.spreadsheet',
+    parents: [folder.id],
+    description:
+      'Live TidyUps Clean Leads & Ads Google Sheet (Tabs: FB Leads, Google Leads, Voice & Quick Quotes, Pasted Leads, ScrubbyBuilder Leads). Ready for Facebook Lead Ads & Google Ads.',
+  };
+
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(createMeta)], { type: 'application/json' }));
+  form.append(
+    'file',
+    new Blob([xlsxBlob], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+  );
+
+  const uploadRes = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,webViewLink',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    }
+  );
+
+  if (!uploadRes.ok) {
+    const errBody = await uploadRes.json().catch(() => ({}));
+    throw new Error(
+      errBody?.error?.message || 'Failed to create Google Sheet in your Google Drive folder.'
+    );
+  }
+
+  const created = await uploadRes.json();
+  const spreadsheetId = created.id;
+  const sheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+
+  // Save the newly created live Google Sheet URL as the active sheet on the server
+  await fetch('/api/google-sheets/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      spreadsheetId,
+      sheetUrl,
+      createdDriveSheetId: spreadsheetId,
+      createdDriveSheetUrl: sheetUrl,
+      createdDriveSheetName: sheetName,
+    }),
+  }).catch(() => {});
+
+  return {
+    spreadsheetId,
+    sheetUrl,
+    sheetName: created.name || sheetName,
+    folder,
+    userEmail,
+  };
+}
+
+/**
+ * Updates an existing Google Sheet in Google Drive with the latest multi-tab leads data
+ * (or creates a new Google Sheet in the user's Drive folder if the existing ID cannot be patched).
+ */
+export async function syncLeadsToLiveGoogleSheetInDrive(options?: {
+  spreadsheetId?: string;
+  accessToken?: string | null;
+}): Promise<LiveDriveSheetResult> {
+  let token = options?.accessToken || getAccessTokenSync();
+  let userEmail: string | null = null;
+
+  if (!token) {
+    const authPromise = ensureDriveAuthToken();
+    const authRes = await authPromise;
+    token = authRes.accessToken;
+    userEmail = authRes.user?.email || null;
+  }
+
+  let folder: DriveFolderInfo;
+  try {
+    folder = await ensureTidyUpsDriveFolder(token);
+  } catch (err: any) {
+    if (err?.message === 'AUTH_EXPIRED') {
+      const freshAuth = await googleSignIn();
+      if (!freshAuth?.accessToken) {
+        throw new Error('Google Drive re-authentication required.');
+      }
+      token = freshAuth.accessToken;
+      userEmail = freshAuth.user?.email || null;
+      folder = await ensureTidyUpsDriveFolder(token);
+    } else {
+      throw err;
+    }
+  }
+
+  const targetId = (options?.spreadsheetId || '').trim();
+  const isRealId = targetId && !targetId.includes('clean_sheet') && targetId.length >= 25;
+
+  if (isRealId) {
+    const xlsxRes = await fetch('/api/leads/export.xlsx?project=tidyups');
+    if (xlsxRes.ok) {
+      const xlsxBlob = await xlsxRes.blob();
+      const patchMeta = {
+        mimeType: 'application/vnd.google-apps.spreadsheet',
+      };
+      const patchForm = new FormData();
+      patchForm.append('metadata', new Blob([JSON.stringify(patchMeta)], { type: 'application/json' }));
+      patchForm.append(
+        'file',
+        new Blob([xlsxBlob], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+      );
+
+      const patchRes = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(
+          targetId
+        )}?uploadType=multipart&fields=id,name,webViewLink`,
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}` },
+          body: patchForm,
+        }
+      );
+
+      if (patchRes.ok) {
+        const updated = await patchRes.json();
+        const sheetUrl = `https://docs.google.com/spreadsheets/d/${updated.id}/edit`;
+        return {
+          spreadsheetId: updated.id,
+          sheetUrl,
+          sheetName: updated.name || 'TidyUps Clean Leads & Ads Hub',
+          folder,
+          userEmail,
+        };
+      }
+    }
+  }
+
+  // Fallback: create a fresh writable Google Sheet in the user's Drive folder and link it
+  return createNewCleanLeadsSheetInDrive({ accessToken: token });
+}
+
+/**
+ * Downloads a file from an internal /api/... endpoint using in-memory fetch() + Blob
+ * so the browser NEVER navigates to a raw .run.app URL (preventing the
+ * "Action required to load your app / blocking a required security cookie" screen).
+ */
+export async function downloadFileFromApiWithoutNavigation(
+  apiUrl: string,
+  fallbackFilename: string
+): Promise<void> {
+  const res = await fetch(apiUrl);
+  if (!res.ok) {
+    throw new Error(`Download failed (${res.status})`);
+  }
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const fnMatch = disposition.match(/filename="?([^"]+)"?/i);
+  const filename = fnMatch?.[1] || fallbackFilename;
+
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+}
+

@@ -27,11 +27,17 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
-  ClipboardPaste
+  ClipboardPaste,
+  CloudUpload,
 } from 'lucide-react';
 import { JobberConfig, ServiceTicket } from '../types/dispatch';
 import { ticketToSheetRow, APP_LEAD_HEADERS, generateTsvRows, LEADS_SPREADSHEET_ID, APP_LEADS_TAB } from '../services/leadSheetSync';
 import { parseSpreadsheetBuffer } from '../data/serviceCatalogData';
+import {
+  TIDYUPS_DRIVE_FOLDER_NAME,
+  createNewCleanLeadsSheetInDrive,
+  syncLeadsToLiveGoogleSheetInDrive,
+} from '../services/googleDriveBackupService';
 
 interface JobberSyncModalProps {
   isOpen: boolean;
@@ -84,6 +90,11 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
   const [isSyncing, setIsSyncing] = useState<string | null>(null);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [copiedTsv, setCopiedTsv] = useState(false);
+  const [activeSpreadsheetId, setActiveSpreadsheetId] = useState<string>(LEADS_SPREADSHEET_ID);
+  const [activeGoogleSheetUrl, setActiveGoogleSheetUrl] = useState<string>(
+    `https://docs.google.com/spreadsheets/d/${LEADS_SPREADSHEET_ID}/edit`
+  );
+  const [confirmSheetOverwrite, setConfirmSheetOverwrite] = useState<boolean>(false);
 
   // Live Token Verification state
   const [isVerifyingToken, setIsVerifyingToken] = useState(false);
@@ -187,6 +198,18 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
         });
       })
       .catch(() => {});
+
+    fetch('/api/google-sheets/config')
+      .then((r) => r.json())
+      .then((sData) => {
+        if (sData?.spreadsheetId && !String(sData.spreadsheetId).includes('clean_sheet')) {
+          setActiveSpreadsheetId(sData.spreadsheetId);
+          setActiveGoogleSheetUrl(
+            sData.sheetUrl || `https://docs.google.com/spreadsheets/d/${sData.spreadsheetId}/edit`
+          );
+        }
+      })
+      .catch(() => {});
   };
 
   const handleSaveCredentialsQuietly = () => {
@@ -264,8 +287,9 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     const height = 740;
     const left = typeof window !== 'undefined' ? window.screen.width / 2 - width / 2 : 100;
     const top = typeof window !== 'undefined' ? window.screen.height / 2 - height / 2 : 100;
+    // Open api.getjobber.com directly so the browser never navigates a popup to a .run.app URL (avoiding the security-cookie screen)
     const popup = window.open(
-      computedServerStartUrl,
+      computedAuthUrl,
       'JobberAuthorization',
       `toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,copyhistory=no,width=${width},height=${height},top=${top},left=${left}`
     );
@@ -379,8 +403,9 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     }
   };
 
-  // Google Sheets Push
+  // Google Sheets Push & Live Drive Sheet Sync
   const handleSyncGoogleSheets = async () => {
+    setConfirmSheetOverwrite(false);
     setIsSyncing('SHEETS');
     setSyncNotice(null);
     try {
@@ -390,11 +415,36 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
         body: JSON.stringify({ tickets }),
       });
       const data = await res.json();
+      const driveRes = await syncLeadsToLiveGoogleSheetInDrive({
+        spreadsheetId: activeSpreadsheetId,
+      });
+      setActiveSpreadsheetId(driveRes.spreadsheetId);
+      setActiveGoogleSheetUrl(driveRes.sheetUrl);
       if (data.success) {
-        setSyncNotice(`Exported ${data.syncedRowsCount} cleaning leads directly to "${data.targetTab}" in Google Sheets!`);
+        setSyncNotice(
+          `✓ Synced ${data.syncedRowsCount} cleaning leads directly into "${driveRes.sheetName}" in your Google Drive!`
+        );
       }
-    } catch {
-      setSyncNotice('Google Sheets sync error.');
+    } catch (err: any) {
+      setSyncNotice(err?.message || 'Google Sheets sync error.');
+    } finally {
+      setIsSyncing(null);
+    }
+  };
+
+  // 1-Click Create New Clean Leads Sheet in Google Drive (FB Ads & Google Ads Ready)
+  const handleCreateNewLeadsSheetInDrive = async () => {
+    setIsSyncing('CREATE_SHEET');
+    setSyncNotice(null);
+    try {
+      const created = await createNewCleanLeadsSheetInDrive();
+      setActiveSpreadsheetId(created.spreadsheetId);
+      setActiveGoogleSheetUrl(created.sheetUrl);
+      setSyncNotice(
+        `✓ Created new multi-tab Google Sheet "${created.sheetName}" inside "${TIDYUPS_DRIVE_FOLDER_NAME}" in Google Drive (ready for FB Ads & Google Ads)!`
+      );
+    } catch (err: any) {
+      setSyncNotice(err?.message || 'Could not create Google Sheet in Drive.');
     } finally {
       setIsSyncing(null);
     }
@@ -880,7 +930,7 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                       <a
                         id="jobber-direct-auth-button"
-                        href={computedServerStartUrl}
+                        href={computedAuthUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => {
@@ -1312,18 +1362,34 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                     <div className="flex items-center gap-2">
                       <Table className="w-4 h-4 text-emerald-600" />
                       <h3 className="font-bold text-xs text-slate-900">
-                        Google Sheets Lead-to-Sheet Processor (Day-3 Integration)
+                        Google Sheets Lead-to-Sheet Processor (FB Ads, Google Ads &amp; Day-3 Integration)
                       </h3>
                     </div>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      Target Spreadsheet: <code className="text-blue-700 bg-blue-50 px-1 py-0.5 rounded">{LEADS_SPREADSHEET_ID}</code> • Tab: <strong className="text-slate-800 font-semibold">{APP_LEADS_TAB}</strong>
+                      Active Spreadsheet: <code className="text-blue-700 bg-blue-50 px-1 py-0.5 rounded font-mono">{activeSpreadsheetId}</code> • Tab: <strong className="text-slate-800 font-semibold">{APP_LEADS_TAB}</strong>
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
+                      type="button"
+                      onClick={handleCreateNewLeadsSheetInDrive}
+                      disabled={isSyncing !== null}
+                      className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                      title={`Create a brand-new multi-tab Google Sheet inside "${TIDYUPS_DRIVE_FOLDER_NAME}" in your Google Drive`}
+                    >
+                      <CloudUpload className="w-3.5 h-3.5" />
+                      <span>
+                        {isSyncing === 'CREATE_SHEET'
+                          ? 'Creating in Drive...'
+                          : '+ Create New Sheet in Drive'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={handleCopyTsv}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                       title="Copy all 20 columns to clipboard to paste directly into Google Sheets"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -1331,9 +1397,10 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                     </button>
 
                     <button
-                      onClick={handleSyncGoogleSheets}
+                      type="button"
+                      onClick={() => setConfirmSheetOverwrite(true)}
                       disabled={isSyncing !== null}
-                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-50"
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isSyncing === 'SHEETS' ? 'animate-spin' : ''}`} />
                       <span>{isSyncing === 'SHEETS' ? 'Pushing...' : 'Push to Google Sheet'}</span>
@@ -1341,10 +1408,34 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                   </div>
                 </div>
 
+                {confirmSheetOverwrite && (
+                  <div className="mb-3 p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="text-xs text-amber-950">
+                      <strong>Confirm Google Drive Sheet Update:</strong> Update your connected Google Sheet (<code className="font-mono">{activeSpreadsheetId}</code>) in Google Drive with {tickets.length} active booking records and multi-tab lead rows?
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmSheetOverwrite(false)}
+                        className="px-3 py-1 rounded-lg bg-white border border-amber-300 text-slate-700 text-xs font-bold cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSyncGoogleSheets}
+                        className="px-3.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+                      >
+                        Confirm &amp; Push to Drive Sheet
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-[11px] text-slate-700 mb-3 space-y-1">
                   <div className="font-semibold text-slate-900 flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Exact 20-Column Schema Formatter:</span>
+                    <span>Exact 20-Column Schema Formatter (Ready for Facebook Lead Ads &amp; Google Ads):</span>
                   </div>
                   <div className="font-mono text-[10px] text-slate-600 bg-white p-2 rounded border border-slate-200 overflow-x-auto whitespace-nowrap">
                     {APP_LEAD_HEADERS.join(' | ')}
@@ -1356,10 +1447,10 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                   <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-800 flex items-center justify-between">
                     <span>Active Cleaning Bookings Preview ({tickets.length} records)</span>
                     <a
-                      href={`https://docs.google.com/spreadsheets/d/${LEADS_SPREADSHEET_ID}`}
+                      href={activeGoogleSheetUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-[11px] font-semibold"
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 text-[11px] font-bold"
                     >
                       <span>Open Google Sheet</span>
                       <ExternalLink className="w-3 h-3" />

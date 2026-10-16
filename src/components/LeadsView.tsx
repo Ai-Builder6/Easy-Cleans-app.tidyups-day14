@@ -26,10 +26,24 @@ import {
   Bath,
   Send,
   Key,
+  CloudUpload,
+  Globe,
+  AlertTriangle,
 } from 'lucide-react';
 import { AdLeadItem, LeadStatus, LeadVerdict } from '../types/lead';
 import { JobberQuote, extractJobberNumericId } from '../services/jobberSyncModules';
 import { QuoteDetailModal } from './QuoteDetailModal';
+import {
+  LEADS_SPREADSHEET_ID,
+  SECONDARY_LEADS_SPREADSHEET_ID,
+  APP_LEAD_HEADERS,
+} from '../services/leadSheetSync';
+import {
+  TIDYUPS_DRIVE_FOLDER_NAME,
+  createNewCleanLeadsSheetInDrive,
+  syncLeadsToLiveGoogleSheetInDrive,
+  downloadFileFromApiWithoutNavigation,
+} from '../services/googleDriveBackupService';
 
 export type CleanSheetTab =
   | 'ALL'
@@ -231,24 +245,40 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
   const [quickPrice, setQuickPrice] = useState('221.07');
   const [quickNotes, setQuickNotes] = useState('');
 
-  // Custom Google Sheet URL state
-  const [googleSheetUrl, setGoogleSheetUrl] = useState(
-    'https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla_clean_sheet/edit'
-  );
+  // Real Google Sheet URL state (defaults to verified Primary Leads Sheet, never a fake placeholder)
+  const defaultPrimarySheetUrl = `https://docs.google.com/spreadsheets/d/${LEADS_SPREADSHEET_ID}/edit`;
+  const defaultSecondarySheetUrl = `https://docs.google.com/spreadsheets/d/${SECONDARY_LEADS_SPREADSHEET_ID}/edit`;
+  const [googleSheetUrl, setGoogleSheetUrl] = useState(defaultPrimarySheetUrl);
+  const [createdDriveSheetUrl, setCreatedDriveSheetUrl] = useState<string>('');
+  const [createdDriveSheetName, setCreatedDriveSheetName] = useState<string>('');
+  const [webhookUrl, setWebhookUrl] = useState<string>('https://app.tidyupscleaning.com/api/leads/webhook');
   const [isSavingSheetUrl, setIsSavingSheetUrl] = useState(false);
+  const [isCreatingDriveSheet, setIsCreatingDriveSheet] = useState(false);
+  const [isSyncingDriveSheet, setIsSyncingDriveSheet] = useState(false);
+  const [isDownloadingFile, setIsDownloadingFile] = useState<'XLSX' | 'CSV' | null>(null);
+  const [showAdsConnectPanel, setShowAdsConnectPanel] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [confirmDriveSyncModal, setConfirmDriveSyncModal] = useState(false);
 
   useEffect(() => {
     setLeadsList(initialLeads || []);
   }, [initialLeads]);
 
   useEffect(() => {
-    fetch(`/api/google-sheets/status?project=${projectId}`)
+    fetch(`/api/google-sheets/config?project=${projectId}`)
       .then((r) => r.json())
       .then((d) => {
-        if (d?.sheetUrl) setGoogleSheetUrl(d.sheetUrl);
+        if (d?.sheetUrl && !String(d.sheetUrl).includes('clean_sheet')) {
+          setGoogleSheetUrl(d.sheetUrl);
+        } else {
+          setGoogleSheetUrl(defaultPrimarySheetUrl);
+        }
+        if (d?.createdDriveSheetUrl) setCreatedDriveSheetUrl(d.createdDriveSheetUrl);
+        if (d?.createdDriveSheetName) setCreatedDriveSheetName(d.createdDriveSheetName);
+        if (d?.webhookUrl) setWebhookUrl(d.webhookUrl);
       })
       .catch(() => {});
-  }, [projectId]);
+  }, [projectId, defaultPrimarySheetUrl]);
 
   const parsedPreviewRows = useMemo(() => parseRawPasteIntoLeads(pasteText), [pasteText]);
 
@@ -307,23 +337,146 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
     });
   }, [leadsList, activeTab, verdictFilter, searchQuery]);
 
-  // Save connected blank Google Sheet URL
-  const handleSaveSheetUrl = async () => {
+  // Save connected Google Sheet URL
+  const handleSaveSheetUrl = async (customUrl?: string) => {
+    const urlToSave = (customUrl ?? googleSheetUrl).trim();
+    if (!urlToSave || urlToSave.includes('clean_sheet')) {
+      setNotice('Please enter a valid Google Sheets URL or click "+ Create New Sheet in Drive".');
+      return;
+    }
     setIsSavingSheetUrl(true);
     try {
       const res = await fetch(`/api/google-sheets/config?project=${projectId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
-        body: JSON.stringify({ sheetUrl: googleSheetUrl }),
+        body: JSON.stringify({ sheetUrl: urlToSave }),
       });
       const data = await res.json();
       if (data.success) {
-        setNotice('✓ Connected your Clean Google Sheet URL! All new Facebook, Google, Voice & Pasted leads sync here.');
+        if (data.config?.sheetUrl) setGoogleSheetUrl(data.config.sheetUrl);
+        setNotice('✓ Connected your Google Sheet URL! All Facebook Ads, Google Ads, Voice & Pasted leads sync here.');
       }
     } catch (e: any) {
       setNotice(`Could not save Sheet URL: ${e.message}`);
     } finally {
       setIsSavingSheetUrl(false);
+    }
+  };
+
+  // 1-Click: Create a brand-new native multi-tab Google Sheet in user's Google Drive (FB Ads & Google Ads Ready)
+  const handleCreateNewSheetInDrive = async () => {
+    setIsCreatingDriveSheet(true);
+    setNotice(null);
+    try {
+      const res = await createNewCleanLeadsSheetInDrive();
+      setGoogleSheetUrl(res.sheetUrl);
+      setCreatedDriveSheetUrl(res.sheetUrl);
+      setCreatedDriveSheetName(res.sheetName);
+      setShowAdsConnectPanel(true);
+      setNotice(
+        `✓ Created new multi-tab Google Sheet "${res.sheetName}" inside "${TIDYUPS_DRIVE_FOLDER_NAME}" in your Google Drive and connected it! Ready for Facebook Ads & Google Ads.`
+      );
+    } catch (err: any) {
+      setNotice(`Could not create Google Sheet in Drive: ${err?.message || 'Please allow Google Drive access.'}`);
+    } finally {
+      setIsCreatingDriveSheet(false);
+    }
+  };
+
+  // Confirmed handler: Sync all current rows directly to the live Google Sheet in Google Drive
+  const handleConfirmedSyncToDriveSheet = async () => {
+    setConfirmDriveSyncModal(false);
+    setIsSyncingDriveSheet(true);
+    setNotice(null);
+    try {
+      const match = googleSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      const currentId = match ? match[1] : LEADS_SPREADSHEET_ID;
+      const res = await syncLeadsToLiveGoogleSheetInDrive({ spreadsheetId: currentId });
+      setGoogleSheetUrl(res.sheetUrl);
+      if (res.spreadsheetId !== LEADS_SPREADSHEET_ID && res.spreadsheetId !== SECONDARY_LEADS_SPREADSHEET_ID) {
+        setCreatedDriveSheetUrl(res.sheetUrl);
+        setCreatedDriveSheetName(res.sheetName);
+      }
+      setNotice(
+        `✓ Synced ${leadsList.length} lead row(s) across all tabs directly into your live Google Sheet in Google Drive!`
+      );
+    } catch (err: any) {
+      setNotice(`Could not sync to Google Sheet in Drive: ${err?.message || 'Check Google Drive authorization.'}`);
+    } finally {
+      setIsSyncingDriveSheet(false);
+    }
+  };
+
+  // Cookie-free in-memory downloads (.xlsx and .csv) that never hit the .run.app security cookie screen
+  const handleDownloadXlsx = async () => {
+    setIsDownloadingFile('XLSX');
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      await downloadFileFromApiWithoutNavigation(
+        `/api/leads/export.xlsx?project=${projectId}`,
+        `TidyUps_Clean_Leads_Google_Sheet_${dateStr}.xlsx`
+      );
+      setNotice('✓ Downloaded multi-tab Clean Google Sheet (.xlsx) without leaving the app!');
+    } catch (err: any) {
+      setNotice(`Download error: ${err?.message}`);
+    } finally {
+      setIsDownloadingFile(null);
+    }
+  };
+
+  const handleDownloadCsv = async () => {
+    setIsDownloadingFile('CSV');
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      await downloadFileFromApiWithoutNavigation(
+        `/api/leads/export.csv?project=${projectId}&tab=${encodeURIComponent(activeTab)}`,
+        `TidyUps_Clean_Leads_${dateStr}.csv`
+      );
+      setNotice('✓ Downloaded Clean Leads (.csv) without leaving the app!');
+    } catch (err: any) {
+      setNotice(`CSV export error: ${err?.message}`);
+    } finally {
+      setIsDownloadingFile(null);
+    }
+  };
+
+  const handleCopyHelper = (key: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(key);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleSendTestWebhookLead = async (platform: 'Facebook Leads' | 'Google Leads') => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/leads/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_tab: platform,
+          first_name: platform === 'Facebook Leads' ? 'Sarah (FB Ad Test)' : 'David (Google Ad Test)',
+          last_name: 'Edmonton',
+          phone_number: '780-555-0148',
+          email: 'leadtest@tidyupscleaning.com',
+          street_address: '10420 98 Ave NW',
+          city: 'Edmonton',
+          post_code: 'T5K 0A1',
+          service: '3Bed 2Bath Deep Cleaning',
+          bedrooms: '3 Bedrooms',
+          bathrooms: '2 Bathrooms',
+          campaign_name: `${platform} Direct Webhook`,
+          message: `Test inbound lead from ${platform} connector`,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.lead) {
+        setLeadsList((prev) => [data.lead, ...prev]);
+        setNotice(data.message || `✓ Test ${platform} lead received!`);
+      }
+    } catch (err: any) {
+      setNotice(`Webhook test failed: ${err?.message}`);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -571,24 +724,52 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
             </button>
           )}
 
-          <a
-            href={`/api/leads/export.xlsx?project=${projectId}`}
-            download
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
-            title="Download Multi-Tab Clean Google Sheet (.xlsx) with Facebook Leads, Google Leads, Voice Quotes & Pasted Leads tabs"
+          <button
+            type="button"
+            onClick={handleCreateNewSheetInDrive}
+            disabled={isCreatingDriveSheet}
+            className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-50"
+            title={`Create a brand-new native multi-tab Google Sheet inside "${TIDYUPS_DRIVE_FOLDER_NAME}" in your Google Drive for Facebook Ads & Google Ads`}
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download Clean Google Sheet (.xlsx)</span>
-          </a>
+            <CloudUpload className="w-3.5 h-3.5" />
+            <span>
+              {isCreatingDriveSheet
+                ? 'Creating Sheet in Google Drive...'
+                : '+ Create New Leads Sheet in Drive'}
+            </span>
+          </button>
 
-          <a
-            href={`/api/leads/export.csv?project=${projectId}&tab=${encodeURIComponent(activeTab)}`}
-            download
-            className="px-3 py-2 bg-[#1b2234] hover:bg-[#232c42] text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+          <button
+            type="button"
+            onClick={() => setConfirmDriveSyncModal(true)}
+            disabled={isSyncingDriveSheet}
+            className="px-3.5 py-2 bg-teal-900/70 hover:bg-teal-800/80 text-teal-200 border border-teal-500/40 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Sync all current leads directly into your live Google Sheet in Google Drive"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingDriveSheet ? 'animate-spin' : ''}`} />
+            <span>{isSyncingDriveSheet ? 'Syncing Drive Sheet...' : 'Sync to Drive Sheet'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadXlsx}
+            disabled={isDownloadingFile !== null}
+            className="px-3.5 py-2 bg-[#1b2234] hover:bg-[#232c42] text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Download Multi-Tab Clean Google Sheet (.xlsx) in-app without cookie prompts"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
-          </a>
+            <span>{isDownloadingFile === 'XLSX' ? 'Downloading...' : 'Download .XLSX'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadCsv}
+            disabled={isDownloadingFile !== null}
+            className="px-3 py-2 bg-[#1b2234] hover:bg-[#232c42] text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{isDownloadingFile === 'CSV' ? 'Exporting...' : 'Export CSV'}</span>
+          </button>
 
           <button
             type="button"
@@ -596,7 +777,7 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
             className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
           >
             {copiedTsv ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedTsv ? 'Copied for Google Sheets!' : 'Copy Clean Table for Google Sheets'}</span>
+            <span>{copiedTsv ? 'Copied for Google Sheets!' : 'Copy Clean Table'}</span>
           </button>
 
           <button
@@ -606,10 +787,50 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
             title="Wipe all rows so your Clean Google Sheet is 100% blank"
           >
             <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span>Reset to 100% Blank Sheet</span>
+            <span>Reset Blank</span>
           </button>
         </div>
       </div>
+
+      {/* Explicit Confirmation Modal Before Updating Live Google Sheet in Drive (per Workspace skill rules) */}
+      {confirmDriveSyncModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#151926] border border-slate-700 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-white">
+                  Update Live Google Sheet in Google Drive?
+                </h3>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  This will update your connected Google Sheet in Google Drive with{' '}
+                  <strong className="text-emerald-300 font-mono">{leadsList.length}</strong> lead row(s) across the{' '}
+                  <strong>All Clean Leads</strong>, <strong>Facebook Leads</strong>, <strong>Google Leads</strong>,{' '}
+                  <strong>Voice &amp; Quick Quotes</strong>, and <strong>ScrubbyBuilder Leads</strong> tabs.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setConfirmDriveSyncModal(false)}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmedSyncToDriveSheet}
+                className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold cursor-pointer"
+              >
+                Confirm &amp; Update Google Sheet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Feedback Banner */}
       {notice && (
@@ -618,59 +839,261 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>{notice}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => setNotice(null)}
-            className="text-emerald-300 hover:text-white p-1 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={googleSheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold flex items-center gap-1"
+            >
+              <span>Open Sheet</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              className="text-emerald-300 hover:text-white p-1 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Connected Blank Google Sheet URL Bar */}
-      <div className="p-4 rounded-2xl bg-[#131724] border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 flex-1">
-          <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="text-xs font-extrabold text-slate-300 whitespace-nowrap">
-            Your Clean Google Sheet URL:
-          </span>
-          <input
-            type="text"
-            value={googleSheetUrl}
-            onChange={(e) => setGoogleSheetUrl(e.target.value)}
-            placeholder="Paste your blank Google Sheet link here (https://docs.google.com/spreadsheets/d/...)"
-            className="flex-1 px-3 py-1.5 rounded-xl bg-[#0b0e17] border border-slate-700 text-xs text-emerald-300 font-mono focus:outline-none focus:border-emerald-500"
-          />
-          <button
-            type="button"
-            onClick={handleSaveSheetUrl}
-            disabled={isSavingSheetUrl}
-            className="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 text-xs font-bold cursor-pointer whitespace-nowrap"
-          >
-            {isSavingSheetUrl ? 'Saving...' : 'Save Sheet Link'}
-          </button>
+      {/* Connected Google Sheet URL Bar + Preset Switcher + 1-Click Create in Drive */}
+      <div className="p-4 rounded-2xl bg-[#131724] border border-slate-800 space-y-3">
+        {/* Row 1: Quick Sheet Switcher (Existing Primary / Existing Secondary / Newly Created Drive Sheet) */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-slate-400 font-bold mr-1">Active Sheet Source:</span>
+            <button
+              type="button"
+              onClick={() => {
+                setGoogleSheetUrl(defaultPrimarySheetUrl);
+                handleSaveSheetUrl(defaultPrimarySheetUrl);
+              }}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                googleSheetUrl.includes(LEADS_SPREADSHEET_ID)
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              Existing Primary Leads Sheet (1TifULi7n...)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setGoogleSheetUrl(defaultSecondarySheetUrl);
+                handleSaveSheetUrl(defaultSecondarySheetUrl);
+              }}
+              className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                googleSheetUrl.includes(SECONDARY_LEADS_SPREADSHEET_ID)
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              Secondary Leads Sheet (1-1palHc...)
+            </button>
+
+            {createdDriveSheetUrl && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGoogleSheetUrl(createdDriveSheetUrl);
+                  handleSaveSheetUrl(createdDriveSheetUrl);
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  googleSheetUrl === createdDriveSheetUrl
+                    ? 'bg-teal-600 text-white shadow-xs'
+                    : 'bg-slate-800 text-teal-300 hover:bg-slate-700 border border-teal-500/40'
+                }`}
+              >
+                New Drive Sheet ({createdDriveSheetName || 'FB & Google Ads Sheet'})
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAdsConnectPanel((v) => !v)}
+              className="px-3 py-1 rounded-lg bg-blue-600/25 hover:bg-blue-600/40 border border-blue-500/40 text-blue-200 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"
+            >
+              <Globe className="w-3.5 h-3.5 text-blue-400" />
+              <span>
+                {showAdsConnectPanel
+                  ? 'Hide FB Ads & Google Ads Connector'
+                  : 'Connect FB Ads & Google Ads to Sheet'}
+              </span>
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <a
-            href={googleSheetUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Open Google Sheet</span>
-          </a>
-          <button
-            type="button"
-            onClick={() => setShowPasteBox((v) => !v)}
-            className="px-3 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"
-          >
-            <ClipboardPaste className="w-3.5 h-3.5 text-purple-400" />
-            <span>{showPasteBox ? 'Hide Paste Table' : 'Show Paste Table'}</span>
-          </button>
+        {/* Row 2: Active URL Input + Open Google Sheet + Create New Sheet in Drive */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 flex-1">
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="text-xs font-extrabold text-slate-300 whitespace-nowrap">
+              Connected Google Sheet URL:
+            </span>
+            <input
+              type="text"
+              value={googleSheetUrl}
+              onChange={(e) => setGoogleSheetUrl(e.target.value)}
+              placeholder="Paste your Google Sheet link here (https://docs.google.com/spreadsheets/d/...)"
+              className="flex-1 px-3 py-1.5 rounded-xl bg-[#0b0e17] border border-slate-700 text-xs text-emerald-300 font-mono focus:outline-none focus:border-emerald-500"
+            />
+            <button
+              type="button"
+              onClick={() => handleSaveSheetUrl()}
+              disabled={isSavingSheetUrl}
+              className="px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-200 text-xs font-bold cursor-pointer whitespace-nowrap"
+            >
+              {isSavingSheetUrl ? 'Saving...' : 'Save Sheet Link'}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href={googleSheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-sm"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-white" />
+              <span>Open Google Sheet</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={handleCreateNewSheetInDrive}
+              disabled={isCreatingDriveSheet}
+              className="px-3 py-1.5 rounded-xl bg-teal-600/30 hover:bg-teal-600/50 border border-teal-500/40 text-teal-200 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"
+            >
+              <CloudUpload className="w-3.5 h-3.5 text-teal-300" />
+              <span>
+                {isCreatingDriveSheet ? 'Creating in Drive...' : '+ Create New Sheet in Drive'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowPasteBox((v) => !v)}
+              className="px-3 py-1.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"
+            >
+              <ClipboardPaste className="w-3.5 h-3.5 text-purple-400" />
+              <span>{showPasteBox ? 'Hide Paste Table' : 'Show Paste Table'}</span>
+            </button>
+          </div>
         </div>
+
+        {/* Collapsible Facebook Lead Ads & Google Ads Connection Panel */}
+        {showAdsConnectPanel && (
+          <div className="mt-3 pt-3 border-t border-slate-800 bg-[#0d111c] rounded-xl p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-xs sm:text-sm font-extrabold text-white flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-blue-400" />
+                  <span>Connect Facebook Lead Ads &amp; Google Ads to Your Active Sheet</span>
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Use these exact details in Meta Lead Ads, Google Ads Lead Form Extensions, Zapier, or Make.com to stream new ad leads straight into your Google Sheet and this dashboard.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSendTestWebhookLead('Facebook Leads')}
+                  className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold cursor-pointer"
+                >
+                  + Test FB Ad Lead
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSendTestWebhookLead('Google Leads')}
+                  className="px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold cursor-pointer"
+                >
+                  + Test Google Ad Lead
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              {/* 1. Active Spreadsheet ID */}
+              <div className="p-3 rounded-xl bg-[#131724] border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-400">1. Active Spreadsheet ID</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const id =
+                        googleSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)?.[1] ||
+                        LEADS_SPREADSHEET_ID;
+                      handleCopyHelper('sheetId', id);
+                    }}
+                    className="text-[11px] text-emerald-400 hover:underline font-bold cursor-pointer"
+                  >
+                    {copiedField === 'sheetId' ? 'Copied!' : 'Copy ID'}
+                  </button>
+                </div>
+                <div className="font-mono text-[11px] text-emerald-300 bg-[#0b0e17] px-2.5 py-1.5 rounded border border-slate-800 truncate">
+                  {googleSheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)?.[1] ||
+                    LEADS_SPREADSHEET_ID}
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Tabs auto-created: <strong className="text-slate-200">Facebook Leads</strong>,{' '}
+                  <strong className="text-slate-200">Google Leads</strong>,{' '}
+                  <strong className="text-slate-200">ScrubbyBuilder Leads</strong>
+                </p>
+              </div>
+
+              {/* 2. Direct Inbound Webhook URL */}
+              <div className="p-3 rounded-xl bg-[#131724] border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-400">
+                    2. Direct FB / Google Ads Webhook URL
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyHelper('webhook', webhookUrl)}
+                    className="text-[11px] text-blue-400 hover:underline font-bold cursor-pointer"
+                  >
+                    {copiedField === 'webhook' ? 'Copied!' : 'Copy Webhook'}
+                  </button>
+                </div>
+                <div className="font-mono text-[11px] text-blue-300 bg-[#0b0e17] px-2.5 py-1.5 rounded border border-slate-800 truncate">
+                  {webhookUrl}
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Paste in Google Ads Lead Form Webhook or Zapier/Make POST action.
+                </p>
+              </div>
+
+              {/* 3. 20-Column Lead Schema */}
+              <div className="p-3 rounded-xl bg-[#131724] border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-400">
+                    3. 20-Column Ad Lead Headers
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyHelper('headers', APP_LEAD_HEADERS.join('\t'))}
+                    className="text-[11px] text-purple-400 hover:underline font-bold cursor-pointer"
+                  >
+                    {copiedField === 'headers' ? 'Copied Headers!' : 'Copy Header Row'}
+                  </button>
+                </div>
+                <div className="font-mono text-[10px] text-slate-300 bg-[#0b0e17] px-2.5 py-1.5 rounded border border-slate-800 truncate">
+                  {APP_LEAD_HEADERS.join(' | ')}
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Matches Facebook Lead Ads &amp; TidyUps Day-3 Lead Processor schema.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────────────

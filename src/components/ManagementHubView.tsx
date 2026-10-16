@@ -35,6 +35,7 @@ import { Technician } from '../types/dispatch';
 import {
   TIDYUPS_DRIVE_FOLDER_NAME,
   uploadWholeProjectZipToDriveFolder,
+  downloadFileFromApiWithoutNavigation,
 } from '../services/googleDriveBackupService';
 
 interface ManagementHubViewProps {
@@ -318,14 +319,19 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
               <span>Open Service Catalog &amp; Price List</span>
               <ArrowRight className="w-4 h-4" />
             </button>
-            <a
-              href="/api/price-list/export.xlsx?project=tidyups"
-              download
+            <button
+              type="button"
+              onClick={() =>
+                downloadFileFromApiWithoutNavigation(
+                  '/api/price-list/export.xlsx?project=tidyups',
+                  `TidyUps_Service_Catalog_Price_List_${new Date().toISOString().slice(0, 10)}.xlsx`
+                )
+              }
               className="w-full py-2 px-4 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>Download Live Google Sheets (.xlsx)</span>
-            </a>
+            </button>
           </div>
         </div>
 

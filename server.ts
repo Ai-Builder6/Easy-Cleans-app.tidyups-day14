@@ -4617,13 +4617,27 @@ const CLEAN_SHEET_TABS = [
   "Pasted Leads",
 ] as const;
 
+function sanitizeSpreadsheetId(rawId?: string): string {
+  const trimmed = String(rawId || "").trim();
+  if (!trimmed || trimmed.includes("clean_sheet") || trimmed.includes("YOUR_") || trimmed.length < 25) {
+    return LEADS_SPREADSHEET_ID;
+  }
+  return trimmed;
+}
+
+const initialValidSheetId = sanitizeSpreadsheetId((initialStored as any)?.cleanSheetConfig?.spreadsheetId);
+
 let googleSheetsSyncState = {
-  spreadsheetId: (initialStored as any)?.cleanSheetConfig?.spreadsheetId || LEADS_SPREADSHEET_ID,
-  sheetUrl:
-    (initialStored as any)?.cleanSheetConfig?.sheetUrl ||
-    `https://docs.google.com/spreadsheets/d/${(initialStored as any)?.cleanSheetConfig?.spreadsheetId || LEADS_SPREADSHEET_ID}/edit`,
-  webhookUrl: (initialStored as any)?.cleanSheetConfig?.webhookUrl || "",
+  spreadsheetId: initialValidSheetId,
+  sheetUrl: `https://docs.google.com/spreadsheets/d/${initialValidSheetId}/edit`,
+  primarySpreadsheetId: LEADS_SPREADSHEET_ID,
+  primarySheetUrl: `https://docs.google.com/spreadsheets/d/${LEADS_SPREADSHEET_ID}/edit`,
   secondarySpreadsheetId: SECONDARY_LEADS_SPREADSHEET_ID,
+  secondarySheetUrl: `https://docs.google.com/spreadsheets/d/${SECONDARY_LEADS_SPREADSHEET_ID}/edit`,
+  createdDriveSheetId: (initialStored as any)?.cleanSheetConfig?.createdDriveSheetId || "",
+  createdDriveSheetUrl: (initialStored as any)?.cleanSheetConfig?.createdDriveSheetUrl || "",
+  createdDriveSheetName: (initialStored as any)?.cleanSheetConfig?.createdDriveSheetName || "",
+  webhookUrl: (initialStored as any)?.cleanSheetConfig?.webhookUrl || "https://app.tidyupscleaning.com/api/leads/webhook",
   targetTab: "All Clean Leads",
   tabs: CLEAN_SHEET_TABS,
   headers: APP_LEAD_HEADERS,
@@ -4632,22 +4646,40 @@ let googleSheetsSyncState = {
 };
 
 app.get("/api/google-sheets/config", (_req, res) => {
+  // Always ensure spreadsheetId is valid and never a fake placeholder
+  const validId = sanitizeSpreadsheetId(googleSheetsSyncState.spreadsheetId);
+  googleSheetsSyncState.spreadsheetId = validId;
+  googleSheetsSyncState.sheetUrl = `https://docs.google.com/spreadsheets/d/${validId}/edit`;
   res.json(googleSheetsSyncState);
 });
 
 app.post("/api/google-sheets/config", (req, res) => {
   const projectId = getProjectId(req);
-  const { sheetUrl, spreadsheetId, webhookUrl } = req.body || {};
+  const {
+    sheetUrl,
+    spreadsheetId,
+    webhookUrl,
+    createdDriveSheetId,
+    createdDriveSheetUrl,
+    createdDriveSheetName,
+  } = req.body || {};
   let extractedId = spreadsheetId ? String(spreadsheetId).trim() : "";
   if (sheetUrl && typeof sheetUrl === "string") {
     const match = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
     if (match) extractedId = match[1];
   }
-  if (extractedId) {
+  if (extractedId && !extractedId.includes("clean_sheet") && extractedId.length >= 20) {
     googleSheetsSyncState.spreadsheetId = extractedId;
     googleSheetsSyncState.sheetUrl = `https://docs.google.com/spreadsheets/d/${extractedId}/edit`;
-  } else if (sheetUrl && String(sheetUrl).trim().startsWith("http")) {
-    googleSheetsSyncState.sheetUrl = String(sheetUrl).trim();
+  }
+  if (createdDriveSheetId) {
+    googleSheetsSyncState.createdDriveSheetId = String(createdDriveSheetId).trim();
+    googleSheetsSyncState.createdDriveSheetUrl =
+      createdDriveSheetUrl ||
+      `https://docs.google.com/spreadsheets/d/${googleSheetsSyncState.createdDriveSheetId}/edit`;
+    if (createdDriveSheetName) {
+      googleSheetsSyncState.createdDriveSheetName = String(createdDriveSheetName).trim();
+    }
   }
   if (webhookUrl !== undefined) {
     googleSheetsSyncState.webhookUrl = String(webhookUrl || "").trim();
@@ -4660,6 +4692,9 @@ app.post("/api/google-sheets/config", (req, res) => {
       spreadsheetId: googleSheetsSyncState.spreadsheetId,
       sheetUrl: googleSheetsSyncState.sheetUrl,
       webhookUrl: googleSheetsSyncState.webhookUrl,
+      createdDriveSheetId: googleSheetsSyncState.createdDriveSheetId,
+      createdDriveSheetUrl: googleSheetsSyncState.createdDriveSheetUrl,
+      createdDriveSheetName: googleSheetsSyncState.createdDriveSheetName,
     };
     store.lastSavedAt = new Date().toISOString();
     saveStore(store, projectId);
@@ -4669,6 +4704,107 @@ app.post("/api/google-sheets/config", (req, res) => {
     success: true,
     config: googleSheetsSyncState,
     message: "Connected your Clean Google Sheet URL!",
+  });
+});
+
+// POST /api/leads/webhook: Direct Inbound Lead Webhook for Facebook Lead Ads (Zapier/Make/Meta) & Google Ads Lead Form Extensions
+app.post("/api/leads/webhook", (req, res) => {
+  const projectId = getProjectId(req);
+  const body = req.body || {};
+
+  // Support Google Ads Lead Form Extension format (user_column_data array) as well as Facebook Lead Ads / Zapier / Make flat JSON
+  const colMap: Record<string, string> = {};
+  if (Array.isArray(body.user_column_data)) {
+    for (const col of body.user_column_data) {
+      const key = String(col.column_id || col.column_name || "").toLowerCase();
+      colMap[key] = String(col.string_value || "");
+    }
+  }
+
+  const rawSource = String(
+    body.source ||
+      body.source_tab ||
+      body.platform ||
+      (body.google_key || body.gclid || body.user_column_data ? "Google Leads" : "FB Leads")
+  );
+  const { source, sourceTab } = resolveCleanSheetTab(rawSource);
+
+  const firstName = String(body.first_name || body.firstName || colMap["first_name"] || "").trim();
+  const lastName = String(body.last_name || body.lastName || colMap["last_name"] || "").trim();
+  const fullName =
+    String(
+      body.customerName ||
+        body.full_name ||
+        body.name ||
+        colMap["full_name"] ||
+        `${firstName} ${lastName}`.trim() ||
+        "Inbound Ad Lead"
+    ).trim();
+
+  const phone = String(
+    body.phone ||
+      body.phone_number ||
+      body.clientPhone ||
+      colMap["phone_number"] ||
+      colMap["user_phone"] ||
+      ""
+  ).trim();
+  const email = String(
+    body.email || body.clientEmail || colMap["email"] || colMap["user_email"] || ""
+  ).trim();
+  const address = String(
+    body.address ||
+      body.street_address ||
+      colMap["street_address"] ||
+      colMap["postal_code"] ||
+      "Edmonton, AB"
+  ).trim();
+  const city = String(body.city || colMap["city"] || "Edmonton").trim();
+  const postalCode = String(body.post_code || body.postalCode || colMap["postal_code"] || "").trim();
+  const bedrooms = String(body.bedrooms || "3 Bedrooms").trim();
+  const bathrooms = String(body.bathrooms || "2 Bathrooms").trim();
+  const serviceRequested = String(
+    body.service || body.serviceRequested || "Residential Standard Cleaning"
+  ).trim();
+
+  const store = loadStore(projectId);
+  const newLead = {
+    id: `lead-webhook-${Date.now().toString(36)}`,
+    customerName: fullName,
+    phone,
+    email,
+    address,
+    city,
+    postalCode,
+    serviceRequested,
+    bedrooms,
+    bathrooms,
+    dateOfServiceRequested: body.date_of_service_requested || new Date().toISOString().slice(0, 10),
+    source: source as any,
+    sourceTab,
+    campaignName: body.campaign_name || body.campaignName || `${sourceTab} Inbound Webhook`,
+    dateReceived: new Date().toISOString(),
+    status: "New",
+    verdict: "Good lead",
+    isJobberSynced: false,
+    quotedAmount: Number(body.quotedAmount || 221.07),
+    notes: body.message || body.notes || `Received via ${sourceTab} Webhook`,
+    missingPhone: !phone,
+  };
+
+  if (store) {
+    if (!Array.isArray(store.adLeads)) store.adLeads = [];
+    store.adLeads.unshift(newLead);
+    store.lastSavedAt = new Date().toISOString();
+    saveStore(store, projectId);
+  }
+
+  res.status(200).json({
+    success: true,
+    lead: newLead,
+    spreadsheetId: googleSheetsSyncState.spreadsheetId,
+    sheetUrl: googleSheetsSyncState.sheetUrl,
+    message: `✓ Inbound lead "${fullName}" added to ${sourceTab} in Clean Google Sheet Hub!`,
   });
 });
 
@@ -5157,6 +5293,44 @@ app.get("/api/leads/export.xlsx", (req, res) => {
     const ws = XLSX.utils.aoa_to_sheet(buildRowsForList(tabLeads));
     XLSX.utils.book_append_sheet(wb, ws, tabName);
   }
+
+  // Also append "Facebook Leads" and the exact 20-column "ScrubbyBuilder Leads" schema tab for direct FB Lead Ads & Google Ads Lead Form connections
+  const fbLeads = leads.filter((l: any) => l.sourceTab === "FB Leads" || l.sourceTab === "Facebook Leads");
+  const fbSheet = XLSX.utils.aoa_to_sheet(buildRowsForList(fbLeads));
+  XLSX.utils.book_append_sheet(wb, fbSheet, "Facebook Leads");
+
+  const twentyColRows = [
+    [...APP_LEAD_HEADERS],
+    ...leads.map((l: any) => {
+      const nameParts = String(l.customerName || "").trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+      return [
+        l.id || "",
+        l.dateReceived || new Date().toISOString(),
+        l.source || "facebook_lead_ads",
+        l.sourceTab || "FB Leads",
+        firstName,
+        lastName,
+        l.phone || "",
+        l.email || "",
+        l.address || "",
+        l.city || "Edmonton",
+        "AB",
+        l.postalCode || "",
+        l.serviceRequested || "Residential Standard Cleaning",
+        l.bedrooms || "3 Bedrooms",
+        l.bathrooms || "2 Bathrooms",
+        l.dateOfServiceRequested || "",
+        l.campaignName || "FB / Google Ads",
+        l.notes || "",
+        `https://app.tidyupscleaning.com/?lead=${encodeURIComponent(l.id || "")}`,
+        l.isJobberSynced ? "booked" : "new",
+      ];
+    }),
+  ];
+  const twentyColSheet = XLSX.utils.aoa_to_sheet(twentyColRows);
+  XLSX.utils.book_append_sheet(wb, twentyColSheet, APP_LEADS_TAB);
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const dateStr = new Date().toISOString().slice(0, 10);
