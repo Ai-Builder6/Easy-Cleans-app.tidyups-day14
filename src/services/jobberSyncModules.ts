@@ -368,37 +368,67 @@ export async function syncJobberCalendar(
   const startTime = Date.now();
   if (accessToken && !accessToken.startsWith("jobber_oauth")) {
     try {
+      const toEdmontonIso = (isoStr?: string): string => {
+        if (!isoStr) return new Date().toISOString();
+        if (/[+-]\d{2}:\d{2}$/.test(isoStr)) return isoStr;
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return isoStr;
+        const parts = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "America/Edmonton",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+          timeZoneName: "longOffset",
+        }).formatToParts(d);
+        const get = (t: string) => parts.find((p) => p.type === t)?.value || "00";
+        const hr = get("hour") === "24" ? "00" : get("hour");
+        const tzOffset = (parts.find((p) => p.type === "timeZoneName")?.value || "GMT-06:00").replace("GMT", "") || "-06:00";
+        return `${get("year")}-${get("month")}-${get("day")}T${hr}:${get("minute")}:${get("second")}${tzOffset}`;
+      };
+
       const query = `
-        query SyncCalendarVisits {
+        query SyncCalendarVisits($after: String) {
           visits(
             filter: {
               startAt: {
-                after: "2026-09-01T00:00:00Z",
-                before: "2026-11-01T23:59:59Z"
+                after: "2026-01-01T00:00:00Z",
+                before: "2026-12-31T23:59:59Z"
               }
             }
-            first: 25
+            first: 50
+            after: $after
           ) {
             totalCount
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
             nodes {
               id
               title
               startAt
               endAt
               completedAt
+              visitStatus
               client {
+                id
                 name
                 defaultPhones
               }
               property {
                 address {
-                  street
+                  street1
+                  street2
                   city
                   province
                   postalCode
                 }
               }
-              assignedUsers {
+              assignedUsers(first: 3) {
                 nodes {
                   name {
                     full
@@ -409,97 +439,113 @@ export async function syncJobberCalendar(
                 id
                 jobNumber
                 title
+                total
+                jobStatus
               }
             }
           }
         }
       `;
-      const data = await jobberGraphql<any>(accessToken, query, undefined, credentials);
-      const nodes = data?.visits?.nodes || [];
 
-      // Incremental delta merge with existing database visits
-      const visitsMap = new Map<string, JobberVisit>();
-      for (const v of existingVisits) {
-        visitsMap.set(v.id || v.visitNumber, { ...v });
+      const nodes: any[] = [];
+      let afterCursor: string | null = null;
+      let hasNextPage = true;
+      let pageCount = 0;
+
+      while (hasNextPage && pageCount < 20) {
+        pageCount++;
+        const data = await jobberGraphql<any>(
+          accessToken,
+          query,
+          afterCursor ? { after: afterCursor } : {},
+          credentials
+        );
+        const pageNodes = data?.visits?.nodes || [];
+        nodes.push(...pageNodes);
+        hasNextPage = Boolean(data?.visits?.pageInfo?.hasNextPage);
+        afterCursor = data?.visits?.pageInfo?.endCursor || null;
+        if (hasNextPage) {
+          await new Promise((r) => setTimeout(r, 350));
+        }
       }
 
-      let newCount = 0;
-      let updatedCount = 0;
-      let unchangedCount = 0;
+      if (nodes.length > 0) {
+        const visitsMap = new Map<string, JobberVisit>();
+        let newCount = 0;
+        let updatedCount = 0;
 
-      for (let idx = 0; idx < nodes.length; idx++) {
-        const node = nodes[idx];
-        const clientName = node.client?.name || "Jobber Client";
-        const rawDefPhone = Array.isArray(node.client?.defaultPhones)
-          ? node.client.defaultPhones[0]
-          : node.client?.defaultPhones;
-        const clientPhone = rawDefPhone || "(780) 718-5092";
-        const addr = node.property?.address;
-        const serviceAddress = addr ? `${addr.street || ""}, ${addr.city || "Edmonton"}, ${addr.province || "AB"}` : "Edmonton, AB";
-        const assigned = (node.assignedUsers?.nodes || []).map((u: any) => u.name?.full || "Staff");
-        
-        let serviceType: JobberVisit["serviceType"] = "Standard Cleaning";
-        const titleLower = `${node.title || ""} ${node.job?.title || ""}`.toLowerCase();
-        if (titleLower.includes("deep") || titleLower.includes("scrub")) serviceType = "Deep Cleaning";
-        else if (titleLower.includes("move") || titleLower.includes("turnover") || titleLower.includes("vacate")) serviceType = "Move-Out Cleaning";
+        for (let idx = 0; idx < nodes.length; idx++) {
+          const node = nodes[idx];
+          const clientName = node.client?.name || "Jobber Client";
+          const rawDefPhone = Array.isArray(node.client?.defaultPhones)
+            ? node.client.defaultPhones[0]
+            : node.client?.defaultPhones;
+          const clientPhone = rawDefPhone || "(780) 718-5092";
+          const addr = node.property?.address;
+          const street = [addr?.street1, addr?.street2].filter(Boolean).join(" ").trim();
+          const city = addr?.city || "Edmonton";
+          const prov = addr?.province || "AB";
+          const postal = addr?.postalCode || "";
+          const serviceAddress = [street, city, prov, postal].filter(Boolean).join(", ") || "Edmonton, AB";
+          const assigned = (node.assignedUsers?.nodes || []).map((u: any) => u.name?.full).filter(Boolean);
 
-        const visitStatus: JobberVisit["status"] = node.completedAt ? "COMPLETED" : "SCHEDULED";
-        const numericVisitId = extractJobberNumericId(node.id);
-        const visitNumber = `VISIT-${numericVisitId.slice(-5) || (visitsMap.size + 1)}`;
-        const key = node.id || visitNumber;
+          let serviceType: JobberVisit["serviceType"] = "Standard Cleaning";
+          const titleLower = `${node.title || ""} ${node.job?.title || ""}`.toLowerCase();
+          if (titleLower.includes("deep") || titleLower.includes("scrub") || titleLower.includes("initial")) serviceType = "Deep Cleaning";
+          else if (titleLower.includes("move") || titleLower.includes("turnover") || titleLower.includes("vacate") || titleLower.includes("post")) serviceType = "Move-Out Cleaning";
 
-        if (visitsMap.has(key)) {
-          const existing = visitsMap.get(key)!;
-          existing.jobberWebUri = resolveJobberWebUri("visits", node.id, existing.jobberWebUri);
-          const hasChanged = existing.status !== visitStatus || existing.serviceType !== serviceType;
-          if (hasChanged) {
-            existing.status = visitStatus;
-            existing.serviceType = serviceType;
-            existing.updatedAt = new Date().toISOString();
-            existing.syncedAt = new Date().toISOString();
-            updatedCount++;
-          } else {
-            unchangedCount++;
-          }
-        } else {
+          const localStart = toEdmontonIso(node.startAt);
+          const localEnd = toEdmontonIso(node.endAt || node.startAt);
+          const todayIso = toEdmontonIso(new Date().toISOString()).slice(0, 10);
+          const visitStatus: JobberVisit["status"] =
+            node.completedAt || node.visitStatus === "COMPLETED" || localStart.slice(0, 10) < todayIso
+              ? "COMPLETED"
+              : "SCHEDULED";
+          const numericVisitId = extractJobberNumericId(node.id);
+          const visitNumber = node.job?.jobNumber
+            ? `JOB-${node.job.jobNumber}`
+            : `VISIT-${numericVisitId.slice(-5) || (visitsMap.size + 1)}`;
+          const key = node.id || visitNumber;
+
           visitsMap.set(key, {
             id: node.id,
             visitNumber,
-            title: node.title || `${clientName} - ${serviceType}`,
+            title: node.job?.title ? `${clientName} - ${node.job.title}` : (node.title || `${clientName} - ${serviceType}`),
             clientName,
             clientPhone,
             serviceAddress,
-            startAt: node.startAt || new Date().toISOString(),
-            endAt: node.endAt || new Date(Date.now() + 3600000).toISOString(),
-            assignedCleaners: assigned.length > 0 ? assigned : ["Joel MBATCHOU", "Melissa Clarke"],
+            startAt: localStart,
+            endAt: localEnd,
+            assignedCleaners: assigned.length > 0 ? assigned : ["Cindy Guay"],
             serviceType,
             status: visitStatus,
             jobberWebUri: resolveJobberWebUri("visits", node.id),
+            quoteTotal: typeof node.job?.total === "number" ? node.job.total : undefined,
             syncedAt: new Date().toISOString(),
           });
           newCount++;
         }
+
+        const mergedVisits = Array.from(visitsMap.values()).sort((a, b) => a.startAt.localeCompare(b.startAt));
+        const crew1 = mergedVisits.filter(v => v.assignedCleaners.includes("Joel MBATCHOU") || v.assignedCleaners.includes("Melissa Clarke")).length;
+        const crew2 = mergedVisits.length - crew1;
+
+        return {
+          visits: mergedVisits,
+          syncedVisitsCount: mergedVisits.length,
+          assignedToCrew1: crew1,
+          assignedToCrew2: crew2,
+          delta: {
+            totalCount: mergedVisits.length,
+            newCount,
+            updatedCount,
+            unchangedCount: 0,
+            durationMs: Date.now() - startTime,
+            syncedAt: new Date().toISOString(),
+          },
+          isLiveJobber: true,
+        };
       }
-
-      const mergedVisits = Array.from(visitsMap.values());
-      const crew1 = mergedVisits.filter(v => v.assignedCleaners.includes("Joel MBATCHOU") || v.assignedCleaners.includes("Melissa Clarke")).length;
-      const crew2 = mergedVisits.length - crew1;
-
-      return {
-        visits: mergedVisits,
-        syncedVisitsCount: mergedVisits.length,
-        assignedToCrew1: crew1,
-        assignedToCrew2: crew2,
-        delta: {
-          totalCount: mergedVisits.length,
-          newCount,
-          updatedCount,
-          unchangedCount: unchangedCount + (mergedVisits.length - nodes.length),
-          durationMs: Date.now() - startTime,
-          syncedAt: new Date().toISOString(),
-        },
-        isLiveJobber: true,
-      };
     } catch (err: any) {
       console.warn("Live Jobber calendar fetch fallback note:", err.message);
     }
@@ -610,7 +656,7 @@ export async function syncJobberQuotes(
     try {
       const query = `
         query SyncQuotes {
-          quotes(first: 25) {
+          quotes(last: 40, filter: { createdAt: { after: "2026-08-01T00:00:00Z" } }) {
             totalCount
             nodes {
               id
@@ -844,10 +890,10 @@ export async function syncJobberInvoices(
           invoices(
             filter: {
               createdAt: {
-                after: "2026-09-01T00:00:00Z"
+                after: "2026-08-01T00:00:00Z"
               }
             }
-            first: 50
+            last: 50
           ) {
             totalCount
             nodes {
@@ -861,9 +907,7 @@ export async function syncJobberInvoices(
               subject
               client {
                 name
-                phones {
-                  number
-                }
+                defaultPhones
               }
             }
           }
@@ -872,9 +916,10 @@ export async function syncJobberInvoices(
       const data = await jobberGraphql<any>(accessToken, query, undefined, credentials);
       const nodes = data?.invoices?.nodes || [];
 
-      // Incremental delta merge with existing database invoices
+      // Incremental delta merge with existing database invoices (excluding legacy fake inv-40.. / inv-2026.. items)
       const invoicesMap = new Map<string, JobberInvoice>();
       for (const inv of existingInvoices) {
+        if (String(inv.id || "").startsWith("inv-")) continue;
         invoicesMap.set(inv.id || inv.invoiceNumber, { ...inv });
       }
 
@@ -920,7 +965,7 @@ export async function syncJobberInvoices(
             id: node.id,
             invoiceNumber,
             clientName: node.client?.name || "Customer",
-            clientPhone: node.client?.phones?.[0]?.number || "(780) 718-5092",
+            clientPhone: (Array.isArray(node.client?.defaultPhones) ? node.client.defaultPhones[0] : node.client?.defaultPhones) || "(780) 718-5092",
             service: node.subject || "Cleaning Services",
             invoiceStatus: status,
             total: tot,

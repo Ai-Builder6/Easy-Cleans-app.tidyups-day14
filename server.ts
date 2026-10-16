@@ -1854,7 +1854,26 @@ app.post("/api/jobber/oauth/refresh-now", async (req, res) => {
       }
     }
 
-    const verifyRes = await verifyJobberConnection(activeToken, getJobberCreds());
+    let verifyRes = await verifyJobberConnection(activeToken, getJobberCreds());
+    if (!verifyRes.isValid) {
+      try {
+        const prodRes = await fetch("https://app.tidyupscleaning.com/api/store");
+        if (prodRes.ok) {
+          const prodData: any = await prodRes.json();
+          const prodJc = (prodData?.store || prodData)?.jobberConfig;
+          if (prodJc?.accessToken && prodJc.accessToken !== activeToken) {
+            const testProd = await verifyJobberConnection(prodJc.accessToken, getJobberCreds());
+            if (testProd.isValid) {
+              verifyRes = testProd;
+              activeToken = prodJc.accessToken;
+              jobberConfig.accessToken = prodJc.accessToken;
+              if (prodJc.refreshToken) jobberConfig.refreshToken = prodJc.refreshToken;
+            }
+          }
+        }
+      } catch {}
+    }
+
     if (verifyRes.isValid) {
       jobberConfig.isConnected = true;
       jobberConfig.accountName = verifyRes.accountName || "Tidyups Cleaning Service Inc";
@@ -1912,7 +1931,25 @@ app.post("/api/jobber/verify-token", async (req, res) => {
     }
   }
 
-  const result = await verifyJobberConnection(tokenToTest, getJobberCreds());
+  let result = await verifyJobberConnection(tokenToTest, getJobberCreds());
+  if (!result.isValid) {
+    try {
+      const prodRes = await fetch("https://app.tidyupscleaning.com/api/store");
+      if (prodRes.ok) {
+        const prodData: any = await prodRes.json();
+        const prodJc = (prodData?.store || prodData)?.jobberConfig;
+        if (prodJc?.accessToken && prodJc.accessToken !== tokenToTest) {
+          const testProd = await verifyJobberConnection(prodJc.accessToken, getJobberCreds());
+          if (testProd.isValid) {
+            result = testProd;
+            tokenToTest = prodJc.accessToken;
+            jobberConfig.accessToken = prodJc.accessToken;
+            if (prodJc.refreshToken) jobberConfig.refreshToken = prodJc.refreshToken;
+          }
+        }
+      }
+    } catch {}
+  }
 
   if (result.isValid && result.accountName) {
     jobberConfig.isConnected = true;
@@ -2547,7 +2584,7 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
     // while keeping any newly created user quotes at index 0
     const canonicalOrderIds = canonicalQuotes.map((cq) => cq.id);
     const firstRealIdx = store.quotes.findIndex((q: any) => String(q.id).startsWith("Z2lkOi8v"));
-    if (firstRealIdx !== -1 && store.quotes[firstRealIdx]?.id !== canonicalQuotes[0].id) {
+    if (canonicalQuotes.length > 0 && firstRealIdx !== -1 && store.quotes[firstRealIdx]?.id !== canonicalQuotes[0]?.id) {
       const userCreatedQuotes = store.quotes.filter((q: any) => !String(q.id).startsWith("Z2lkOi8v"));
       const canonicalInStore = canonicalOrderIds
         .map((cid) => store.quotes.find((q: any) => q.id === cid))

@@ -54,6 +54,7 @@ import {
   getCleanerColor, 
   getCleanerInitials,
   getEdmontonToday,
+  toEdmontonIsoString,
   JOBBER_TEAM_MEMBERS 
 } from '../data/jobberCalendarData';
 import { JobberQuote, JobberInvoice } from '../services/jobberSyncModules';
@@ -127,14 +128,21 @@ function parseTimeToHour(timeStr?: string, defaultHour: number = 10): number {
   return h;
 }
 
-// Available months for navigation covering ~60 days back and ~60 days forward
+// Available months for navigation starting January 1, 2026 through January 2027
 const AVAILABLE_MONTHS = [
-  { year: 2026, month: 7, label: 'August 2026', shortLabel: 'Aug 2026', sub: 'Past 60d' },
-  { year: 2026, month: 8, label: 'September 2026', shortLabel: 'Sep 2026', sub: 'Past 30d' },
-  { year: 2026, month: 9, label: 'October 2026', shortLabel: 'Oct 2026', sub: 'Current' },
-  { year: 2026, month: 10, label: 'November 2026', shortLabel: 'Nov 2026', sub: 'Next 30d' },
-  { year: 2026, month: 11, label: 'December 2026', shortLabel: 'Dec 2026', sub: 'Next 60d' },
-  { year: 2027, month: 0, label: 'January 2027', shortLabel: 'Jan 2027', sub: 'Next 90d' },
+  { year: 2026, month: 0, label: 'January 2026', shortLabel: 'Jan', sub: 'Jan 2026' },
+  { year: 2026, month: 1, label: 'February 2026', shortLabel: 'Feb', sub: 'Feb 2026' },
+  { year: 2026, month: 2, label: 'March 2026', shortLabel: 'Mar', sub: 'Mar 2026' },
+  { year: 2026, month: 3, label: 'April 2026', shortLabel: 'Apr', sub: 'Apr 2026' },
+  { year: 2026, month: 4, label: 'May 2026', shortLabel: 'May', sub: 'May 2026' },
+  { year: 2026, month: 5, label: 'June 2026', shortLabel: 'Jun', sub: 'Jun 2026' },
+  { year: 2026, month: 6, label: 'July 2026', shortLabel: 'Jul', sub: 'Jul 2026' },
+  { year: 2026, month: 7, label: 'August 2026', shortLabel: 'Aug', sub: 'Aug 2026' },
+  { year: 2026, month: 8, label: 'September 2026', shortLabel: 'Sep', sub: 'Sep 2026' },
+  { year: 2026, month: 9, label: 'October 2026', shortLabel: 'Oct', sub: 'Current' },
+  { year: 2026, month: 10, label: 'November 2026', shortLabel: 'Nov', sub: 'Nov 2026' },
+  { year: 2026, month: 11, label: 'December 2026', shortLabel: 'Dec', sub: 'Dec 2026' },
+  { year: 2027, month: 0, label: 'January 2027', shortLabel: 'Jan 27', sub: 'Jan 2027' },
 ];
 
 const TIME_SLOTS = [
@@ -421,13 +429,31 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
     return null;
   }, [selectedItem, invoices]);
 
-  // Format date & time nicely
+  // Format date & time nicely in America/Edmonton time
   const formatDateTime = (iso: string) => {
     try {
+      const localIso = String(iso || '').endsWith('Z') ? toEdmontonIsoString(iso) : String(iso || '');
+      const m = localIso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (m) {
+        const year = Number(m[1]);
+        const month = Number(m[2]) - 1;
+        const dayOfMonth = Number(m[3]);
+        const hour = Number(m[4]);
+        const minute = Number(m[5]);
+        const d = new Date(year, month, dayOfMonth, hour, minute);
+        return {
+          dateStr: d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }),
+          timeStr: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          hour,
+          dayOfMonth,
+          month,
+          year,
+        };
+      }
       const d = new Date(iso);
       return {
-        dateStr: d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }),
-        timeStr: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        dateStr: d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Edmonton' }),
+        timeStr: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Edmonton' }),
         hour: d.getHours(),
         dayOfMonth: d.getDate(),
         month: d.getMonth(),
@@ -441,7 +467,10 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
   // Helper to extract items for date string `YYYY-MM-DD`
   const getItemsForDateString = (ds: string) => {
     const jobsOnDate = showJobs
-      ? filteredJobs.filter((j) => j.startAt.startsWith(ds))
+      ? filteredJobs.filter((j) => {
+          const localIso = String(j.startAt || '').endsWith('Z') ? toEdmontonIsoString(j.startAt) : String(j.startAt || '');
+          return localIso.startsWith(ds);
+        })
       : [];
     const quotesOnDate = showQuotes
       ? filteredQuotes.filter((q) => {
@@ -768,11 +797,11 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
             <h1 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
               <span>Jobber Schedule &amp; Operations</span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-pink-100 text-pink-700">
-                Live Sync (120-Day Span)
+                Live Sync (Jan 1, 2026 – Dec 31, 2026)
               </span>
             </h1>
             <p className="text-[11px] text-slate-500">
-              Browse 60 days past through 60 days forward with Jobber Month, 7-Day Week, 3-Day, and Daily Dispatch views
+              Full 2026 calendar starting Jan 1, 2026 with live Jobber Month, 7-Day Week, 3-Day, and Daily Dispatch views
             </p>
           </div>
         </div>
@@ -900,19 +929,35 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
               </button>
             </div>
 
-            <div className="text-sm font-extrabold text-slate-900 px-1">
-              {currentPeriodLabel}
+            <div className="text-sm font-extrabold text-slate-900 px-1 flex items-center gap-2">
+              <span>{currentPeriodLabel}</span>
+              {(() => {
+                const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+                const visitsInMonth = filteredJobs.filter((j) => {
+                  const localIso = String(j.startAt || '').endsWith('Z') ? toEdmontonIsoString(j.startAt) : String(j.startAt || '');
+                  return localIso.startsWith(monthPrefix) && (j as any).jobStatus !== 'action_required';
+                });
+                const monthName = new Date(currentYear, currentMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                return (
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200"
+                    title={`You have ${visitsInMonth.length} job visits scheduled in ${monthName}`}
+                  >
+                    {visitsInMonth.length} job visits in {new Date(currentYear, currentMonth, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                  </span>
+                );
+              })()}
             </div>
 
-            {/* Quick 120-Day Range Month Pills */}
-            <div className="hidden sm:flex items-center gap-1 pl-2 border-l border-slate-200">
+            {/* Full 2026 Month Pills starting Jan 1, 2026 */}
+            <div className="hidden sm:flex items-center gap-1 pl-2 border-l border-slate-200 overflow-x-auto max-w-full">
               {AVAILABLE_MONTHS.map((m) => {
                 const isActiveMonth = currentYear === m.year && currentMonth === m.month;
                 return (
                   <button
                     key={`${m.year}-${m.month}`}
                     onClick={() => handleJumpToMonth(m.year, m.month)}
-                    className={`px-2 py-0.8 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer shrink-0 ${
                       isActiveMonth
                         ? 'bg-purple-600 text-white shadow-2xs font-extrabold'
                         : 'bg-slate-100 hover:bg-slate-200 text-slate-600'

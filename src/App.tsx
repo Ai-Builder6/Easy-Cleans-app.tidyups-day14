@@ -131,8 +131,16 @@ export function isFakeSimulationItem(item: any): boolean {
   
   if (
     id.startsWith('ujob-') ||
+    id.startsWith('vis-') ||
+    id.startsWith('v-sep') ||
+    id.startsWith('v-oct') ||
+    id.startsWith('v-gen') ||
+    id.startsWith('inv-') ||
     num.startsWith('job-108') ||
     num.startsWith('job-109') ||
+    num.startsWith('visit-40') ||
+    num.startsWith('visit-41') ||
+    name.includes('test customer edmonton') ||
     name.includes('vance') ||
     name.includes('heritage pointe') ||
     name.includes('lindqvist') ||
@@ -141,7 +149,6 @@ export function isFakeSimulationItem(item: any): boolean {
     name.includes('chloe bennett') ||
     name.includes('liam & chloe') ||
     name.includes('al-mansoor') ||
-    name.includes('condo bridge') ||
     name.includes('simulation') ||
     name.includes('fake')
   ) {
@@ -314,10 +321,12 @@ export function App() {
   const [activeLegalTab, setActiveLegalTab] = useState<LegalPageType>('SUPPORT');
   const [scheduledJobsList, setScheduledJobsList] = useState<ScheduledJobItem[]>(() => {
     const raw = (storedData?.scheduledVisits && storedData.scheduledVisits.length > 0) ? storedData.scheduledVisits : generateHistoricAndFutureVisits();
-    return raw.map((v: any) => {
-      const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);
-      return { ...v, lat: coords.lat, lng: coords.lng };
-    });
+    return raw
+      .filter((v: any) => !isFakeSimulationItem(v))
+      .map((v: any) => {
+        const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);
+        return { ...v, lat: coords.lat, lng: coords.lng };
+      });
   });
   const [unscheduledJobsList, setUnscheduledJobsList] = useState<UnscheduledJobItem[]>(() => {
     const rawJobs = storedData?.unscheduledJobs || [];
@@ -372,11 +381,11 @@ export function App() {
   const [scheduledJobsSubTab, setScheduledJobsSubTab] = useState<'CALENDAR' | 'LIST' | 'UNSCHEDULED'>('CALENDAR');
   const [quotesList, setQuotesList] = useState<JobberQuote[]>(() => {
     const base = (storedData?.quotes && storedData.quotes.length > 0) ? storedData.quotes : INITIAL_JOBBER_QUOTES;
-    const hasDevonQuote = base.some((q: JobberQuote) => q.quoteNumber === 'QT-2410' || q.clientName?.toLowerCase().includes('devon clark'));
-    return hasDevonQuote ? base : [INITIAL_JOBBER_QUOTES[0], ...base];
+    return base.filter((q: any) => !isFakeSimulationItem(q));
   });
   const [invoicesList, setInvoicesList] = useState<JobberInvoice[]>(() => {
-    return (storedData?.invoices && storedData.invoices.length > 0) ? storedData.invoices : INITIAL_JOBBER_INVOICES;
+    const base = (storedData?.invoices && storedData.invoices.length > 0) ? storedData.invoices : INITIAL_JOBBER_INVOICES;
+    return base.filter((inv: any) => !isFakeSimulationItem(inv));
   });
   const [selectedScheduledJobId, setSelectedScheduledJobId] = useState<string | null>(null);
   const [quoCallsList, setQuoCallsList] = useState<any[]>(() => {
@@ -901,34 +910,38 @@ export function App() {
       .then((r) => r.json())
       .then((data) => {
         if (data) {
-          if (data.tickets && data.tickets.length > 0) setTickets(data.tickets);
+          const cleanTickets = Array.isArray(data.tickets) ? data.tickets.filter((t: any) => !isFakeSimulationItem(t)) : [];
+          if (cleanTickets.length > 0) setTickets(cleanTickets);
           if (data.scheduledVisits && data.scheduledVisits.length > 0) {
             setScheduledJobsList(
-              data.scheduledVisits.map((v: any, idx: number) => {
-                const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);
-                return {
-                  id: v.id || `visit-${idx}`,
-                  visitNumber: v.visitNumber || `VISIT-${4000 + idx}`,
-                  title: v.title || 'Cleaning Service Visit',
-                  clientName: v.clientName || 'Jobber Client',
-                  clientPhone: v.clientPhone || '(780) 555-0100',
-                  secondaryPhone: v.secondaryPhone,
-                  serviceAddress: v.serviceAddress || '10405 Jasper Ave NW, Edmonton, AB',
-                  lat: coords.lat,
-                  lng: coords.lng,
-                  startAt: v.startAt || new Date().toISOString(),
-                endAt: v.endAt || new Date(Date.now() + 3600000).toISOString(),
-                assignedCleaners: v.assignedCleaners || ['Melissa Clarke', 'Joel Mbatchou'],
-                serviceType: v.serviceType || 'Standard Cleaning',
-                status: v.status || 'SCHEDULED',
-                jobberWebUri: v.jobberWebUri || 'https://secure.getjobber.com',
-                notes: v.notes,
-                };
-              })
+              data.scheduledVisits
+                .filter((v: any) => !isFakeSimulationItem(v))
+                .map((v: any, idx: number) => {
+                  const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);
+                  return {
+                    ...v,
+                    id: v.id || `visit-${idx}`,
+                    visitNumber: v.visitNumber || `VISIT-${4000 + idx}`,
+                    title: v.title || 'Cleaning Service Visit',
+                    clientName: v.clientName || 'Jobber Client',
+                    clientPhone: v.clientPhone || '(780) 718-5092',
+                    secondaryPhone: v.secondaryPhone,
+                    serviceAddress: v.serviceAddress || '10405 Jasper Ave NW, Edmonton, AB',
+                    lat: coords.lat,
+                    lng: coords.lng,
+                    startAt: v.startAt || new Date().toISOString(),
+                    endAt: v.endAt || new Date(Date.now() + 3600000).toISOString(),
+                    assignedCleaners: v.assignedCleaners || ['Cindy Guay'],
+                    serviceType: v.serviceType || 'Standard Cleaning',
+                    status: v.status || 'SCHEDULED',
+                    jobberWebUri: v.jobberWebUri || 'https://secure.getjobber.com',
+                    notes: v.notes,
+                  };
+                })
             );
           }
-          if (data.unscheduledJobs && data.unscheduledJobs.length > 0) {
-            setUnscheduledJobsList(data.unscheduledJobs);
+          if (data.unscheduledJobs) {
+            setUnscheduledJobsList(data.unscheduledJobs.filter((j: any) => !isFakeSimulationItem(j)));
           }
           if (data.clients && data.clients.length > 0) {
             setClientsList(data.clients);
@@ -939,32 +952,36 @@ export function App() {
             const overrides = data.cleanerOverrides || {};
             const finalTechs = baseTechs.map((t: Technician) => {
               const ov = overrides[t.id];
-              if (!ov) return t;
+              const assignedIds = cleanTickets.filter((tk: ServiceTicket) => tk.assignedTechId === t.id).map((tk: ServiceTicket) => tk.id);
+              if (!ov) return { ...t, assignedTicketIds: assignedIds };
               return {
                 ...t,
                 ...ov,
+                assignedTicketIds: assignedIds,
                 depotLocation: { ...t.depotLocation, ...(ov.depotLocation || {}) },
                 currentLocation: { ...t.currentLocation, ...(ov.currentLocation || {}) },
               };
             });
             setTechnicians(finalTechs);
-          } else if (data.cleanerOverrides) {
-            const overrides = data.cleanerOverrides;
+          } else {
+            const overrides = data.cleanerOverrides || {};
             setTechnicians((prev) =>
               prev.map((t) => {
                 const ov = overrides[t.id];
-                if (!ov) return t;
+                const assignedIds = cleanTickets.filter((tk: ServiceTicket) => tk.assignedTechId === t.id).map((tk: ServiceTicket) => tk.id);
+                if (!ov) return { ...t, assignedTicketIds: assignedIds };
                 return {
                   ...t,
                   ...ov,
+                  assignedTicketIds: assignedIds,
                   depotLocation: { ...t.depotLocation, ...(ov.depotLocation || {}) },
                   currentLocation: { ...t.currentLocation, ...(ov.currentLocation || {}) },
                 };
               })
             );
           }
-          if (data.quotes && data.quotes.length > 0) setQuotesList(data.quotes);
-          if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices);
+          if (data.quotes && data.quotes.length > 0) setQuotesList(data.quotes.filter((q: any) => !isFakeSimulationItem(q)));
+          if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices.filter((inv: any) => !isFakeSimulationItem(inv)));
           if (data.quoCallLogs && data.quoCallLogs.length > 0) setQuoCallsList(data.quoCallLogs);
           if (data.adLeads && data.adLeads.length > 0) setLeadsList(data.adLeads);
           if (data.serviceCatalog && data.serviceCatalog.length > 0) setServiceCatalog(data.serviceCatalog);
@@ -2741,9 +2758,54 @@ export function App() {
         {/* Jobber Backend Integration & Sync Hub Modal */}
         <JobberSyncModal
           isOpen={isJobberModalOpen}
-          onClose={() => setIsJobberModalOpen(false)}
+          onClose={() => {
+            setIsJobberModalOpen(false);
+            fetch(`/api/store?project=${activeProjectId}`, { headers: { 'x-project-id': activeProjectId } })
+              .then((r) => r.json())
+              .then((data) => {
+                if (!data) return;
+                if (data.tickets && data.tickets.length > 0) setTickets(data.tickets.filter((t: any) => !isFakeSimulationItem(t)));
+                if (data.scheduledVisits && data.scheduledVisits.length > 0) {
+                  setScheduledJobsList(
+                    data.scheduledVisits
+                      .filter((v: any) => !isFakeSimulationItem(v))
+                      .map((v: any) => {
+                        const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);
+                        return { ...v, lat: coords.lat, lng: coords.lng };
+                      })
+                  );
+                }
+                if (data.unscheduledJobs) setUnscheduledJobsList(data.unscheduledJobs.filter((j: any) => !isFakeSimulationItem(j)));
+                if (data.quotes && data.quotes.length > 0) setQuotesList(data.quotes.filter((q: any) => !isFakeSimulationItem(q)));
+                if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices.filter((inv: any) => !isFakeSimulationItem(inv)));
+                if (data.clients && data.clients.length > 0) setClientsList(data.clients);
+              })
+              .catch(() => {});
+          }}
           tickets={tickets}
-          onTicketsUpdated={setTickets}
+          onTicketsUpdated={(updated) => {
+            setTickets(updated.filter((t: any) => !isFakeSimulationItem(t)));
+            fetch(`/api/store?project=${activeProjectId}`, { headers: { 'x-project-id': activeProjectId } })
+              .then((r) => r.json())
+              .then((data) => {
+                if (!data) return;
+                if (data.scheduledVisits && data.scheduledVisits.length > 0) {
+                  setScheduledJobsList(
+                    data.scheduledVisits
+                      .filter((v: any) => !isFakeSimulationItem(v))
+                      .map((v: any) => {
+                        const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);
+                        return { ...v, lat: coords.lat, lng: coords.lng };
+                      })
+                  );
+                }
+                if (data.unscheduledJobs) setUnscheduledJobsList(data.unscheduledJobs.filter((j: any) => !isFakeSimulationItem(j)));
+                if (data.quotes && data.quotes.length > 0) setQuotesList(data.quotes.filter((q: any) => !isFakeSimulationItem(q)));
+                if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices.filter((inv: any) => !isFakeSimulationItem(inv)));
+                if (data.clients && data.clients.length > 0) setClientsList(data.clients);
+              })
+              .catch(() => {});
+          }}
           projectId={activeProjectId}
         />
 
