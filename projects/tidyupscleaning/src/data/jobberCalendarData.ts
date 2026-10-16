@@ -110,21 +110,95 @@ export function getCleanerInitials(cleanerName: string): string {
 }
 
 /**
- * Format ISO datetime string nicely for calendar and map views
+ * Returns the real-time current date in Edmonton (America/Edmonton) so the app
+ * always knows the exact live "Today" (e.g., Wednesday, October 14, 2026) and
+ * automatically updates every day.
+ */
+export function getEdmontonToday() {
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth() + 1;
+  let day = now.getDate();
+
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Edmonton',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const y = Number(parts.find((p) => p.type === 'year')?.value);
+    const m = Number(parts.find((p) => p.type === 'month')?.value);
+    const d = Number(parts.find((p) => p.type === 'day')?.value);
+    if (y && m && d) {
+      year = y;
+      month = m;
+      day = d;
+    }
+  } catch {
+    // Fallback to local system date if Intl timezone is unavailable
+  }
+
+  const monthIndex = month - 1;
+  const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const date = new Date(year, monthIndex, day, 12, 0, 0);
+
+  return {
+    year,
+    month,
+    monthIndex,
+    day,
+    dateString,
+    date,
+    formattedFull: date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    formattedShort: date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    }),
+  };
+}
+
+/**
+ * Format ISO datetime string nicely for calendar and map views without UTC day-shift bugs
  */
 export function formatDateTime(iso: string) {
   try {
-    const d = new Date(iso);
+    const raw = String(iso || '').trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
+    if (match) {
+      const year = Number(match[1]);
+      const monthIndex = Number(match[2]) - 1;
+      const day = Number(match[3]);
+      const hour = match[4] !== undefined ? Number(match[4]) : 9;
+      const minute = match[5] !== undefined ? Number(match[5]) : 0;
+      const d = new Date(year, monthIndex, day, hour, minute);
+      return {
+        dateStr: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        timeStr: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        hour,
+        dateString: `${match[1]}-${match[2]}-${match[3]}`,
+      };
+    }
+
+    const d = new Date(raw);
     return {
-      dateStr: d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }),
+      dateStr: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
       timeStr: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
       hour: d.getHours(),
+      dateString: raw.slice(0, 10),
     };
   } catch {
     return {
       dateStr: iso,
       timeStr: 'Scheduled',
       hour: 9,
+      dateString: String(iso || '').slice(0, 10),
     };
   }
 }
@@ -868,195 +942,250 @@ export const INITIAL_UNSCHEDULED_JOBS: UnscheduledJobItem[] = [];
  */
 export function generateJobberQuotes(): JobberQuote[] {
   const quotes: JobberQuote[] = [
-    // October 2026 (Current)
     {
-      id: 'qt-2041',
-      quoteNumber: 'QT-2041',
-      clientName: 'Matthew Penkala',
-      clientPhone: '(780) 555-8912',
-      serviceAddress: '10920 84 Ave NW, Edmonton, AB',
-      service: 'Standard Maintenance Clean',
-      quoteStatus: 'APPROVED',
-      total: 240.0,
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Nzg4MTg3',
+      quoteNumber: 'QT-4270',
+      clientName: 'Waldemar Dutra',
+      clientPhone: '7809904635',
+      serviceAddress: '8 coachman way Basement Suite, Edmonton, AB T8H 1C5',
+      service: 'Move Out Cleaning Services 2026',
+      bedrooms: '2 Bedrooms',
+      bathrooms: '1 Bathroom',
+      quoteStatus: 'CONVERTED',
+      total: 354.38,
       depositRequired: 50.0,
-      createdAt: '2026-09-25T11:00:00-06:00',
-      scheduledDate: '2026-10-02',
+      createdAt: '2026-10-05T19:20:04Z',
+      scheduledDate: '2026-10-16',
       scheduledTime: '10:00 AM',
-      jobberWebUri: 'https://secure.getjobber.com/quotes/2041',
-      notes: 'Approved via Jobber Client Hub. Regular bi-weekly schedule request.',
+      assignedCleaners: [],
+      verdict: 'Client',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/66788187',
+      notes: 'Move Out Cleaning Services 2026 at 8 coachman way Basement Suite, Edmonton, AB T8H 1C5.',
       lineItems: [
-        { description: 'Standard Residential Clean (2 Bed / 2 Bath)', quantity: 1, unitPrice: 200.0, total: 200.0 },
-        { description: 'Pet Eco-Safe Sanitizer Treatment', quantity: 1, unitPrice: 40.0, total: 40.0 },
+        { description: 'Move Out Cleaning Services 2026 (Basement Suite)', quantity: 1, unitPrice: 315.0, total: 315.0 },
       ],
     },
     {
-      id: 'qt-2042',
-      quoteNumber: 'QT-2042',
-      clientName: 'Jacqueline Ares',
-      clientPhone: '(780) 555-9988',
-      serviceAddress: '14102 102 Ave NW, Edmonton, AB',
-      service: 'Tandem Home Detail Clean',
-      quoteStatus: 'APPROVED',
-      total: 380.0,
-      depositRequired: 100.0,
-      createdAt: '2026-09-29T14:22:00-06:00',
-      scheduledDate: '2026-10-05',
-      scheduledTime: '11:00 AM',
-      jobberWebUri: 'https://secure.getjobber.com/quotes/2042',
-      notes: 'Jobber Client Hub booking. Regular bi-weekly schedule request.',
-      lineItems: [
-        { description: 'Deep Cleaning (3 Bed / 2 Bath)', quantity: 1, unitPrice: 300.0, total: 300.0 },
-        { description: 'Interior Appliance Detailing', quantity: 1, unitPrice: 80.0, total: 80.0 },
-      ],
-    },
-    {
-      id: 'qt-2045',
-      quoteNumber: 'QT-2045',
-      clientName: 'Sindhu Murugavel',
-      clientPhone: '(780) 555-4309',
-      serviceAddress: '12411 106 Ave NW, Edmonton, AB',
-      service: 'Deep Cleaning',
-      quoteStatus: 'APPROVED',
-      total: 450.0,
-      depositRequired: 100.0,
-      createdAt: '2026-09-30T09:15:00-06:00',
-      scheduledDate: '2026-10-08',
-      scheduledTime: '09:00 AM',
-      jobberWebUri: 'https://secure.getjobber.com/quotes/2045',
-      notes: 'Full house deep scrub with sanitization.',
-      lineItems: [
-        { description: 'Deep Clean Package', quantity: 1, unitPrice: 370.0, total: 370.0 },
-        { description: 'Window Interior & Track Steam', quantity: 1, unitPrice: 80.0, total: 80.0 },
-      ],
-    },
-    {
-      id: 'qt-2048',
-      quoteNumber: 'QT-2048',
-      clientName: 'Adam Joly',
-      clientPhone: '(780) 555-6611',
-      serviceAddress: '6812 112 Ave NW, Edmonton, AB',
-      service: 'Bi-Weekly Clean',
-      quoteStatus: 'APPROVED',
-      total: 220.0,
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzgyNjI5',
+      quoteNumber: 'QT-4269',
+      clientName: 'Waldemar Dutra',
+      clientPhone: '7809904635',
+      serviceAddress: '8 coachman way Main Level, Edmonton, AB T8H 1C5',
+      service: 'Move Out Cleaning Services 2026',
+      bedrooms: '3 Bedrooms',
+      bathrooms: '2 Bathrooms',
+      quoteStatus: 'ARCHIVED',
+      total: 365.63,
       depositRequired: 50.0,
-      createdAt: '2026-10-01T15:30:00-06:00',
-      scheduledDate: '2026-10-12',
-      scheduledTime: '01:00 PM',
-      jobberWebUri: 'https://secure.getjobber.com/quotes/2048',
-      notes: 'Regular bi-weekly residential maintenance.',
+      createdAt: '2026-10-05T18:30:00Z',
+      sentAt: '2026-10-05T18:35:00Z',
+      assignedCleaners: [],
+      verdict: 'Client',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/66782629',
+      notes: 'Move Out Cleaning Services 2026 at 8 coachman way Main Level, Edmonton, AB T8H 1C5.',
       lineItems: [
-        { description: 'Bi-Weekly Maintenance Clean', quantity: 1, unitPrice: 220.0, total: 220.0 },
+        { description: 'Move Out Cleaning Services 2026 (Main Level)', quantity: 1, unitPrice: 325.0, total: 325.0 },
       ],
     },
     {
-      id: 'qt-2051',
-      quoteNumber: 'QT-2051',
-      clientName: 'Clare Gibson',
-      clientPhone: '(780) 555-3184',
-      serviceAddress: '8910 148 St NW, Edmonton, AB',
-      service: 'Move-Out Clean',
-      quoteStatus: 'APPROVED',
-      total: 310.0,
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Nzc4MDQx',
+      quoteNumber: 'QT-4268',
+      clientName: 'Jaskaranjit Dhaliwal',
+      clientPhone: '(780) 394-4846',
+      serviceAddress: '173 Cornell Court, Edmonton, Alberta T5C 3C3',
+      service: 'Move Out Cleaning Services 2026',
+      bedrooms: '3 Bedrooms',
+      bathrooms: '2.5 Bathrooms',
+      quoteStatus: 'CONVERTED',
+      total: 458.44,
       depositRequired: 100.0,
-      createdAt: '2026-10-01T09:10:00-06:00',
+      createdAt: '2026-10-05T17:49:01Z',
+      sentAt: '2026-10-05T17:53:00Z',
       scheduledDate: '2026-10-15',
-      scheduledTime: '09:30 AM',
-      jobberWebUri: 'https://secure.getjobber.com/quotes/2051',
-      notes: 'Move-out turnover service with baseboards and appliances.',
+      scheduledTime: '09:00 AM',
+      assignedCleaners: [],
+      verdict: 'Client',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/66778041',
+      notes: 'Move Out Cleaning Services 2026 at 173 Cornell Court, Edmonton, Alberta T5C 3C3.',
       lineItems: [
-        { description: 'Move-Out Scrub Package', quantity: 1, unitPrice: 310.0, total: 310.0 },
+        { description: 'Move Out Cleaning Services 2026 (3 Bed / 2.5 Bath)', quantity: 1, unitPrice: 407.5, total: 407.5 },
       ],
     },
     {
-      id: 'qt-2055',
-      quoteNumber: 'QT-2055',
-      clientName: 'Suchi Jobanputra',
-      clientPhone: '(780) 555-5201',
-      serviceAddress: '4310 114a St NW, Edmonton, AB',
-      service: 'Standard Maintenance Clean',
-      quoteStatus: 'APPROVED',
-      total: 290.0,
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzcyMDA4',
+      quoteNumber: 'QT-4267',
+      clientName: 'Angela Swindler',
+      clientPhone: 'p:+17807229187',
+      clientEmail: 'Jaybird451965@gmail.com',
+      serviceAddress: '9616 182 st nw, Edmonton, AB CA',
+      service: '3Bed 2Bath Moveout Cleaning 2026',
+      bedrooms: '3 Bedrooms',
+      bathrooms: '2 Bathrooms',
+      quoteStatus: 'AWAITING_RESPONSE',
+      total: 365.63,
       depositRequired: 50.0,
-      createdAt: '2026-10-01T09:30:00-06:00',
-      scheduledDate: '2026-10-23',
-      scheduledTime: '02:00 PM',
-      jobberWebUri: 'https://secure.getjobber.com/quotes/2055',
-      notes: 'Standard bi-weekly clean.',
+      createdAt: '2026-10-05T16:55:01Z',
+      sentAt: '2026-10-05T16:55:30Z',
+      requestedDate: '2026-10-28',
+      assignedCleaners: [],
+      verdict: 'Good lead',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/66772008',
+      notes: 'Requested: 3Bed 2Bath Moveout Cleaning 2026 at 9616 182 st nw, Edmonton, AB T5T 3N4.',
       lineItems: [
-        { description: 'Standard Residential Clean', quantity: 1, unitPrice: 290.0, total: 290.0 },
+        { description: '3Bed 2Bath Moveout Cleaning 2026', quantity: 1, unitPrice: 325.0, total: 325.0 },
+      ],
+    },
+    {
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzcxNTcy',
+      quoteNumber: 'QT-4266',
+      clientName: 'Alawi Agroomah',
+      clientPhone: '(647) 834-9444',
+      serviceAddress: '320 Ambleside Link Southwest 221, Edmonton, AB',
+      service: '2Bed 2Bath Deep Cleaning 2026',
+      bedrooms: '2 Bedrooms',
+      bathrooms: '2 Bathrooms',
+      quoteStatus: 'APPROVED',
+      total: 222.19,
+      depositRequired: 50.0,
+      createdAt: '2026-10-05T16:50:54Z',
+      assignedCleaners: [],
+      verdict: 'Good lead',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/66771572',
+      notes: 'Approved in Jobber. Requested: 2Bed 2Bath Deep Cleaning 2026 at 320 Ambleside Link Southwest 221.',
+      lineItems: [
+        { description: '2Bed 2Bath Deep Cleaning 2026', quantity: 1, unitPrice: 197.5, total: 197.5 },
+      ],
+    },
+    {
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzE0ODg4',
+      quoteNumber: 'QT-4265',
+      clientName: 'Raj Dhillon',
+      clientPhone: '(780) 803-4647',
+      serviceAddress: '6105 52 Avenue, Edmonton, AB',
+      service: 'MoveIn - Post Construction',
+      bedrooms: '3 Bedrooms',
+      bathrooms: '2.5 Bathrooms',
+      quoteStatus: 'AWAITING_RESPONSE',
+      total: 376.88,
+      depositRequired: 50.0,
+      createdAt: '2026-10-03T18:36:04Z',
+      assignedCleaners: [],
+      verdict: 'Good lead',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/66714888',
+      notes: 'Requested: MoveIn - Post Construction at 6105 52 Avenue.',
+      lineItems: [
+        { description: 'MoveIn - Post Construction Cleaning', quantity: 1, unitPrice: 335.0, total: 335.0 },
+      ],
+    },
+    {
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDg3MDY4',
+      quoteNumber: 'QT-4281',
+      clientName: 'Natasha Tsang',
+      clientPhone: '(780) 993-2903',
+      serviceAddress: '1015 Burns Close NW, Edmonton, AB',
+      service: '4Bed 3Bath Deep Cleaning 2026',
+      bedrooms: '4 Bedrooms',
+      bathrooms: '3 Bathrooms',
+      quoteStatus: 'DRAFT',
+      total: 461.25,
+      depositRequired: 100.0,
+      createdAt: '2026-10-08T18:20:00Z',
+      assignedCleaners: [],
+      verdict: 'Good lead',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/67087068',
+      notes: '4Bed 3Bath Deep Cleaning 2026 at 1015 Burns Close NW, Edmonton, AB.',
+      lineItems: [
+        { description: '4Bed 3Bath Deep Cleaning 2026', quantity: 1, unitPrice: 439.29, total: 439.29 },
+      ],
+    },
+    {
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDg2ODY4',
+      quoteNumber: 'QT-4280',
+      clientName: 'Tanja Penina',
+      clientPhone: '(587) 938-5714',
+      serviceAddress: 'Edmonton Southwest, AB',
+      service: '2Bed 2Bath Deep Cleaning 2026',
+      bedrooms: '2 Bedrooms',
+      bathrooms: '2 Bathrooms',
+      quoteStatus: 'AWAITING_RESPONSE',
+      total: 222.19,
+      depositRequired: 50.0,
+      createdAt: '2026-10-08T17:45:00Z',
+      assignedCleaners: [],
+      verdict: 'Good lead',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/67086868',
+      notes: '2Bed 2Bath Deep Cleaning 2026.',
+      lineItems: [
+        { description: '2Bed 2Bath Deep Cleaning 2026', quantity: 1, unitPrice: 197.5, total: 197.5 },
+      ],
+    },
+    {
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDI4MDIx',
+      quoteNumber: 'QT-4278',
+      clientName: 'Sana Ahmad',
+      clientPhone: '(780) 902-7158',
+      clientEmail: 'sanausman2025@outlook.com',
+      serviceAddress: 'Edmonton, Alberta T6X 1J9',
+      service: '2Bed 2Bath Move Out Cleaning 2026',
+      bedrooms: '2 Bedrooms',
+      bathrooms: '2 Bathrooms',
+      quoteStatus: 'DRAFT',
+      total: 357.19,
+      depositRequired: 50.0,
+      createdAt: '2026-10-07T21:10:00Z',
+      requestedDate: '2026-10-22',
+      assignedCleaners: [],
+      verdict: 'Good lead',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/67028021',
+      notes: '2Bed 2Bath Move Out Cleaning requested for October 22.',
+      lineItems: [
+        { description: '2Bed 2Bath Move Out Cleaning 2026', quantity: 1, unitPrice: 317.5, total: 317.5 },
+      ],
+    },
+    {
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDIyNTc1',
+      quoteNumber: 'QT-4277',
+      clientName: 'Parin Daya',
+      clientPhone: '403-560-3307',
+      serviceAddress: '839 Drysdale Run Northwest, Edmonton, Alberta',
+      service: '2Bed 2Bath Initial Basic Cleaning',
+      bedrooms: '2 Bedrooms',
+      bathrooms: '2 Bathrooms',
+      quoteStatus: 'CONVERTED',
+      total: 223.32,
+      depositRequired: 50.0,
+      createdAt: '2026-10-07T19:30:00Z',
+      assignedCleaners: [],
+      verdict: 'Client',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/67022575',
+      notes: 'Initial Basic Cleaning at 839 Drysdale Run NW, Edmonton, AB.',
+      lineItems: [
+        { description: '2Bed 2Bath Initial Basic Cleaning', quantity: 1, unitPrice: 198.5, total: 198.5 },
+      ],
+    },
+    {
+      id: 'Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODEyMTA5',
+      quoteNumber: 'QT-4271',
+      clientName: 'Soymya',
+      clientPhone: '+1 (306) 251-0379',
+      serviceAddress: 'Chivers Cr, Chappelle, Edmonton, AB',
+      service: '3Bed 2.5Bath Deep Cleaning 2026',
+      bedrooms: '3 Bedrooms',
+      bathrooms: '2.5 Bathrooms',
+      quoteStatus: 'DRAFT',
+      total: 223.32,
+      depositRequired: 50.0,
+      createdAt: '2026-10-06T00:18:59Z',
+      requestedDate: '2026-10-17',
+      assignedCleaners: [],
+      verdict: 'Good lead',
+      jobberWebUri: 'https://secure.getjobber.com/quotes/66812109',
+      notes: '1900 sq ft, 3 bed, 2.5 bath Deep cleaning in Chappelle. Preferred schedule: October 17 morning.',
+      lineItems: [
+        { description: '3Bed 2.5Bath Deep Cleaning 2026', quantity: 1, unitPrice: 198.5, total: 198.5 },
       ],
     },
   ];
-
-  // Seed August 2026 (-60 days) and September 2026 (-30 days) Quotes
-  const pastMonths = [
-    { year: 2026, month: '08', days: [4, 11, 18, 25], status: 'CONVERTED' as const },
-    { year: 2026, month: '09', days: [2, 8, 15, 22, 29], status: 'CONVERTED' as const },
-  ];
-
-  let quoteIdx = 2001;
-  const sampleNames = [
-    { name: 'Owa & Alex Isegh', addr: '3112 119 St NW, Edmonton', amt: 260, s: 'Standard Clean' },
-    { name: 'Jacqueline Ares', addr: '14102 102 Ave NW, Edmonton', amt: 380, s: 'Deep Cleaning' },
-    { name: 'Brett & Ellie Kanuk', addr: '4904 141 Ave NW, Edmonton', amt: 240, s: 'Bi-Weekly Clean' },
-    { name: 'Clare Gibson', addr: '8910 148 St NW, Edmonton', amt: 310, s: 'Move-Out Clean' },
-    { name: 'Suchi Jobanputra', addr: '4310 114a St NW, Edmonton', amt: 290, s: 'Standard Clean' },
-    { name: 'Sindhu Murugavel', addr: '12411 106 Ave NW, Edmonton', amt: 450, s: 'Deep Clean' },
-    { name: 'Adam Joly', addr: '6812 112 Ave NW, Edmonton', amt: 220, s: 'Bi-Weekly Clean' },
-  ];
-
-  for (const pm of pastMonths) {
-    pm.days.forEach((day, i) => {
-      const sample = sampleNames[(day + i) % sampleNames.length];
-      const dayStr = day < 10 ? `0${day}` : `${day}`;
-      quotes.push({
-        id: `qt-${pm.year}-${pm.month}-${dayStr}`,
-        quoteNumber: `QT-${quoteIdx++}`,
-        clientName: sample.name,
-        clientPhone: '(780) 555-0144',
-        serviceAddress: sample.addr,
-        service: sample.s,
-        quoteStatus: pm.status,
-        total: sample.amt,
-        depositRequired: 50,
-        createdAt: `${pm.year}-${pm.month}-${dayStr}T09:00:00-06:00`,
-        scheduledDate: `${pm.year}-${pm.month}-${dayStr}`,
-        scheduledTime: '10:00 AM',
-        jobberWebUri: `https://secure.getjobber.com/quotes/${quoteIdx}`,
-        notes: `Historic Jobber quote successfully approved and converted into visit.`,
-      });
-    });
-  }
-
-  // Seed November 2026 (+30 days) and December 2026 (+60 days) Quotes
-  const futureMonths = [
-    { year: 2026, month: '11', days: [3, 10, 17, 24] },
-    { year: 2026, month: '12', days: [1, 8, 15, 22] },
-  ];
-
-  for (const fm of futureMonths) {
-    fm.days.forEach((day, i) => {
-      const sample = sampleNames[(day + i * 2) % sampleNames.length];
-      const dayStr = day < 10 ? `0${day}` : `${day}`;
-      const status: 'APPROVED' | 'AWAITING_RESPONSE' = i % 2 === 0 ? 'APPROVED' : 'AWAITING_RESPONSE';
-      quotes.push({
-        id: `qt-${fm.year}-${fm.month}-${dayStr}`,
-        quoteNumber: `QT-${quoteIdx++}`,
-        clientName: sample.name,
-        clientPhone: '(780) 555-0144',
-        serviceAddress: sample.addr,
-        service: sample.s,
-        quoteStatus: status,
-        total: sample.amt + 20,
-        depositRequired: 50,
-        createdAt: `${fm.year}-${fm.month}-${dayStr}T09:00:00-06:00`,
-        scheduledDate: `${fm.year}-${fm.month}-${dayStr}`,
-        scheduledTime: i % 2 === 0 ? '11:00 AM' : '02:00 PM',
-        jobberWebUri: `https://secure.getjobber.com/quotes/${quoteIdx}`,
-        notes: `Forward pipeline quote for ${fm.month === '11' ? 'November' : 'December'} 2026 scheduling.`,
-      });
-    });
-  }
 
   return quotes;
 }

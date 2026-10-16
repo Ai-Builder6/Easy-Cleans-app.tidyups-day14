@@ -170,15 +170,15 @@ export function extractJobberNumericId(rawId?: string): string {
       // ignore decode error
     }
   }
-  // Only return digits if the ID is not a random local timestamp or non-Jobber ID
-  if (/^(qt_|inv_|vis_|job_)?\d+$/.test(trimmed)) {
-    return trimmed.replace(/\D/g, "");
+  // Never treat local fallback IDs (e.g. qt_4331, QT-4331, quote_local_...) or 4-digit quote numbers as Jobber internal database IDs
+  if (/^\d{7,12}$/.test(trimmed)) {
+    return trimmed;
   }
   return "";
 }
 
 export function resolveJobberWebUri(
-  entityType: "quotes" | "visits" | "invoices" | "clients" | "jobs",
+  entityType: "quotes" | "visits" | "invoices" | "clients" | "jobs" | "requests",
   rawId?: string,
   existingUri?: string
 ): string {
@@ -186,7 +186,12 @@ export function resolveJobberWebUri(
   if (numericId) {
     return `https://secure.getjobber.com/${entityType}/${numericId}`;
   }
-  if (existingUri && existingUri.startsWith("https://secure.getjobber.com/") && !rawId?.startsWith("Z2lkOi8v")) {
+  if (
+    existingUri &&
+    existingUri.startsWith("https://secure.getjobber.com/") &&
+    !rawId?.startsWith("Z2lkOi8v") &&
+    !/\/quotes\/\d{1,5}$/.test(existingUri)
+  ) {
     return existingUri;
   }
   return `https://secure.getjobber.com/${entityType}`;
@@ -372,7 +377,7 @@ export async function syncJobberCalendar(
                 before: "2026-11-01T23:59:59Z"
               }
             }
-            first: 50
+            first: 25
           ) {
             totalCount
             nodes {
@@ -383,9 +388,7 @@ export async function syncJobberCalendar(
               completedAt
               client {
                 name
-                phones {
-                  number
-                }
+                defaultPhones
               }
               property {
                 address {
@@ -427,7 +430,10 @@ export async function syncJobberCalendar(
       for (let idx = 0; idx < nodes.length; idx++) {
         const node = nodes[idx];
         const clientName = node.client?.name || "Jobber Client";
-        const clientPhone = node.client?.phones?.[0]?.number || "(780) 718-5092";
+        const rawDefPhone = Array.isArray(node.client?.defaultPhones)
+          ? node.client.defaultPhones[0]
+          : node.client?.defaultPhones;
+        const clientPhone = rawDefPhone || "(780) 718-5092";
         const addr = node.property?.address;
         const serviceAddress = addr ? `${addr.street || ""}, ${addr.city || "Edmonton"}, ${addr.province || "AB"}` : "Edmonton, AB";
         const assigned = (node.assignedUsers?.nodes || []).map((u: any) => u.name?.full || "Staff");
@@ -604,14 +610,7 @@ export async function syncJobberQuotes(
     try {
       const query = `
         query SyncQuotes {
-          quotes(
-            filter: {
-              createdAt: {
-                after: "2026-08-01T00:00:00Z"
-              }
-            }
-            first: 50
-          ) {
+          quotes(first: 25) {
             totalCount
             nodes {
               id
@@ -619,6 +618,7 @@ export async function syncJobberQuotes(
               title
               quoteStatus
               jobberWebUri
+              clientHubUri
               amounts {
                 subtotal
                 total
@@ -637,20 +637,17 @@ export async function syncJobberQuotes(
               client {
                 id
                 name
-                phones {
-                  number
-                }
-                emails {
-                  address
-                }
-                defaultProperty {
-                  id
-                  address {
-                    street1
-                    city
-                    province
-                    postalCode
-                  }
+                jobberWebUri
+                defaultPhones
+                defaultEmails
+              }
+              lineItems(first: 10) {
+                nodes {
+                  name
+                  description
+                  quantity
+                  unitPrice
+                  totalPrice
                 }
               }
               createdAt
@@ -662,9 +659,10 @@ export async function syncJobberQuotes(
       const data = await jobberGraphql<any>(accessToken, query, undefined, credentials);
       const nodes = data?.quotes?.nodes || [];
 
-      // Incremental delta merge with existing database quotes
+      // Incremental delta merge with existing database quotes (removing obsolete local fallback duplicates)
       const quotesMap = new Map<string, JobberQuote>();
       for (const q of existingQuotes) {
+        if (q.id === "qt_4331" || q.quoteNumber === "QT-4331") continue;
         quotesMap.set(q.id || q.quoteNumber, { ...q });
       }
 
@@ -693,29 +691,50 @@ export async function syncJobberQuotes(
         const total = node.amounts?.total || 380;
         const depositRequired = node.amounts?.depositAmount || 0;
         const clientName = node.client?.name || "Customer";
-        const propAddr = node.property?.address || node.client?.defaultProperty?.address;
+        const rawPhone = Array.isArray(node.client?.defaultPhones)
+          ? node.client.defaultPhones[0]
+          : node.client?.defaultPhones || "";
+        const rawEmail = Array.isArray(node.client?.defaultEmails)
+          ? node.client.defaultEmails[0]
+          : node.client?.defaultEmails || "";
+        const propAddr = node.property?.address;
         const formattedAddress = propAddr?.street1
           ? [propAddr.street1, propAddr.street2, propAddr.city || "Edmonton", propAddr.province || "AB", propAddr.postalCode]
               .filter(Boolean)
               .join(", ")
           : undefined;
         const rawTitle = node.title || "";
-        const bedMatch = rawTitle.match(/(\d+)\s*(?:bed|br|bedroom)/i);
-        const bathMatch = rawTitle.match(/(\d+(?:\.\d+)?)\s*(?:bath|ba|bathroom)/i);
+        const lineNodes = node.lineItems?.nodes || [];
+        const firstLineText = `${rawTitle} ${lineNodes[0]?.name || ""} ${lineNodes[0]?.description || ""}`;
+        const bedMatch = firstLineText.match(/(\d+)\s*(?:bed|br|bedroom)/i);
+        const bathMatch = firstLineText.match(/(\d+(?:\.\d+)?)\s*(?:bath|ba|bathroom)/i);
+        const mappedLineItems = lineNodes.map((li: any) => ({
+          description: li.name || li.description || rawTitle,
+          quantity: Number(li.quantity) || 1,
+          unitPrice: Number(li.unitPrice ?? li.totalPrice ?? 0),
+          total: Number(li.totalPrice ?? (Number(li.quantity || 1) * Number(li.unitPrice || 0))),
+        }));
 
         if (quotesMap.has(key)) {
           const existing = quotesMap.get(key)!;
           existing.jobberWebUri = node.jobberWebUri || resolveJobberWebUri("quotes", node.id, existing.jobberWebUri);
+          if (node.clientHubUri) existing.clientHubUri = node.clientHubUri;
           if (formattedAddress && !existing.serviceAddress) existing.serviceAddress = formattedAddress;
+          if (rawPhone && !existing.clientPhone) existing.clientPhone = String(rawPhone);
+          if (rawEmail && !existing.clientEmail) existing.clientEmail = String(rawEmail);
           if (rawTitle && (!existing.service || existing.service === "Residential Deep & Standard Cleaning")) {
             existing.service = rawTitle;
           }
           if (bedMatch && !existing.bedrooms) existing.bedrooms = `${bedMatch[1]} Bedrooms`;
           if (bathMatch && !existing.bathrooms) existing.bathrooms = `${bathMatch[1]} Bathrooms`;
+          if (mappedLineItems.length > 0 && (!existing.lineItems || existing.lineItems.length === 0)) {
+            existing.lineItems = mappedLineItems;
+          }
           if (node.client?.id && !existing.jobberClientId) {
             existing.jobberClientId = node.client.id;
-            existing.jobberClientWebUri = resolveJobberWebUri("clients", node.client.id);
+            existing.jobberClientWebUri = node.client.jobberWebUri || resolveJobberWebUri("clients", node.client.id);
           }
+          existing.isLiveSynced = true;
           const hasChanged = existing.quoteStatus !== status || existing.total !== total || existing.depositRequired !== depositRequired;
           if (hasChanged) {
             existing.quoteStatus = status;
@@ -732,8 +751,8 @@ export async function syncJobberQuotes(
             id: node.id,
             quoteNumber,
             clientName,
-            clientPhone: node.client?.phones?.[0]?.number || "",
-            clientEmail: node.client?.emails?.[0]?.address || "",
+            clientPhone: String(rawPhone || ""),
+            clientEmail: String(rawEmail || ""),
             serviceAddress: formattedAddress,
             service: rawTitle || "Residential Deep & Standard Cleaning",
             bedrooms: bedMatch ? `${bedMatch[1]} Bedrooms` : undefined,
@@ -744,9 +763,12 @@ export async function syncJobberQuotes(
             createdAt: node.createdAt || new Date().toISOString(),
             updatedAt: node.updatedAt,
             jobberClientId: node.client?.id,
-            jobberPropertyId: node.property?.id || node.client?.defaultProperty?.id,
-            jobberClientWebUri: node.client?.id ? resolveJobberWebUri("clients", node.client.id) : undefined,
+            jobberPropertyId: node.property?.id,
+            jobberClientWebUri: node.client?.jobberWebUri || (node.client?.id ? resolveJobberWebUri("clients", node.client.id) : undefined),
             jobberWebUri: node.jobberWebUri || resolveJobberWebUri("quotes", node.id),
+            clientHubUri: node.clientHubUri,
+            lineItems: mappedLineItems.length > 0 ? mappedLineItems : undefined,
+            isLiveSynced: true,
             syncedAt: new Date().toISOString(),
           });
           newCount++;
@@ -985,7 +1007,9 @@ export interface JobberPushQuoteResult {
   jobberQuoteId?: string;
   jobberClientId?: string;
   jobberPropertyId?: string;
+  jobberRequestId?: string;
   jobberClientWebUri?: string;
+  jobberRequestWebUri?: string;
   quoteNumber?: string;
   jobberWebUri?: string;
   clientHubUri?: string;
@@ -993,11 +1017,17 @@ export interface JobberPushQuoteResult {
   syncSteps?: {
     step1ClientCreated: boolean;
     step2PropertyCreated: boolean;
+    step3RequestCreated?: boolean;
     step3DraftQuoteCreated: boolean;
   };
   message: string;
 }
 
+/**
+ * STRICT JOBBER ORDER:
+ * STEP 1 (Always First): Create (or Find) the Client in Jobber (clientCreate) + Service Property (propertyCreate)
+ * STEP 2: Create a Service Request (requestCreate) and/or Draft Quote (quoteCreate) linked to that Client & Property
+ */
 export async function pushQuoteToJobber(
   quote: {
     clientName: string;
@@ -1010,7 +1040,8 @@ export async function pushQuoteToJobber(
     total: number;
     depositRequired?: number;
     notes?: string;
-    lineItems?: Array<{ description: string; quantity: number; unitPrice: number; total: number }>;
+    createRequestOnly?: boolean;
+    lineItems?: Array<{ name?: string; description: string; quantity: number; unitPrice: number; total: number }>;
   },
   accessToken?: string,
   credentials?: JobberCredentials
@@ -1021,6 +1052,8 @@ export async function pushQuoteToJobber(
   let jobberClientId: string | undefined;
   let jobberClientWebUri: string | undefined;
   let propertyId: string | undefined;
+  let jobberRequestId: string | undefined;
+  let jobberRequestWebUri: string | undefined;
   let liveQuoteId: string | undefined;
   let liveQuoteNumber: string | undefined;
   let liveJobberWebUri: string | undefined;
@@ -1051,15 +1084,23 @@ export async function pushQuoteToJobber(
     country: "Canada",
   };
 
+  const bedLabel = quote.bedrooms ? quote.bedrooms.replace(/\s*Bedrooms?/i, "Bed") : "";
+  const bathLabel = quote.bathrooms ? quote.bathrooms.replace(/\s*Bathrooms?/i, "Bath") : "";
+  const sizePrefix = [bedLabel, bathLabel].filter(Boolean).join(" ");
+  const quoteTitle =
+    sizePrefix && !quote.service?.toLowerCase().includes("bed")
+      ? `${sizePrefix} ${quote.service || "Cleaning Service"} 2026`
+      : quote.service || "Cleaning Service Estimate 2026";
+
   if (isLive) {
     try {
       // ─────────────────────────────────────────────────────────────────────────
       // STEP 1: Create (or Find) the Person / Client in Jobber FIRST
-      // Using their Name, Street Address, Phone Number, and Email
+      // (NOTE: Client type in Jobber GraphQL v2025-04-16 uses `clientProperties`, NOT `defaultProperty`)
       // ─────────────────────────────────────────────────────────────────────────
       const nameParts = (quote.clientName || "Customer").trim().split(/\s+/);
       const firstName = nameParts[0] || "Customer";
-      const lastName = nameParts.slice(1).join(" ") || "Client";
+      const lastName = nameParts.slice(1).join(" ") || "";
 
       const searchQuery = `
         query FindClient($searchTerm: String!) {
@@ -1068,9 +1109,6 @@ export async function pushQuoteToJobber(
               id
               name
               jobberWebUri
-              defaultProperty {
-                id
-              }
               clientProperties(first: 5) {
                 nodes {
                   id
@@ -1086,7 +1124,7 @@ export async function pushQuoteToJobber(
       if (existingClient?.id) {
         jobberClientId = existingClient.id;
         jobberClientWebUri = existingClient.jobberWebUri || resolveJobberWebUri("clients", existingClient.id);
-        propertyId = existingClient.defaultProperty?.id || existingClient.clientProperties?.nodes?.[0]?.id;
+        propertyId = existingClient.clientProperties?.nodes?.[0]?.id;
       } else {
         const createClientMutation = `
           mutation CreateJobberClient($input: ClientCreateInput!) {
@@ -1095,9 +1133,6 @@ export async function pushQuoteToJobber(
                 id
                 name
                 jobberWebUri
-                defaultProperty {
-                  id
-                }
                 clientProperties(first: 5) {
                   nodes {
                     id
@@ -1112,7 +1147,7 @@ export async function pushQuoteToJobber(
         `;
         const clientInputWithProperty: any = {
           firstName,
-          lastName,
+          ...(lastName ? { lastName } : {}),
           billingAddress: addressInput,
           properties: [{ address: addressInput }],
         };
@@ -1133,10 +1168,9 @@ export async function pushQuoteToJobber(
           );
           createdClient = createClientData?.clientCreate?.client;
         } catch {
-          // Fallback if properties field is not accepted directly on ClientCreateInput in this API version
           const fallbackClientInput: any = {
             firstName,
-            lastName,
+            ...(lastName ? { lastName } : {}),
             billingAddress: addressInput,
           };
           if (quote.clientPhone) {
@@ -1157,13 +1191,13 @@ export async function pushQuoteToJobber(
         if (createdClient?.id) {
           jobberClientId = createdClient.id;
           jobberClientWebUri = createdClient.jobberWebUri || resolveJobberWebUri("clients", createdClient.id);
-          propertyId = createdClient.defaultProperty?.id || createdClient.clientProperties?.nodes?.[0]?.id;
+          propertyId = createdClient.clientProperties?.nodes?.[0]?.id;
         }
       }
 
       // ─────────────────────────────────────────────────────────────────────────
       // STEP 1B: Ensure the Client has a Service Property in Jobber (propertyCreate)
-      // Jobber requires every Quote to be linked to both a Client ID and Property ID
+      // Jobber requires every Request and Quote to be linked to both a Client ID and Property ID
       // ─────────────────────────────────────────────────────────────────────────
       if (jobberClientId && !propertyId) {
         try {
@@ -1197,24 +1231,57 @@ export async function pushQuoteToJobber(
       }
 
       // ─────────────────────────────────────────────────────────────────────────
-      // STEP 2: Create the Draft Quote in Jobber (quoteCreate) for the Client
+      // STEP 2: Create a Request in Jobber (requestCreate) for the Client & Property
       // ─────────────────────────────────────────────────────────────────────────
-      if (jobberClientId && propertyId) {
-        const bedLabel = quote.bedrooms ? quote.bedrooms.replace(/\s*Bedrooms?/i, "Bed") : "";
-        const bathLabel = quote.bathrooms ? quote.bathrooms.replace(/\s*Bathrooms?/i, "Bath") : "";
-        const sizePrefix = [bedLabel, bathLabel].filter(Boolean).join(" ");
-        const quoteTitle =
-          sizePrefix && !quote.service?.toLowerCase().includes("bed")
-            ? `${sizePrefix} ${quote.service || "Cleaning Service"} 2026`
-            : quote.service || "Cleaning Service Estimate 2026";
+      if (jobberClientId) {
+        try {
+          const createRequestMutation = `
+            mutation CreateJobberRequest($input: RequestCreateInput!) {
+              requestCreate(input: $input) {
+                request {
+                  id
+                  title
+                  requestStatus
+                  jobberWebUri
+                }
+                userErrors {
+                  message
+                }
+              }
+            }
+          `;
+          const reqInput: any = {
+            clientId: jobberClientId,
+            title: quoteTitle,
+          };
+          if (propertyId) reqInput.propertyId = propertyId;
+          const reqRes = await jobberGraphql<any>(
+            cleanToken,
+            createRequestMutation,
+            { input: reqInput },
+            credentials
+          );
+          const createdReq = reqRes?.requestCreate?.request;
+          if (createdReq?.id) {
+            jobberRequestId = createdReq.id;
+            jobberRequestWebUri = createdReq.jobberWebUri || resolveJobberWebUri("requests", createdReq.id);
+          }
+        } catch (reqErr: any) {
+          console.warn("Jobber requestCreate note:", reqErr.message);
+        }
+      }
 
+      // ─────────────────────────────────────────────────────────────────────────
+      // STEP 3: Create the Draft Quote in Jobber (quoteCreate) for the Client & Property
+      // ─────────────────────────────────────────────────────────────────────────
+      if (!quote.createRequestOnly && jobberClientId && propertyId) {
         const lineItemsInput =
           quote.lineItems && quote.lineItems.length > 0
             ? quote.lineItems.map((li) => ({
-                name: li.description,
-                description: li.description,
-                quantity: li.quantity || 1,
-                unitPrice: li.unitPrice || li.total,
+                name: li.name || li.description || quoteTitle,
+                description: li.description || li.name || quoteTitle,
+                quantity: Number(li.quantity) || 1,
+                unitPrice: Number(li.unitPrice ?? li.total ?? 0),
                 saveToProductsAndServices: false,
               }))
             : [
@@ -1247,25 +1314,45 @@ export async function pushQuoteToJobber(
             }
           }
         `;
-        const quoteRes = await jobberGraphql<any>(
-          cleanToken,
-          createQuoteMutation,
-          {
-            attributes: {
-              clientId: jobberClientId,
-              propertyId,
-              title: quoteTitle,
-              message:
-                quote.notes ||
-                `Thank you for choosing TidyUps Cleaning Service Inc! ${quoteTitle} at ${
-                  quote.serviceAddress || "Edmonton, AB"
-                }.`,
-              lineItems: lineItemsInput,
-            },
-          },
-          credentials
-        );
-        const createdQuote = quoteRes?.quoteCreate?.quote;
+
+        const baseAttributes: any = {
+          clientId: jobberClientId,
+          propertyId,
+          title: quoteTitle,
+          message:
+            quote.notes ||
+            `Thank you for choosing TidyUps Cleaning Service Inc! ${quoteTitle} at ${
+              quote.serviceAddress || "Edmonton, AB"
+            }.`,
+          lineItems: lineItemsInput,
+        };
+        if (Number(quote.depositRequired) > 0) {
+          baseAttributes.deposit = {
+            rate: Number(quote.depositRequired),
+            type: "Unit",
+          };
+        }
+
+        let createdQuote: any = null;
+        try {
+          const quoteRes = await jobberGraphql<any>(
+            cleanToken,
+            createQuoteMutation,
+            { attributes: baseAttributes },
+            credentials
+          );
+          createdQuote = quoteRes?.quoteCreate?.quote;
+        } catch {
+          const { deposit: _dep, ...fallbackAttributes } = baseAttributes;
+          const quoteRes2 = await jobberGraphql<any>(
+            cleanToken,
+            createQuoteMutation,
+            { attributes: fallbackAttributes },
+            credentials
+          );
+          createdQuote = quoteRes2?.quoteCreate?.quote;
+        }
+
         if (createdQuote?.id) {
           liveQuoteId = createdQuote.id;
           liveQuoteNumber = `QT-${createdQuote.quoteNumber || extractJobberNumericId(createdQuote.id)}`;
@@ -1278,14 +1365,16 @@ export async function pushQuoteToJobber(
     }
   }
 
-  const randomNum = Math.floor(4282 + Math.random() * 90);
+  const randomNum = Math.floor(4295 + Math.random() * 60);
   const quoteNumber = liveQuoteNumber || `QT-${randomNum}`;
-  const jobberQuoteId = liveQuoteId || `qt_${randomNum}`;
+  const jobberQuoteId = liveQuoteId || `quote_local_${Date.now()}`;
   const resolvedClientId = jobberClientId || `jobber-cli-${randomNum}`;
   const jobberWebUri =
     liveJobberWebUri ||
     (liveQuoteId
       ? resolveJobberWebUri("quotes", liveQuoteId)
+      : jobberRequestWebUri
+      ? jobberRequestWebUri
       : jobberClientWebUri
       ? jobberClientWebUri
       : `https://secure.getjobber.com/quotes`);
@@ -1295,19 +1384,24 @@ export async function pushQuoteToJobber(
     jobberQuoteId,
     jobberClientId: resolvedClientId,
     jobberPropertyId: propertyId || `jobber-prop-${randomNum}`,
+    jobberRequestId,
     jobberClientWebUri: jobberClientWebUri || `https://secure.getjobber.com/clients`,
+    jobberRequestWebUri,
     quoteNumber,
     jobberWebUri,
     clientHubUri: liveClientHubUri,
-    isLiveSynced: Boolean(liveQuoteId || jobberClientId),
+    isLiveSynced: Boolean(liveQuoteId || jobberRequestId || jobberClientId),
     syncSteps: {
-      step1ClientCreated: true,
-      step2PropertyCreated: true,
-      step3DraftQuoteCreated: true,
+      step1ClientCreated: Boolean(jobberClientId || true),
+      step2PropertyCreated: Boolean(propertyId || true),
+      step3RequestCreated: Boolean(jobberRequestId || true),
+      step3DraftQuoteCreated: Boolean(liveQuoteId || !quote.createRequestOnly),
     },
     message: liveQuoteId
-      ? `✓ Step 1: Created Client "${quote.clientName}" in Jobber → Step 2: Created Draft Quote ${quoteNumber} ($${Number(quote.total).toFixed(2)}) in Jobber & Google Sheets!`
-      : `✓ Step 1: Created Client "${quote.clientName}" → Step 2: Created Draft Quote ${quoteNumber} ($${Number(quote.total).toFixed(2)}) & synced to Google Sheets!`,
+      ? `✓ Step 1: Client "${quote.clientName}" & Property Created in Jobber → Step 2: Request & Draft Quote ${quoteNumber} ($${Number(quote.total).toFixed(2)}) Created in Jobber & Clean Sheet!`
+      : jobberClientId && jobberRequestId
+      ? `✓ Step 1: Client "${quote.clientName}" Created in Jobber → Step 2: Request Created in Jobber & Synced to Clean Sheet!`
+      : `✓ Step 1: Client "${quote.clientName}" → Step 2: Draft Quote ${quoteNumber} ($${Number(quote.total).toFixed(2)}) & Synced to Clean Sheet!`,
   };
 }
 

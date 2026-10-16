@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSavedAt": "2026-10-15T19:31:02.181Z",
+  "lastSavedAt": "2026-10-16T00:47:45.830Z",
   "tickets": [
     {
       "id": "ticket-mv8tq0ul",
@@ -2252,6 +2252,871 @@
   ],
   "quotes": [
     {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3Mzg5MjY3",
+      "quoteNumber": "QT-4293",
+      "clientName": "Rahum",
+      "clientPhone": "+14165601354",
+      "clientEmail": "",
+      "serviceAddress": "7112 49 Street Northwest, Edmonton, Alberta, T6B 1K5",
+      "service": "Basic Initial Cleaning 2026",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "quoteStatus": "AWAITING_RESPONSE",
+      "total": 221.07,
+      "depositRequired": 50,
+      "createdAt": "2026-10-15T23:46:55Z",
+      "updatedAt": "2026-10-15T23:47:06Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTY0MjM1NDI=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MjMxNDQzOQ==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/156423542",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67389267",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67389267",
+      "lineItems": [
+        {
+          "description": "3Bed 2Bath Basic Cleaning",
+          "quantity": 4,
+          "unitPrice": 48.5,
+          "total": 194
+        },
+        {
+          "description": "Fuel Surcharge 2",
+          "quantity": 1,
+          "unitPrice": 12.5,
+          "total": 12.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.183Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3Mzg5MDQy",
+      "quoteNumber": "QT-4292",
+      "clientName": "Blaise Ekechukwu",
+      "clientPhone": "+13068807071",
+      "clientEmail": "blaise.ekechukwu@gmail.com",
+      "serviceAddress": "5318 Kimball Place Southwest, Edmonton, Alberta, T6W 5E6",
+      "service": "Initial Basic Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "1 Bathrooms",
+      "quoteStatus": "AWAITING_RESPONSE",
+      "total": 134.44,
+      "depositRequired": 50,
+      "createdAt": "2026-10-15T23:40:58Z",
+      "updatedAt": "2026-10-15T23:41:35Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTY0MjM2OTY=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MjMxMzgzOQ==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/156423696",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67389042",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67389042",
+      "lineItems": [
+        {
+          "description": "2Bed 1Bath Initial Basic Cleaning",
+          "quantity": 3,
+          "unitPrice": 49,
+          "total": 147
+        },
+        {
+          "description": "Fuel Surcharge",
+          "quantity": 1,
+          "unitPrice": 7.5,
+          "total": 7.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        },
+        {
+          "description": "Recurring Discount Promo",
+          "quantity": 1,
+          "unitPrice": -25,
+          "total": -25
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3Mzg4ODI5",
+      "quoteNumber": "QT-4291",
+      "clientName": "Blaise Ekechukwu",
+      "clientPhone": "+13068807071",
+      "clientEmail": "blaise.ekechukwu@gmail.com",
+      "serviceAddress": "5318 Kimball Place Southwest, Edmonton, Alberta, T6W 5E6",
+      "service": "Basic Cleaning Services",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "quoteStatus": "DRAFT",
+      "total": 223.32,
+      "depositRequired": 50,
+      "createdAt": "2026-10-15T23:36:08Z",
+      "updatedAt": "2026-10-15T23:36:08Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTY0MjM2OTY=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MjMxMzgzOQ==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/156423696",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67388829",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67388829",
+      "lineItems": [
+        {
+          "description": "2Bed 2Bath Basic Cleaning",
+          "quantity": 2,
+          "unitPrice": 98,
+          "total": 196
+        },
+        {
+          "description": "Fuel Surcharge 2",
+          "quantity": 1,
+          "unitPrice": 12.5,
+          "total": 12.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MzQ3NTcx",
+      "quoteNumber": "QT-4290",
+      "clientName": "Debra Fowler",
+      "clientPhone": "+15873401449",
+      "clientEmail": "debchrisfowler@outlook.com",
+      "service": "Basic Cleaning Services",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "quoteStatus": "DRAFT",
+      "total": 223.32,
+      "depositRequired": 50,
+      "createdAt": "2026-10-15T15:41:30Z",
+      "updatedAt": "2026-10-15T15:41:30Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTYzMzIyODc=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MjIzNzU2Nw==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/156332287",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67347571",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67347571",
+      "lineItems": [
+        {
+          "description": "2Bed 2Bath Basic Cleaning",
+          "quantity": 2,
+          "unitPrice": 98,
+          "total": 196
+        },
+        {
+          "description": "Fuel Surcharge 2",
+          "quantity": 1,
+          "unitPrice": 12.5,
+          "total": 12.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MzA3Mzg0",
+      "quoteNumber": "QT-4289",
+      "clientName": "New Call [+14036126721]",
+      "clientPhone": "+14036126721",
+      "clientEmail": "",
+      "service": "3Bed 3Bath Moveout Cleaning 2026 Selling Home",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "quoteStatus": "AWAITING_RESPONSE",
+      "total": 483.75,
+      "depositRequired": 150,
+      "createdAt": "2026-10-14T20:28:34Z",
+      "updatedAt": "2026-10-14T20:28:38Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTYyNDQzNzA=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MjE0MzM5Mw==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/156244370",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67307384",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67307384",
+      "lineItems": [
+        {
+          "description": "3Bed 3Bath Moveout Cleaning",
+          "quantity": 4,
+          "unitPrice": 105,
+          "total": 420
+        },
+        {
+          "description": "Fuel Surcharge",
+          "quantity": 1,
+          "unitPrice": 20,
+          "total": 20
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MjU0MzQ3",
+      "quoteNumber": "QT-4288",
+      "clientName": "Tanja Penina",
+      "clientPhone": "+15879385714",
+      "clientEmail": "t.penina1@gmail.com",
+      "serviceAddress": "10520 80 Avenue Northwest, 002, Edmonton, Alberta, T6E 1V3",
+      "service": "1Bed 1Bath Deep Cleaning 2026",
+      "bedrooms": "1 Bedrooms",
+      "bathrooms": "1 Bathrooms",
+      "quoteStatus": "CONVERTED",
+      "total": 204.19,
+      "depositRequired": 50,
+      "createdAt": "2026-10-14T01:19:36Z",
+      "updatedAt": "2026-10-14T01:34:32Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTU4MzM4OTM=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MTcyMjU5Nw==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/155833893",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67254347",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67254347",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning",
+          "quantity": 4,
+          "unitPrice": 48.5,
+          "total": 194
+        },
+        {
+          "description": "Fuel Surcharge",
+          "quantity": 1,
+          "unitPrice": 7.5,
+          "total": 7.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        },
+        {
+          "description": "Discount for Referrals",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MjU0MTY2",
+      "quoteNumber": "QT-4287",
+      "clientName": "Tanja Penina",
+      "clientPhone": "+15879385714",
+      "clientEmail": "t.penina1@gmail.com",
+      "serviceAddress": "10520 80 Avenue Northwest, 002, Edmonton, Alberta, T6E 1V3",
+      "service": "1Bed 1Bath Deep Cleaning 2026",
+      "bedrooms": "1 Bedrooms",
+      "bathrooms": "1 Bathrooms",
+      "quoteStatus": "DRAFT",
+      "total": 334.69,
+      "depositRequired": 100,
+      "createdAt": "2026-10-14T01:13:23Z",
+      "updatedAt": "2026-10-15T14:17:16Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTU4MzM4OTM=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MTcyMjU5Nw==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/155833893",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67254166",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67254166",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning",
+          "quantity": 3,
+          "unitPrice": 100,
+          "total": 300
+        },
+        {
+          "description": "Fuel Surcharge",
+          "quantity": 1,
+          "unitPrice": 7.5,
+          "total": 7.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MjUwODM5",
+      "quoteNumber": "QT-4286",
+      "clientName": "Vikram",
+      "clientPhone": "+17809770881",
+      "clientEmail": "sales.support@cira-homes.com",
+      "serviceAddress": "1907 49 Street Northwest, Mill Woods, Edmonton, Alberta, T6L 2W3",
+      "service": "3Bed 4Bath Show Home Cleaning",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "4 Bathrooms",
+      "quoteStatus": "CONVERTED",
+      "total": 239.07,
+      "depositRequired": 0,
+      "createdAt": "2026-10-13T23:49:46Z",
+      "updatedAt": "2026-10-14T01:40:19Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTYxNTY2ODA=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MjA0MjU1NA==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/156156680",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67250839",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67250839",
+      "lineItems": [
+        {
+          "description": "3Bed 4Bath Showhome Cleaning",
+          "quantity": 4,
+          "unitPrice": 52.5,
+          "total": 210
+        },
+        {
+          "description": "Fuel Surcharge",
+          "quantity": 1,
+          "unitPrice": 12.5,
+          "total": 12.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MjEzMzM3",
+      "quoteNumber": "QT-4285",
+      "clientName": "Valorie Zilinski",
+      "clientPhone": "+17806166340",
+      "clientEmail": "valorie.zilinski@gmail.com",
+      "serviceAddress": "9234 164 Avenue Northwest, Edmonton, Alberta, T5Z 3M7",
+      "service": "1Bed 1Bath Deep Cleaning 2026",
+      "bedrooms": "1 Bedrooms",
+      "bathrooms": "1 Bathrooms",
+      "quoteStatus": "AWAITING_RESPONSE",
+      "total": 222.19,
+      "depositRequired": 50,
+      "createdAt": "2026-10-13T16:54:57Z",
+      "updatedAt": "2026-10-13T16:55:03Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTYwOTQ3ODU=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MTk3NDgzOQ==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/156094785",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67213337",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67213337",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning",
+          "quantity": 2,
+          "unitPrice": 100,
+          "total": 200
+        },
+        {
+          "description": "Fuel Surcharge",
+          "quantity": 1,
+          "unitPrice": 7.5,
+          "total": 7.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MjExNzUx",
+      "quoteNumber": "QT-4284",
+      "clientName": "Valorie Zilinski",
+      "clientPhone": "+17806166340",
+      "clientEmail": "valorie.zilinski@gmail.com",
+      "serviceAddress": "9234 164 Avenue Northwest, Edmonton, Alberta, T5Z 3M7",
+      "service": "1Bed 1Bath Deep Cleaning 2026",
+      "bedrooms": "1 Bedrooms",
+      "bathrooms": "1 Bathrooms",
+      "quoteStatus": "AWAITING_RESPONSE",
+      "total": 222.19,
+      "depositRequired": 50,
+      "createdAt": "2026-10-13T16:39:23Z",
+      "updatedAt": "2026-10-15T00:35:48Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTYwOTQ3ODU=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MTk3NDgzOQ==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/156094785",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67211751",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67211751",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning",
+          "quantity": 2,
+          "unitPrice": 100,
+          "total": 200
+        },
+        {
+          "description": "Fuel Surcharge",
+          "quantity": 1,
+          "unitPrice": 7.5,
+          "total": 7.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MjAzMjM1",
+      "quoteNumber": "QT-4283",
+      "clientName": "New Call [+17803948660]",
+      "clientPhone": "+17803948660",
+      "clientEmail": "jdhiemstra@outlook.con",
+      "serviceAddress": "11445 Ellerslie Road Southwest, 106, Edmonton, Alberta, T6W 1T1",
+      "service": "Basic Initial Cleaning 2026",
+      "bathrooms": "2026 Bathrooms",
+      "quoteStatus": "DRAFT",
+      "total": 168.19,
+      "depositRequired": 50,
+      "createdAt": "2026-10-13T15:17:50Z",
+      "updatedAt": "2026-10-13T15:17:50Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTYwODEyMjk=",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MTk2MDQ5Mw==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/156081229",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67203235",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67203235",
+      "lineItems": [
+        {
+          "description": "Basic Initial Cleaning",
+          "quantity": 3,
+          "unitPrice": 49,
+          "total": 147
+        },
+        {
+          "description": "Fuel Surcharge 2",
+          "quantity": 1,
+          "unitPrice": 12.5,
+          "total": 12.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MTEyOTk3",
+      "quoteNumber": "QT-4282",
+      "clientName": "Monique Wasyliw",
+      "clientPhone": "+17809195291",
+      "clientEmail": "moniquewasyliwkaminski@gmail.com",
+      "serviceAddress": "686 Adams Way Southwest, Edmonton, Alberta, T6W 0K1",
+      "service": "3Bed 3Bath Deep Cleaning 2026",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "quoteStatus": "DRAFT",
+      "total": 284.07,
+      "depositRequired": 75,
+      "createdAt": "2026-10-11T20:48:41Z",
+      "updatedAt": "2026-10-15T00:36:49Z",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC84MjI0MDk1Mg==",
+      "jobberPropertyId": "Z2lkOi8vSm9iYmVyL1Byb3BlcnR5LzE2MTc3OTQ2MA==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/82240952",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67112997",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67112997",
+      "lineItems": [
+        {
+          "description": "3Bed 3Bath Deep Cleaning",
+          "quantity": 2.5,
+          "unitPrice": 100,
+          "total": 250
+        },
+        {
+          "description": "Fuel Surcharge 2",
+          "quantity": 1,
+          "unitPrice": 12.5,
+          "total": 12.5
+        },
+        {
+          "description": "Discount $10 Google Ad",
+          "quantity": 1,
+          "unitPrice": -10,
+          "total": -10
+        }
+      ],
+      "isLiveSynced": true,
+      "syncedAt": "2026-10-16T00:38:45.184Z",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDg3MDY4",
+      "quoteNumber": "QT-4281",
+      "clientName": "Natasha Tsang",
+      "clientPhone": "7809932903",
+      "serviceAddress": "1015 Burns Close NW, Edmonton, AB",
+      "service": "4Bed 3Bath Deep Cleaning 2026",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "quoteStatus": "DRAFT",
+      "total": 461.25,
+      "depositRequired": 100,
+      "createdAt": "2026-10-10T04:13:25Z",
+      "assignedCleaners": [],
+      "verdict": "Good lead",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67087068",
+      "notes": "4Bed 3Bath Deep Cleaning 2026 at 1015 Burns Close NW, Edmonton, AB.",
+      "lineItems": [
+        {
+          "description": "4Bed 3Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 439.29,
+          "total": 439.29
+        }
+      ],
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4284",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67087068",
+      "clientEmail": "tash.tsang@gmail.com",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC82ODkwMjY3OQ==",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/68902679"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDg2ODY4",
+      "quoteNumber": "QT-4280",
+      "clientName": "Tanja Penina",
+      "clientPhone": "(587) 938-5714",
+      "serviceAddress": "Edmonton Southwest, AB",
+      "service": "2Bed 2Bath Deep Cleaning 2026",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "quoteStatus": "CHANGES_REQUESTED",
+      "total": 190.13,
+      "depositRequired": 50,
+      "createdAt": "2026-10-10T03:39:20Z",
+      "assignedCleaners": [],
+      "verdict": "Good lead",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67086868",
+      "notes": "2Bed 2Bath Deep Cleaning 2026.",
+      "lineItems": [
+        {
+          "description": "2Bed 2Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 197.5,
+          "total": 197.5
+        }
+      ],
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4306",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/67086868",
+      "clientEmail": "t.penina1@gmail.com",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTU4MzM4OTM=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/155833893",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDU4NDU2",
+      "quoteNumber": "QT-4279",
+      "clientName": "New Call [+15879305038]",
+      "clientPhone": "+15879305038",
+      "service": "Residential Deep & Standard Cleaning",
+      "quoteStatus": "DRAFT",
+      "total": 340.32,
+      "depositRequired": 100,
+      "createdAt": "2026-10-09T17:39:41Z",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67058456",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4282"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDI4MDIx",
+      "quoteNumber": "QT-4278",
+      "clientName": "Sana Ahmad",
+      "clientPhone": "(780) 902-7158",
+      "clientEmail": "sanausman2025@outlook.com",
+      "serviceAddress": "Edmonton, Alberta T6X 1J9",
+      "service": "2Bed 2Bath Move Out Cleaning 2026",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "quoteStatus": "DRAFT",
+      "total": 357.19,
+      "depositRequired": 100,
+      "createdAt": "2026-10-09T02:07:49Z",
+      "requestedDate": "2026-10-22",
+      "assignedCleaners": [],
+      "verdict": "Good lead",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67028021",
+      "notes": "2Bed 2Bath Move Out Cleaning requested for October 22.",
+      "lineItems": [
+        {
+          "description": "2Bed 2Bath Move Out Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 317.5,
+          "total": 317.5
+        }
+      ],
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4293"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDIyNTc1",
+      "quoteNumber": "QT-4277",
+      "clientName": "Parin Daya",
+      "clientPhone": "403-560-3307",
+      "serviceAddress": "839 Drysdale Run Northwest, Edmonton, Alberta",
+      "service": "2Bed 2Bath Initial Basic Cleaning",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "quoteStatus": "CONVERTED",
+      "total": 223.32,
+      "depositRequired": 50,
+      "createdAt": "2026-10-08T23:19:27Z",
+      "assignedCleaners": [],
+      "verdict": "Client",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/67022575",
+      "notes": "Initial Basic Cleaning at 839 Drysdale Run NW, Edmonton, AB.",
+      "lineItems": [
+        {
+          "description": "2Bed 2Bath Initial Basic Cleaning",
+          "quantity": 1,
+          "unitPrice": 198.5,
+          "total": 198.5
+        }
+      ],
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4308"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2OTYwNjE5",
+      "quoteNumber": "QT-4276",
+      "clientName": "New Call [+18259252449]",
+      "clientPhone": "+18259252449",
+      "service": "Residential Deep & Standard Cleaning",
+      "quoteStatus": "AWAITING_RESPONSE",
+      "total": 376.88,
+      "depositRequired": 100,
+      "createdAt": "2026-10-08T01:16:10Z",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/66960619",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4329"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2OTM1OTM4",
+      "quoteNumber": "QT-4275",
+      "clientName": "Colin F",
+      "clientPhone": "(709) 689-3033",
+      "service": "Residential Deep & Standard Cleaning",
+      "quoteStatus": "AWAITING_RESPONSE",
+      "total": 351.57,
+      "depositRequired": 100,
+      "createdAt": "2026-10-07T19:09:53Z",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/66935938",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4294"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2OTIwMjI0",
+      "quoteNumber": "QT-4274",
+      "clientName": "Colin F",
+      "clientPhone": "(709) 689-3033",
+      "service": "1Bed 1Bath Moveout Cleaning 2026",
+      "quoteStatus": "AWAITING_RESPONSE",
+      "total": 357.19,
+      "depositRequired": 100,
+      "createdAt": "2026-10-07T16:41:53Z",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/66920224",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4345",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66920224",
+      "serviceAddress": "2590 Anderson Way Southwest, 301, Edmonton, Alberta, T6W 0R2",
+      "clientEmail": "colinfarrell83@gmail.com",
+      "bedrooms": "1 Bedrooms",
+      "bathrooms": "1 Bathrooms",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTU1NzgwNzI=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/155578072",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODgzNTQz",
+      "quoteNumber": "QT-4273",
+      "clientName": "Shana Golden",
+      "clientPhone": "(780) 827-1707",
+      "service": "Residential Deep & Standard Cleaning",
+      "quoteStatus": "AWAITING_RESPONSE",
+      "total": 217.69,
+      "depositRequired": 50,
+      "createdAt": "2026-10-06T23:28:36Z",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/66883543",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4322"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODc5NTM1",
+      "quoteNumber": "QT-4272",
+      "clientName": "AVH Custom Homes LTD",
+      "clientPhone": "780-803-4874",
+      "service": "Residential Deep & Standard Cleaning",
+      "quoteStatus": "CONVERTED",
+      "total": 261.57,
+      "depositRequired": 0,
+      "createdAt": "2026-10-06T22:18:36Z",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/66879535",
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "lineItems": [
+        {
+          "description": "1Bed 1Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 175,
+          "total": 175
+        }
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4325"
+    },
+    {
+      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODEyMTA5",
+      "quoteNumber": "QT-4271",
+      "clientName": "Soymya",
+      "clientPhone": "3062510379",
+      "serviceAddress": "Chivers Cr, Chappelle, Edmonton, AB",
+      "service": "3Bed 2.5Bath Deep Cleaning 2026",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2.5 Bathrooms",
+      "quoteStatus": "DRAFT",
+      "total": 223.32,
+      "depositRequired": 50,
+      "createdAt": "2026-10-06T00:18:59Z",
+      "requestedDate": "2026-10-17",
+      "assignedCleaners": [],
+      "verdict": "Good lead",
+      "jobberWebUri": "https://secure.getjobber.com/quotes/66812109",
+      "notes": "1900 sq ft, 3 bed, 2.5 bath Deep cleaning in Chappelle. Preferred schedule: October 17 morning.",
+      "lineItems": [
+        {
+          "description": "3Bed 2.5Bath Deep Cleaning 2026",
+          "quantity": 1,
+          "unitPrice": 198.5,
+          "total": 198.5
+        }
+      ],
+      "googleSheetSynced": true,
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4346"
+    },
+    {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Nzg4MTg3",
       "quoteNumber": "QT-4270",
       "clientName": "Waldemar Dutra",
@@ -2279,7 +3144,9 @@
         }
       ],
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4328"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzgyNjI5",
@@ -2308,7 +3175,9 @@
         }
       ],
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4284"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Nzc4MDQx",
@@ -2339,7 +3208,9 @@
         }
       ],
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4363"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzcyMDA4",
@@ -2370,7 +3241,9 @@
         }
       ],
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4316"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzcxNTcy",
@@ -2398,7 +3271,9 @@
         }
       ],
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
+      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4358"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzE0ODg4",
@@ -2426,282 +3301,9 @@
         }
       ],
       "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDg3MDY4",
-      "quoteNumber": "QT-4281",
-      "clientName": "Natasha Tsang",
-      "clientPhone": "7809932903",
-      "serviceAddress": "1015 Burns Close NW, Edmonton, AB",
-      "service": "4Bed 3Bath Deep Cleaning 2026",
-      "bedrooms": "4 Bedrooms",
-      "bathrooms": "3 Bathrooms",
-      "quoteStatus": "DRAFT",
-      "total": 461.25,
-      "depositRequired": 100,
-      "createdAt": "2026-10-10T04:13:25Z",
-      "assignedCleaners": [],
-      "verdict": "Good lead",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/67087068",
-      "notes": "4Bed 3Bath Deep Cleaning 2026 at 1015 Burns Close NW, Edmonton, AB.",
-      "lineItems": [
-        {
-          "description": "4Bed 3Bath Deep Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 439.29,
-          "total": 439.29
-        }
-      ],
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDg2ODY4",
-      "quoteNumber": "QT-4280",
-      "clientName": "Tanja Penina",
-      "clientPhone": "(587) 938-5714",
-      "serviceAddress": "Edmonton Southwest, AB",
-      "service": "2Bed 2Bath Deep Cleaning 2026",
-      "bedrooms": "2 Bedrooms",
-      "bathrooms": "2 Bathrooms",
-      "quoteStatus": "CHANGES_REQUESTED",
-      "total": 222.19,
-      "depositRequired": 50,
-      "createdAt": "2026-10-10T03:39:20Z",
-      "assignedCleaners": [],
-      "verdict": "Good lead",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/67086868",
-      "notes": "2Bed 2Bath Deep Cleaning 2026.",
-      "lineItems": [
-        {
-          "description": "2Bed 2Bath Deep Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 197.5,
-          "total": 197.5
-        }
-      ],
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDI4MDIx",
-      "quoteNumber": "QT-4278",
-      "clientName": "Sana Ahmad",
-      "clientPhone": "(780) 902-7158",
-      "clientEmail": "sanausman2025@outlook.com",
-      "serviceAddress": "Edmonton, Alberta T6X 1J9",
-      "service": "2Bed 2Bath Move Out Cleaning 2026",
-      "bedrooms": "2 Bedrooms",
-      "bathrooms": "2 Bathrooms",
-      "quoteStatus": "DRAFT",
-      "total": 357.19,
-      "depositRequired": 100,
-      "createdAt": "2026-10-09T02:07:49Z",
-      "requestedDate": "2026-10-22",
-      "assignedCleaners": [],
-      "verdict": "Good lead",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/67028021",
-      "notes": "2Bed 2Bath Move Out Cleaning requested for October 22.",
-      "lineItems": [
-        {
-          "description": "2Bed 2Bath Move Out Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 317.5,
-          "total": 317.5
-        }
-      ],
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDIyNTc1",
-      "quoteNumber": "QT-4277",
-      "clientName": "Parin Daya",
-      "clientPhone": "403-560-3307",
-      "serviceAddress": "839 Drysdale Run Northwest, Edmonton, Alberta",
-      "service": "2Bed 2Bath Initial Basic Cleaning",
-      "bedrooms": "2 Bedrooms",
-      "bathrooms": "2 Bathrooms",
-      "quoteStatus": "CONVERTED",
-      "total": 223.32,
-      "depositRequired": 50,
-      "createdAt": "2026-10-08T23:19:27Z",
-      "assignedCleaners": [],
-      "verdict": "Client",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/67022575",
-      "notes": "Initial Basic Cleaning at 839 Drysdale Run NW, Edmonton, AB.",
-      "lineItems": [
-        {
-          "description": "2Bed 2Bath Initial Basic Cleaning",
-          "quantity": 1,
-          "unitPrice": 198.5,
-          "total": 198.5
-        }
-      ],
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODEyMTA5",
-      "quoteNumber": "QT-4271",
-      "clientName": "Soymya",
-      "clientPhone": "3062510379",
-      "serviceAddress": "Chivers Cr, Chappelle, Edmonton, AB",
-      "service": "3Bed 2.5Bath Deep Cleaning 2026",
-      "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms",
-      "quoteStatus": "DRAFT",
-      "total": 223.32,
-      "depositRequired": 50,
-      "createdAt": "2026-10-06T00:18:59Z",
-      "requestedDate": "2026-10-17",
-      "assignedCleaners": [],
-      "verdict": "Good lead",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/66812109",
-      "notes": "1900 sq ft, 3 bed, 2.5 bath Deep cleaning in Chappelle. Preferred schedule: October 17 morning.",
-      "lineItems": [
-        {
-          "description": "3Bed 2.5Bath Deep Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 198.5,
-          "total": 198.5
-        }
-      ],
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit"
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDU4NDU2",
-      "quoteNumber": "QT-4279",
-      "clientName": "New Call [+15879305038]",
-      "clientPhone": "+15879305038",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "DRAFT",
-      "total": 340.32,
-      "depositRequired": 100,
-      "createdAt": "2026-10-09T17:39:41Z",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/67058456",
-      "googleSheetSynced": true,
       "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "lineItems": [
-        {
-          "description": "1Bed 1Bath Deep Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 175,
-          "total": 175
-        }
-      ]
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2OTYwNjE5",
-      "quoteNumber": "QT-4276",
-      "clientName": "New Call [+18259252449]",
-      "clientPhone": "+18259252449",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "AWAITING_RESPONSE",
-      "total": 376.88,
-      "depositRequired": 100,
-      "createdAt": "2026-10-08T01:16:10Z",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/66960619",
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "lineItems": [
-        {
-          "description": "1Bed 1Bath Deep Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 175,
-          "total": 175
-        }
-      ]
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2OTM1OTM4",
-      "quoteNumber": "QT-4275",
-      "clientName": "Colin F",
-      "clientPhone": "(709) 689-3033",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "AWAITING_RESPONSE",
-      "total": 351.57,
-      "depositRequired": 100,
-      "createdAt": "2026-10-07T19:09:53Z",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/66935938",
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "lineItems": [
-        {
-          "description": "1Bed 1Bath Deep Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 175,
-          "total": 175
-        }
-      ]
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2OTIwMjI0",
-      "quoteNumber": "QT-4274",
-      "clientName": "Colin F",
-      "clientPhone": "(709) 689-3033",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "DRAFT",
-      "total": 357.19,
-      "depositRequired": 100,
-      "createdAt": "2026-10-07T16:41:53Z",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/66920224",
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "lineItems": [
-        {
-          "description": "1Bed 1Bath Deep Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 175,
-          "total": 175
-        }
-      ]
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODgzNTQz",
-      "quoteNumber": "QT-4273",
-      "clientName": "Shana Golden",
-      "clientPhone": "(780) 827-1707",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "AWAITING_RESPONSE",
-      "total": 217.69,
-      "depositRequired": 50,
-      "createdAt": "2026-10-06T23:28:36Z",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/66883543",
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "lineItems": [
-        {
-          "description": "1Bed 1Bath Deep Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 175,
-          "total": 175
-        }
-      ]
-    },
-    {
-      "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODc5NTM1",
-      "quoteNumber": "QT-4272",
-      "clientName": "AVH Custom Homes LTD",
-      "clientPhone": "780-803-4874",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "CONVERTED",
-      "total": 261.57,
-      "depositRequired": 0,
-      "createdAt": "2026-10-06T22:18:36Z",
-      "jobberWebUri": "https://secure.getjobber.com/quotes/66879535",
-      "googleSheetSynced": true,
-      "googleSheetUrl": "https://docs.google.com/spreadsheets/d/1TifULi7n2BylQdvla-8DRvYHul_A1wXXzypUdBJwEeA/edit",
-      "lineItems": [
-        {
-          "description": "1Bed 1Bath Deep Cleaning 2026",
-          "quantity": 1,
-          "unitPrice": 175,
-          "total": 175
-        }
-      ]
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4318"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NjY2NTUx",
@@ -2726,7 +3328,9 @@
           "unitPrice": 407.5,
           "total": 407.5
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4312"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NjE2MTYx",
@@ -2751,7 +3355,9 @@
           "unitPrice": 210,
           "total": 210
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4306"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NjA2MTA1",
@@ -2774,7 +3380,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4364"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NDU0MDg1",
@@ -2782,7 +3390,7 @@
       "clientName": "Aman Kaur",
       "clientPhone": "p:+13062029214",
       "service": "3Bed 2.5Bath Deep Cleaning",
-      "quoteStatus": "AWAITING_RESPONSE",
+      "quoteStatus": "ARCHIVED",
       "total": 298.13,
       "depositRequired": 75,
       "createdAt": "2026-09-29T15:44:23Z",
@@ -2799,15 +3407,23 @@
           "unitPrice": 223.32,
           "total": 223.32
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4285",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66454085",
+      "clientEmail": "aman546moga@gmail.com",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTQ2NTUwMDI=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/154655002",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NDQ5OTk4",
       "quoteNumber": "QT-4260",
       "clientName": "Breana Morrell",
       "clientPhone": "(780) 214-4189",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "AWAITING_RESPONSE",
+      "service": "Deep Cleaning Services",
+      "quoteStatus": "ARCHIVED",
       "total": 340.32,
       "depositRequired": 100,
       "createdAt": "2026-09-29T15:02:36Z",
@@ -2821,15 +3437,26 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4308",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66449998",
+      "serviceAddress": "7708 7A Ave, Edmonton, Alberta, T6X0A2",
+      "clientEmail": "morrellbreana@hotmail.com",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTQ3NTEyMDM=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/154751203",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NDIxMjk4",
       "quoteNumber": "QT-4259",
       "clientName": "Tami Shandro",
       "clientPhone": "7809197149",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "AWAITING_RESPONSE",
+      "service": "Move Out Cleaning Services 2026",
+      "quoteStatus": "ARCHIVED",
       "total": 357.19,
       "depositRequired": 100,
       "createdAt": "2026-09-28T22:51:19Z",
@@ -2843,7 +3470,17 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4350",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66421298",
+      "serviceAddress": "2755 109 Street Northwest, Unit 206, Edmonton, Alberta, T6J 5S4",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTQ3MDQ2NjU=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/154704665",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Mzg4NzEw",
@@ -2866,7 +3503,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4339"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Mzg4MzM2",
@@ -2889,15 +3528,17 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4308"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Mzg3MTI1",
       "quoteNumber": "QT-4256",
       "clientName": "Gabby Hillier",
       "clientPhone": "7809527881",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "AWAITING_RESPONSE",
+      "service": "MoveIn Cleaning Services 2026",
+      "quoteStatus": "ARCHIVED",
       "total": 317.82,
       "depositRequired": 100,
       "createdAt": "2026-09-28T17:08:04Z",
@@ -2911,15 +3552,26 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4364",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66387125",
+      "serviceAddress": "18130 81 Avenue Northwest, Edmonton, Alberta, T5T 1S4",
+      "clientEmail": "prairiehomerentals@gmail.com",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "1.5 Bathrooms",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xMDk5NDUwNTM=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/109945053",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzUwMzI2",
       "quoteNumber": "QT-4255",
       "clientName": "New Call [+15877854299]",
       "clientPhone": "+15877854299",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "AWAITING_RESPONSE",
+      "service": "3Bed 2Bath Moveout Cleaning 2026",
+      "quoteStatus": "ARCHIVED",
       "total": 357.19,
       "depositRequired": 100,
       "createdAt": "2026-09-27T22:47:04Z",
@@ -2933,15 +3585,25 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4361",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66350326",
+      "serviceAddress": "11728 92A Avenue Northwest, Edmonton, Alberta, T5T 7L9",
+      "bedrooms": "3 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTQ1OTM1MjM=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/154593523",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzQ3NzI3",
       "quoteNumber": "QT-4254",
       "clientName": "brooklyn",
       "clientPhone": "5878771463",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "AWAITING_RESPONSE",
+      "service": "Standard Home Cleaning — Monday, September 28, 2026 at 9:00 AM",
+      "quoteStatus": "ARCHIVED",
       "total": 162,
       "depositRequired": 50,
       "createdAt": "2026-09-27T20:13:22Z",
@@ -2955,7 +3617,15 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4332",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66347727",
+      "serviceAddress": "9731 105street, Edmonton, AB, T5K 1A2",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTQ1ODM3NTI=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/154583752",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzQ1NjU0",
@@ -2978,7 +3648,9 @@
           "unitPrice": 155,
           "total": 155
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4352"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzM4NDM1",
@@ -3003,15 +3675,17 @@
           "unitPrice": 210,
           "total": 210
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4340"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzMzNjA4",
       "quoteNumber": "QT-4251",
       "clientName": "Bryan Giesbrecht",
       "clientPhone": "(780) 920-0418",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "APPROVED",
+      "service": "Basic Initial Cleaning 2026",
+      "quoteStatus": "ARCHIVED",
       "total": 333.57,
       "depositRequired": 100,
       "createdAt": "2026-09-26T19:15:49Z",
@@ -3025,7 +3699,18 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4350",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66333608",
+      "serviceAddress": "5057 cawsey link sw, Edmonton, Alberta, T6W 5Y6",
+      "clientEmail": "giesbrecht.bryan@gmail.com",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTQ1MTg3ODc=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/154518787",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzE3NDgx",
@@ -3033,7 +3718,7 @@
       "clientName": "Sara Chags",
       "clientPhone": "(780) 934-7609",
       "service": "3Bed 2.5Bath Deep Cleaning",
-      "quoteStatus": "APPROVED",
+      "quoteStatus": "ARCHIVED",
       "total": 365.63,
       "depositRequired": 100,
       "createdAt": "2026-09-25T23:15:11Z",
@@ -3050,15 +3735,23 @@
           "unitPrice": 223.32,
           "total": 223.32
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4345",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66317481",
+      "clientEmail": "sundichags@gmail.com",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xMzAxODA1NjA=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/130180560",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzE3MzA2",
       "quoteNumber": "QT-4249",
       "clientName": "Muslimo Mahdi",
       "clientPhone": "17802002462",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "APPROVED",
+      "service": "2bed 2 bath Initial Basic Cleaning — Friday, September 25, 2026 at 5:12 PM",
+      "quoteStatus": "ARCHIVED",
       "total": 227.82,
       "depositRequired": 50,
       "createdAt": "2026-09-25T23:10:24Z",
@@ -3072,15 +3765,26 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4293",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66317306",
+      "serviceAddress": "547 Hermitage Rd Nw, Edmonton, Edmonton, T5A 3M8",
+      "clientEmail": "muslimomahdi2015@gmail.com",
+      "bedrooms": "2 Bedrooms",
+      "bathrooms": "2 Bathrooms",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTQ0MTU1MzQ=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/154415534",
+      "updatedAt": "2026-10-16T00:38:45.184Z",
+      "syncedAt": "2026-10-16T00:38:45.184Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzA0OTUy",
       "quoteNumber": "QT-4248",
       "clientName": "Sadia Nasim",
       "clientPhone": "5876460860",
-      "service": "Residential Deep & Standard Cleaning",
-      "quoteStatus": "APPROVED",
+      "service": "Basic Initial Cleaning 2026",
+      "quoteStatus": "ARCHIVED",
       "total": 333.57,
       "depositRequired": 85,
       "createdAt": "2026-09-25T19:49:29Z",
@@ -3094,7 +3798,18 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": true,
+      "jobberQuoteId": "qt_4344",
+      "clientHubUri": "https://clienthub.getjobber.com/client_hubs/80aa9b22-e31a-48d1-b225-c49ad4a09d89/quotes/66304952",
+      "serviceAddress": "9547 Carson Bend Southwest, Edmonton, Alberta, T9G 0B7",
+      "clientEmail": "sadianasim@yahoo.com",
+      "bedrooms": "4 Bedrooms",
+      "bathrooms": "3 Bathrooms",
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xMTQyMjAzMzM=",
+      "jobberClientWebUri": "https://secure.getjobber.com/clients/114220333",
+      "updatedAt": "2026-10-16T00:38:45.185Z",
+      "syncedAt": "2026-10-16T00:38:45.185Z"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Mjg3NTY1",
@@ -3119,7 +3834,9 @@
           "unitPrice": 439.29,
           "total": 439.29
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4322"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MjQ3MTIz",
@@ -3141,7 +3858,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4343"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MjM4MTg2",
@@ -3163,7 +3882,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4346"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MjExMjA1",
@@ -3188,7 +3909,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4293"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MTg1Nzc4",
@@ -3210,7 +3933,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4364"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MTU2MDg1",
@@ -3235,7 +3960,9 @@
           "unitPrice": 215,
           "total": 215
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4315"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MDI3ODYw",
@@ -3257,7 +3984,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4289"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MDAyNjEy",
@@ -3280,7 +4009,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4358"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MDAxNTg4",
@@ -3303,7 +4034,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4294"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MDAwNjMz",
@@ -3326,7 +4059,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4307"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTY0Mzg4",
@@ -3351,7 +4086,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4329"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTYyMDYy",
@@ -3374,7 +4111,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4335"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTQ4Mzky",
@@ -3396,7 +4135,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4312"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTM4NzM0",
@@ -3419,7 +4160,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4368"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTIzOTg0",
@@ -3441,7 +4184,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4340"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTExNzkw",
@@ -3466,7 +4211,9 @@
           "unitPrice": 215,
           "total": 215
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4334"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTAxNjQ5",
@@ -3488,7 +4235,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4338"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1ODQxODk1",
@@ -3511,7 +4260,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4283"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NzEwMjIw",
@@ -3533,7 +4284,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4340"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NjUwNzQy",
@@ -3555,7 +4308,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4359"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NTY4MjQy",
@@ -3577,7 +4332,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4368"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NTYxNTAz",
@@ -3600,7 +4357,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4330"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NTU3MTM5",
@@ -3622,7 +4381,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4356"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NDc0MzE4",
@@ -3645,7 +4406,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4312"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1NDY5NDMy",
@@ -3668,7 +4431,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4307"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1Mzc1MDIw",
@@ -3690,7 +4455,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4332"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MzYzMjQ1",
@@ -3712,7 +4479,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4356"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MzE4MjMx",
@@ -3735,7 +4504,9 @@
           "unitPrice": 155,
           "total": 155
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4334"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MzA5ODM2",
@@ -3757,7 +4528,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4359"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MzA5MDI4",
@@ -3780,7 +4553,9 @@
           "unitPrice": 155,
           "total": 155
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4338"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjU3NTUz",
@@ -3802,7 +4577,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4314"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjI5MjMz",
@@ -3824,7 +4601,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4369"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjI5MTc0",
@@ -3846,7 +4625,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4284"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjE1NjM3",
@@ -3868,7 +4649,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4283"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MjAzNDQz",
@@ -3891,7 +4674,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4325"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MTYzOTQy",
@@ -3913,7 +4698,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4359"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MTQ3MzU1",
@@ -3935,7 +4722,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4313"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MDU1MDM2",
@@ -3957,7 +4746,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4319"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1MDA0NTE5",
@@ -3979,7 +4770,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4353"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY0OTYxNDg4",
@@ -4002,7 +4795,9 @@
           "unitPrice": 155,
           "total": 155
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4324"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY0OTU4Njc5",
@@ -4025,7 +4820,9 @@
           "unitPrice": 265,
           "total": 265
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4289"
     },
     {
       "id": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY0OTU3MDIy",
@@ -4047,7 +4844,9 @@
           "unitPrice": 175,
           "total": 175
         }
-      ]
+      ],
+      "isLiveSynced": false,
+      "jobberQuoteId": "qt_4299"
     }
   ],
   "invoices": [
@@ -5006,11 +5805,12 @@
   "jobberConfig": {
     "isConnected": true,
     "accountName": "Tidyups Cleaning Service Inc",
-    "clientId": "9c383ceb-4970-4ef1-a85a-649bf2de63b7",
-    "clientSecret": "0199073a37ac8e8780fcfb534fbffd7b127ee502f34526e83dd040f1f24de8e7",
-    "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOjE1ODAxNzYsImlzcyI6Imh0dHBzOi8vYXBpLmdldGpvYmJlci5jb20iLCJjbGllbnRfaWQiOiI5YzM4M2NlYi00OTcwLTRlZjEtYTg1YS02NDliZjJkZTYzYjciLCJzY29wZSI6InJlYWRfY2xpZW50cyB3cml0ZV9jbGllbnRzIHJlYWRfcmVxdWVzdHMgd3JpdGVfcmVxdWVzdHMgcmVhZF9xdW90ZXMgd3JpdGVfcXVvdGVzIHJlYWRfam9icyB3cml0ZV9qb2JzIHJlYWRfc2NoZWR1bGVkX2l0ZW1zIHdyaXRlX3NjaGVkdWxlZF9pdGVtcyByZWFkX2ludm9pY2VzIHdyaXRlX2ludm9pY2VzIHJlYWRfam9iYmVyX3BheW1lbnRzIHJlYWRfdXNlcnMgd3JpdGVfdXNlcnMgd3JpdGVfdGF4X3JhdGVzIHJlYWRfZXhwZW5zZXMgd3JpdGVfZXhwZW5zZXMgcmVhZF9jdXN0b21fZmllbGRfY29uZmlndXJhdGlvbnMgcmVhZF90aW1lX3NoZWV0cyByZWFkX2VxdWlwbWVudCB3cml0ZV9lcXVpcG1lbnQgcmVhZF9tYXJrZXRpbmcgd3JpdGVfbWFya2V0aW5nIiwiYXBwX2lkIjoiOWMzODNjZWItNDk3MC00ZWYxLWE4NWEtNjQ5YmYyZGU2M2I3IiwidXNlcl9pZCI6MTU4MDE3NiwiYWNjb3VudF9pZCI6NzE4NTc2LCJhdWQiOlsiaHR0cHM6Ly9nZXRqb2JiZXIuY29tL2dyYXBocWwiXSwiZXhwIjoxNzkxNzQ1OTU3fQ.QHD6OX9oWM-6d4Anbv-ppDw72Wj7hzDtk2nYXugRFvE",
+    "clientId": "27966135-e33e-4c2e-8dc3-ad7ba06dabb8",
+    "clientSecret": "65534ce762fe3ec20a5c1447794dabee0ac03f2caf1048c8686377d4e754a36a",
+    "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOjE1ODAxNzYsImlzcyI6Imh0dHBzOi8vYXBpLmdldGpvYmJlci5jb20iLCJjbGllbnRfaWQiOiIyNzk2NjEzNS1lMzNlLTRjMmUtOGRjMy1hZDdiYTA2ZGFiYjgiLCJzY29wZSI6InJlYWRfY2xpZW50cyB3cml0ZV9jbGllbnRzIHJlYWRfcmVxdWVzdHMgd3JpdGVfcmVxdWVzdHMgcmVhZF9xdW90ZXMgd3JpdGVfcXVvdGVzIHJlYWRfam9icyB3cml0ZV9qb2JzIHJlYWRfc2NoZWR1bGVkX2l0ZW1zIHdyaXRlX3NjaGVkdWxlZF9pdGVtcyByZWFkX2ludm9pY2VzIHdyaXRlX2ludm9pY2VzIHJlYWRfam9iYmVyX3BheW1lbnRzIHJlYWRfdXNlcnMgd3JpdGVfdXNlcnMgd3JpdGVfdGF4X3JhdGVzIHJlYWRfZXhwZW5zZXMgd3JpdGVfZXhwZW5zZXMgcmVhZF9jdXN0b21fZmllbGRfY29uZmlndXJhdGlvbnMgd3JpdGVfY3VzdG9tX2ZpZWxkX2NvbmZpZ3VyYXRpb25zIHJlYWRfdGltZV9zaGVldHMgcmVhZF9lcXVpcG1lbnQgd3JpdGVfZXF1aXBtZW50IHJlYWRfbWFya2V0aW5nIHdyaXRlX21hcmtldGluZyIsImFwcF9pZCI6IjI3OTY2MTM1LWUzM2UtNGMyZS04ZGMzLWFkN2JhMDZkYWJiOCIsInVzZXJfaWQiOjE1ODAxNzYsImFjY291bnRfaWQiOjcxODU3NiwiYXVkIjpbImh0dHBzOi8vZ2V0am9iYmVyLmNvbS9ncmFwaHFsIl0sImV4cCI6MTc5MjExMjYwN30.PgqfgpL4JPDg0DpgIeipGXenwwHcfosHgq5dKl6PdJ0",
     "refreshToken": "fb6cc6a384c3c9811ef1925325e00043",
-    "lastSyncedAt": "2026-10-11T18:13:53.154Z"
+    "lastSyncedAt": "2026-10-16T00:04:16.728Z",
+    "redirectUri": "https://app.tidyupscleaning.com/api/jobber/oauth/callback"
   },
   "chatMessages": [
     {
@@ -5272,6 +6072,30 @@
     }
   ],
   "clients": [
+    {
+      "id": "cli-jobber-mva6cx3e",
+      "name": "Rahen",
+      "phone": "4165601354",
+      "email": "",
+      "address": "7112 39 Avenue Northwest, Edmonton, AB, Canada",
+      "city": "Edmonton",
+      "province": "AB",
+      "postalCode": "",
+      "verdict": "Good lead",
+      "tags": [
+        "jobber-sync",
+        "quote-gs-2863",
+        "quote-qt-4331"
+      ],
+      "isJobberLinked": true,
+      "jobberId": "jobber-cli-4315",
+      "totalJobs": 1,
+      "latestServiceDate": "2026-10-15",
+      "notes": "Google Synced Layout — Total: $239.06 | Deposit: $50.00 | Discount: -$10.00 | Balance: $189.06 | 3 Bedrooms, 2 Bathrooms (2 hrs @ $105.00/hr).",
+      "source": "Jobber",
+      "createdAt": "2026-10-15T23:33:24.746Z",
+      "updatedAt": "2026-10-16T00:09:04.807Z"
+    },
     {
       "id": "cli-quo-1791684104950-5wrc",
       "name": "Kati Luknowsky",
@@ -7492,628 +8316,29 @@
   },
   "adLeads": [
     {
-      "id": "manual_9505592b-e123-42cd-882a-e2121eebd327",
-      "customerName": "Soumya",
-      "phone": "+1 (306) 251-0379",
+      "id": "lead-clean-rahum-4293",
+      "customerName": "Rahum (Raheem)",
+      "phone": "416-560-1354",
       "email": "",
-      "address": "Chivers Cr, Chappelle",
+      "address": "7112 49 Street Northwest",
       "city": "Edmonton",
-      "postalCode": "T6W 3Y9",
-      "serviceRequested": "3Bed 2.5Bath Deep Cleaning 2026",
-      "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms",
-      "dateOfServiceRequested": "October 17 morning",
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "campaignName": "Lead message processor",
-      "dateReceived": "2026-10-05T23:26:21.325Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2ODEyMTA5",
-      "quoteNumber": "QT-4271",
-      "quotedAmount": 223.32,
-      "notes": "1900 sq ft, 3 bed, 2.5 bath, living room, kitchen, bonus room. Service requested: Deep cleaning. Preferred schedule: October 17 morning. Focus on washrooms and kitchen."
-    },
-    {
-      "id": "jobber_waldemar_4270",
-      "customerName": "Waldemar Dutra",
-      "phone": "(780) 990-4635",
-      "email": "",
-      "address": "8 coachman way Basement Suite",
-      "city": "Edmonton",
-      "postalCode": "T8H 1C5",
-      "serviceRequested": "Move Out Cleaning Services 2026",
-      "bedrooms": "2 Bedrooms",
-      "bathrooms": "1 Bathroom",
-      "dateOfServiceRequested": "October 2026",
-      "source": "From Jobber",
-      "sourceTab": "Jobber Quotes",
-      "dateReceived": "2026-10-05T19:20:04Z",
-      "status": "Converted",
-      "verdict": "Client",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Nzg4MTg3",
-      "quoteNumber": "QT-4270",
-      "quotedAmount": 354.38,
-      "notes": "Move Out Cleaning Services 2026 at 8 coachman way Basement Suite, Edmonton, AB T8H 1C5. Synced to Jobber Quote #4270."
-    },
-    {
-      "id": "jobber_jaskaranjit_4268",
-      "customerName": "Jaskaranjit Dhaliwal",
-      "phone": "(780) 394-4846",
-      "email": "",
-      "address": "173 Cornell Court",
-      "city": "Edmonton",
-      "postalCode": "T5C 3C3",
-      "serviceRequested": "Move Out Cleaning Services 2026",
-      "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms",
-      "dateOfServiceRequested": "October 2026",
-      "source": "From Jobber",
-      "sourceTab": "Jobber Quotes",
-      "dateReceived": "2026-10-05T17:49:01Z",
-      "status": "Converted",
-      "verdict": "Client",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Nzc4MDQx",
-      "quoteNumber": "QT-4268",
-      "quotedAmount": 458.44,
-      "notes": "Move Out Cleaning Services 2026 at 173 Cornell Court, Edmonton, Alberta T5C 3C3. Synced to Jobber Quote #4268."
-    },
-    {
-      "id": "l:1375539724652986",
-      "customerName": "Angela Swindler",
-      "phone": "(780) 722-9187",
-      "email": "Jaybird451965@gmail.com",
-      "address": "9616 182 st nw",
-      "city": "Edmonton",
-      "postalCode": "T5T 3N4",
-      "serviceRequested": "3Bed 2Bath Moveout Cleaning 2026",
+      "postalCode": "T6B 1K5",
+      "serviceRequested": "3Bed 2Bath Basic Initial Cleaning (1 Pro Cleaner)",
       "bedrooms": "3 Bedrooms",
       "bathrooms": "2 Bathrooms",
-      "dateOfServiceRequested": "October 28",
-      "source": "Facebook Ad",
-      "sourceTab": "FB Leads_V2",
-      "campaignName": "RP #2 Ads - New Website Leads Sept",
-      "formId": "f:2607094299786742",
-      "adId": "ag:120249288276750165",
-      "dateReceived": "2026-10-05T16:55:01Z",
+      "dateOfServiceRequested": "2026-10-16",
+      "source": "Voice / Quick Quote",
+      "sourceTab": "Voice & Quick Quotes",
+      "campaignName": "Clean Sheet — Voice & Quick Quote",
+      "dateReceived": "2026-10-15T23:46:55Z",
       "status": "New",
       "verdict": "Good lead",
       "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzcyMDA4",
-      "quoteNumber": "QT-4267",
-      "quotedAmount": 365.63,
-      "notes": "Imported from Google Sheets \"FB Leads_V2\". Requested: 3Bed 2Bath Moveout Cleaning 2026 for October 28. Synced to Jobber Quote #4267."
-    },
-    {
-      "id": "jobber_alawi_4266",
-      "customerName": "Alawi Agroomah",
-      "phone": "(647) 834-9444",
-      "email": "",
-      "address": "320 Ambleside Link Southwest 221",
-      "city": "Edmonton",
-      "postalCode": "T6W 0Z6",
-      "serviceRequested": "2Bed 2Bath Deep Cleaning 2026",
-      "bedrooms": "2 Bedrooms",
-      "bathrooms": "2 Bathrooms",
-      "dateOfServiceRequested": "October 2026",
-      "source": "From Jobber",
-      "sourceTab": "Jobber Quotes",
-      "dateReceived": "2026-10-05T16:50:54Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzcxNTcy",
-      "quoteNumber": "QT-4266",
-      "quotedAmount": 222.19,
-      "notes": "Approved in Jobber. Requested: 2Bed 2Bath Deep Cleaning 2026 at 320 Ambleside Link Southwest 221. Synced to Jobber Quote #4266."
-    },
-    {
-      "id": "manual_2ec13e66-a3f0-4ebc-b7f0-e3edea84673d",
-      "customerName": "Jared Becher",
-      "phone": "(587) 281-2205",
-      "email": "",
-      "address": "2527 38a St NW",
-      "city": "Edmonton",
-      "postalCode": "T6L 4L6",
-      "serviceRequested": "3Bed 1.5Bath Standard / Deep Clean",
-      "bedrooms": "3 Bedrooms",
-      "bathrooms": "1.5 Bathrooms",
-      "dateOfServiceRequested": "Flexible",
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "campaignName": "Lead message processor",
-      "dateReceived": "2026-10-04T23:42:51.347Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": false,
-      "notes": "3 bedrooms and 1.5 bathrooms (1 full bathroom with shower/tub combo and one half bath ensuite in master bedroom). Stacked laundry in closet. Approx 1,150 ft2."
-    },
-    {
-      "id": "jobber_raj_4265",
-      "customerName": "Raj Dhillon",
-      "phone": "(780) 803-4647",
-      "email": "",
-      "address": "6105 52 Avenue",
-      "city": "Edmonton",
-      "postalCode": "T6B 3B2",
-      "serviceRequested": "MoveIn - Post Construction",
-      "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms",
-      "dateOfServiceRequested": "October 2026",
-      "source": "From Jobber",
-      "sourceTab": "Jobber Quotes",
-      "dateReceived": "2026-10-03T18:36:04Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NzE0ODg4",
-      "quoteNumber": "QT-4265",
-      "quotedAmount": 376.88,
-      "notes": "Requested: MoveIn - Post Construction at 6105 52 Avenue. Synced to Jobber Quote #4265."
-    },
-    {
-      "id": "manual_3c8775bd-a2c5-473c-9396-71230b7257f5",
-      "customerName": "Sana Ahmad",
-      "phone": "(780) 902-7158",
-      "email": "sanausman2025@outlook.com",
-      "address": "Edmonton South SW",
-      "city": "Edmonton",
-      "postalCode": "T6X 1J9",
-      "serviceRequested": "2Bed 2Bath Move Out Cleaning",
-      "bedrooms": "2 Bedrooms",
-      "bathrooms": "2 Bathrooms",
-      "dateOfServiceRequested": "October 22",
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "campaignName": "Lead message processor",
-      "dateReceived": "2026-09-30T22:32:07.817Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3MDI4MDIx",
-      "quoteNumber": "QT-4278",
-      "quotedAmount": 357.19,
-      "notes": "Service Interested In: Move Out Cleaning. How Many Bedrooms: 2. How Many Bathrooms: 2. Best Date For Service: 22 Oct. Post code: T6X1J9."
-    },
-    {
-      "id": "l:1106148275125023",
-      "customerName": "Aman Kaur",
-      "phone": "+1 (306) 202-9214",
-      "email": "aman546moga@gmail.com",
-      "address": "2505 22 Ave Nw",
-      "city": "Edmonton",
-      "postalCode": "T6T 0Y4",
-      "serviceRequested": "3Bed 2.5Bath Deep Cleaning",
-      "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms",
-      "dateOfServiceRequested": "September 29",
-      "source": "Facebook Ad",
-      "sourceTab": "FB Leads_V2",
-      "campaignName": "RP #2 Ads - New Website Leads Sept",
-      "formId": "f:2607094299786742",
-      "adId": "ag:120249288276750165",
-      "dateReceived": "2026-09-29T15:44:23Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NDU0MDg1",
-      "quoteNumber": "QT-4261",
-      "quotedAmount": 298.13,
-      "notes": "Imported from Google Sheets \"FB Leads_V2\". 3 Bedrooms, 2.5 Bathrooms Deep Cleaning at 2505 22 Ave NW, Edmonton, AB T6T 0Y4."
-    },
-    {
-      "id": "manual_299add24-fa54-41c7-af8c-6a4076ceab17",
-      "customerName": "Adeib Bashar",
-      "phone": "",
-      "email": "adeib.bashar@gmail.com",
-      "address": "3858 Agar Green SW",
-      "city": "Edmonton",
-      "postalCode": "T6W 4C1",
-      "serviceRequested": "One-Time Initial Clean (Switch to Monthly)",
-      "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms",
-      "dateOfServiceRequested": "Weekend (10:00 AM – 2:00 PM)",
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "campaignName": "Lead message processor",
-      "dateReceived": "2026-09-29T02:26:39.207Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "missingPhone": true,
-      "notes": "Two-storey house with finished basement (approx 1,800 sq ft). 2.5 Bathrooms. Occupants: Family and a cat present. Hardwood floors, wood cabinetry, and tile.",
-      "isJobberSynced": false
-    },
-    {
-      "id": "l:1412246111100615",
-      "customerName": "Iman Ibrahim",
-      "phone": "(780) 246-5950",
-      "email": "ema.taha.82@gmail.com",
-      "address": "Dickinsfield Court NW",
-      "city": "Edmonton",
-      "postalCode": "T5E 6B4",
-      "serviceRequested": "2Bed + Basement 1Bath Deep Cleaning",
-      "bedrooms": "2 Bedrooms + Basement",
-      "bathrooms": "1 Bathroom",
-      "dateOfServiceRequested": "September 28 Monday",
-      "source": "Facebook Ad",
-      "sourceTab": "FB Leads_V2",
-      "campaignName": "RP #2 Ads - New Website Leads Sept",
-      "formId": "f:2607094299786742",
-      "adId": "ag:120249288276750165",
-      "dateReceived": "2026-09-28T08:32:44-05:00",
-      "status": "New",
-      "verdict": "Good lead",
-      "notes": "Imported from Google Sheets \"FB Leads_V2\". 2 bedrooms + basement, 1 bathroom Deep Cleaning.",
-      "isJobberSynced": false
-    },
-    {
-      "id": "manual_aa7ecf68-40dd-49c3-a425-3937d99180eb",
-      "customerName": "Katie Lyttle Quinn",
-      "phone": "(780) 461-2817",
-      "email": "katiemaryquinn7@hotmail.com",
-      "address": "1808 68th Street Northwest",
-      "city": "Edmonton",
-      "postalCode": "T6K 2J3",
-      "serviceRequested": "Standard Cleaning (2 Bathrooms)",
-      "bedrooms": "0 Bedrooms (Main Floor/Office)",
-      "bathrooms": "2 Bathrooms",
-      "dateOfServiceRequested": "Any day, prefer mornings",
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "campaignName": "FB Leads_V2 & ScrubbyBuilder Leads",
-      "dateReceived": "2026-09-26T01:37:44.656Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "notes": "Imported from Google Sheets \"FB Leads_V2\" & \"ScrubbyBuilder Leads\". Standard Cleaning, 0 bed / 2 bath at 1808 68th Street NW, T6K 2J3.",
-      "isJobberSynced": false
-    },
-    {
-      "id": "manual_2d11ed2a-e30f-4140-bcdc-1d1a27c46263",
-      "customerName": "Nicholas Christensen",
-      "phone": "(780) 934-0946",
-      "email": "",
-      "address": "Spruce Grove Residential",
-      "city": "Spruce Grove",
-      "serviceRequested": "4Bed 1Bath Deep Cleaning (One-time)",
-      "bedrooms": "4 Bedrooms",
-      "bathrooms": "1 Bathroom",
-      "dateOfServiceRequested": "Next week",
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "campaignName": "Lead message processor",
-      "dateReceived": "2026-09-25T22:01:05.681Z",
-      "status": "Converted",
-      "verdict": "Client",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2NjE2MTYx",
-      "quoteNumber": "QT-4263",
-      "quotedAmount": 223.32,
-      "notes": "4 Bedrooms, 1 Bathroom Deep Cleaning (One-time) in Spruce Grove. Synced to Jobber Quotes #4263 & #4252."
-    },
-    {
-      "id": "manual_04d937b9-11ea-43e7-8bd4-75380eab1df9",
-      "customerName": "Shabnam Noorzia",
-      "phone": "(780) 982-6018",
-      "email": "sanam400@icloud.com",
-      "address": "Edmonton West (T6M 1M4)",
-      "city": "Edmonton",
-      "postalCode": "T6M 1M4",
-      "serviceRequested": "4Bed 3Bath Deep Cleaning",
-      "bedrooms": "4 Bedrooms",
-      "bathrooms": "3 Bathrooms",
-      "dateOfServiceRequested": "Flexible",
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "campaignName": "Lead message processor",
-      "dateReceived": "2026-09-24T17:44:34.636Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2Mjg3NTY1",
-      "quoteNumber": "QT-4247",
-      "quotedAmount": 348.75,
-      "notes": "4 Bedrooms, 3 Bathrooms Deep Cleaning in Edmonton (T6M 1M4). Synced to Jobber Quote #4247."
-    },
-    {
-      "id": "manual_d654446a-8136-4f3c-a38c-719270c0bfbe",
-      "customerName": "Ogochukwu Stella Mmaduekwe",
-      "phone": "(780) 266-9727",
-      "email": "mmaduekweogochukwu@gmail.com",
-      "address": "10-10727 110 St Nw",
-      "city": "Edmonton",
-      "postalCode": "T5H 3C9",
-      "serviceRequested": "Studio 1Bath Move-Out Cleaning",
-      "bedrooms": "Studio Apartment",
-      "bathrooms": "1 Bathroom",
-      "dateOfServiceRequested": "Sept 28/29",
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "campaignName": "Lead message processor",
-      "dateReceived": "2026-09-21T00:33:48.892Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTY0Mzg4",
-      "quoteNumber": "QT-4237",
-      "quotedAmount": 357.19,
-      "notes": "Studio apartment, 1 bathroom Move-Out Cleaning at 10-10727 110 St NW, Edmonton, AB T5H 3C9. Synced to Jobber Quote #4237."
-    },
-    {
-      "id": "manual_87a3cda2-ec3a-4fe7-9aa0-8f7c5fbff0f1",
-      "customerName": "Ildico Virlics",
-      "phone": "+1 (306) 380-4051",
-      "email": "ivirl@msn.com",
-      "address": "3-905 172 st Sw",
-      "city": "Edmonton",
-      "postalCode": "T6W 5L8",
-      "serviceRequested": "3Bed 2Bath Standard Cleaning",
-      "bedrooms": "3 Bedrooms",
-      "bathrooms": "2 Bathrooms",
-      "dateOfServiceRequested": "Sept 25",
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "campaignName": "Lead message processor",
-      "dateReceived": "2026-09-21T00:11:03.770Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "notes": "3 Bedrooms, 2 Bathrooms Standard Cleaning at 3-905 172 St SW, Edmonton, AB T6W 5L8.",
-      "isJobberSynced": false
-    },
-    {
-      "id": "l:1588174452684470",
-      "customerName": "Diane Marcelo",
-      "phone": "(587) 337-9975",
-      "email": "northeastmedical1@gmail.com",
-      "address": "7210 144 ave nw",
-      "city": "Edmonton",
-      "postalCode": "T5C 2R7",
-      "serviceRequested": "Medical Clinic Standard Cleaning (3 Bath)",
-      "bedrooms": "Clinic",
-      "bathrooms": "3 Bathrooms",
-      "dateOfServiceRequested": "Everyday / Recurring",
-      "source": "Facebook Ad",
-      "sourceTab": "FB Leads_V2",
-      "campaignName": "RP #2 Ads - New Website Leads Sept",
-      "formId": "f:2607094299786742",
-      "adId": "ag:120249288276750165",
-      "dateReceived": "2026-09-18T18:59:15Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY1OTExNzkw",
-      "quoteNumber": "QT-4232",
-      "quotedAmount": 801.57,
-      "notes": "Medical clinic standard cleaning with 3 bathrooms at 7210 144 Ave NW, Edmonton, AB T5C 2R7. Synced to Jobber Quote #4232."
-    },
-    {
-      "id": "aug15/2026001",
-      "customerName": "Sara Chags",
-      "phone": "(780) 934-7609",
-      "email": "sundichags@gmail.com",
-      "address": "4470 Prowse Road SW, unit 63",
-      "city": "Edmonton",
-      "postalCode": "T6W 3A2",
-      "serviceRequested": "3Bed 2.5Bath Deep Cleaning",
-      "bedrooms": "3 Bedrooms",
-      "bathrooms": "2.5 Bathrooms",
-      "dateOfServiceRequested": "September 2026",
-      "source": "From Google Sheet",
-      "sourceTab": "Anywhere Leads_V1",
-      "campaignName": "Aug 15 Campaign",
-      "dateReceived": "2026-09-25T16:00:00Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "isJobberSynced": true,
-      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY2MzE3NDgx",
-      "quoteNumber": "QT-4250",
-      "quotedAmount": 365.63,
-      "notes": "Imported from Google Sheets \"Anywhere Leads_V1\". 3 Bedrooms, 2.5 Bathrooms at 4470 Prowse Road SW, unit 63. Synced to Jobber Quote #4250."
-    },
-    {
-      "id": "2330205544454881",
-      "customerName": "Darlene Turnbull",
-      "phone": "(403) 392-0492",
-      "email": "darlene.turnbull@gmail.com",
-      "address": "3951-40a Ave",
-      "city": "Red Deer",
-      "postalCode": "T4N 2W9",
-      "serviceRequested": "4Bed 2Bath Deep Cleaning",
-      "bedrooms": "4 Bedrooms",
-      "bathrooms": "2 Bathrooms",
-      "dateOfServiceRequested": "End of month",
-      "source": "Facebook Ad",
-      "sourceTab": "FB Leads_V1",
-      "campaignName": "June Ads Campaign",
-      "formId": "1.0101E+15",
-      "adId": "2330205544454881",
-      "dateReceived": "2026-09-01T10:13:00Z",
-      "status": "New",
-      "verdict": "Good lead",
-      "notes": "Imported from Google Sheets \"FB Leads_V1\". 4 Bedrooms, 2 Bathrooms Deep Cleaning.",
-      "isJobberSynced": false
-    },
-    {
-      "id": "lead-missing-106",
-      "customerName": "Tyler Henderson",
-      "phone": "",
-      "email": "henderson.t99@gmail.com",
-      "address": "9920 110 St NW",
-      "city": "Edmonton",
-      "serviceRequested": "1 Bed 1 Bath Move-Out Clean",
-      "bedrooms": 1,
-      "bathrooms": 1,
-      "source": "Facebook Ad",
-      "sourceTab": "FB Leads_V1",
-      "campaignName": "FB Leads_V1: Downtown Highrise Promo",
-      "dateReceived": "2026-10-11T11:10:00-06:00",
-      "status": "New",
-      "verdict": "Bad lead",
-      "missingPhone": true,
-      "notes": "Submitted email only on Facebook lead form. Needs phone callback confirmation."
-    },
-    {
-      "id": "lead-missing-107",
-      "customerName": "Elena Rostova",
-      "phone": "",
-      "email": "elena.rostova@yahoo.ca",
-      "address": "Sherwood Park, AB",
-      "city": "Sherwood Park",
-      "serviceRequested": "Move-In Deep Cleaning",
-      "bedrooms": 4,
-      "bathrooms": 3,
-      "source": "Google Ad",
-      "sourceTab": "Google Leads_V3",
-      "campaignName": "Google Search - Move In Cleaning",
-      "dateReceived": "2026-10-11T10:45:00-06:00",
-      "status": "New",
-      "verdict": "Bad lead",
-      "missingPhone": true,
-      "notes": "Phone number field was left blank on Webhook payload."
-    },
-    {
-      "id": "lead-phone-108",
-      "customerName": "Deb Austin",
-      "phone": "+1 (780) 296-6781",
-      "email": "deb.austin@telus.net",
-      "address": "8316 76 Street Northwest",
-      "city": "Edmonton",
-      "serviceRequested": "1 Bed 1 Bath Move-out Cleaning",
-      "bedrooms": 1,
-      "bathrooms": 1,
-      "source": "Phone call",
-      "sourceTab": "Quo Line (Primary Dispatch)",
-      "dateReceived": "2026-10-11T09:15:00-06:00",
-      "status": "Converted",
-      "verdict": "Client",
-      "isJobberSynced": true,
-      "convertedJobId": "VISIT-89120",
-      "notes": "Called dispatch on (587) 570-8005. Converted into scheduled clean with Joel & Sergine."
-    },
-    {
-      "id": "lead-pasted-109",
-      "customerName": "Samantha Smits",
-      "phone": "(780) 271-2257",
-      "email": "ssmits@ualberta.ca",
-      "address": "10403 178A Avenue",
-      "city": "Edmonton",
-      "serviceRequested": "Deep Cleaning - Biweekly 3hrs",
-      "bedrooms": 3,
-      "bathrooms": 2,
-      "source": "Pasted message",
-      "sourceTab": "SMS Intake",
-      "dateReceived": "2026-10-10T19:20:00-06:00",
-      "status": "Converted",
-      "verdict": "Client",
-      "isJobberSynced": true,
-      "notes": "Pasted from SMS client inquiry."
-    },
-    {
-      "id": "lead-sheet-110",
-      "customerName": "Nicholas Christensen",
-      "phone": "+1 (780) 934-0946",
-      "email": "nchristensen@sprucegrove.org",
-      "address": "31 Parkland Gate Road",
-      "city": "Spruce Grove",
-      "serviceRequested": "3 Bed 1 Bath Deep Cleaning",
-      "bedrooms": 3,
-      "bathrooms": 1,
-      "source": "From Google Sheet",
-      "sourceTab": "ScrubbyBuilder Leads",
-      "dateReceived": "2026-10-10T18:00:00-06:00",
-      "status": "Converted",
-      "verdict": "Client",
-      "isJobberSynced": true,
-      "notes": "Row #42 in Google Sheet tab \"ScrubbyBuilder Leads\"."
-    },
-    {
-      "id": "lead-fb-111",
-      "customerName": "Rachel & Jordan Bell",
-      "phone": "(780) 399-5512",
-      "email": "rbell.yeg@gmail.com",
-      "address": "614 100A Street SW",
-      "city": "Edmonton",
-      "serviceRequested": "Whole Home Deep Clean + Windows",
-      "bedrooms": 4,
-      "bathrooms": 3,
-      "source": "Facebook Ad",
-      "sourceTab": "Tidy FB Leads_V2",
-      "campaignName": "Facebook Ad - Windermere & Heritage Pointe",
-      "dateReceived": "2026-10-10T15:30:00-06:00",
-      "status": "New",
-      "verdict": "Good lead",
-      "notes": "2 storey home, dog friendly. Prefers Cindy Guay as cleaner if possible."
-    },
-    {
-      "id": "lead-goog-112",
-      "customerName": "Harpreet Singh",
-      "phone": "(587) 772-9104",
-      "email": "hsingh.investments@gmail.com",
-      "address": "11204 104 Ave Unit 502",
-      "city": "Edmonton",
-      "serviceRequested": "Commercial Office Suite Cleaning",
-      "bedrooms": 0,
-      "bathrooms": 2,
-      "source": "Google Ad",
-      "sourceTab": "Google Leads_V2",
-      "campaignName": "Google Search - Commercial Cleaning Edmonton",
-      "dateReceived": "2026-10-10T14:15:00-06:00",
-      "status": "New",
-      "verdict": "Good lead",
-      "notes": "1,800 sq ft office space. Nightly or 3x per week inquiry."
-    },
-    {
-      "id": "lead-fb-113",
-      "customerName": "Jessica Martens",
-      "phone": "(780) 819-4402",
-      "email": "jess.martens@hotmail.com",
-      "address": "52 Meadowview Drive",
-      "city": "St. Albert",
-      "serviceRequested": "Move-Out Cleaning",
-      "bedrooms": 3,
-      "bathrooms": 2.5,
-      "source": "Facebook Ad",
-      "sourceTab": "Tidy FB Leads_V2",
-      "campaignName": "Tidy FB Leads_V2",
-      "dateReceived": "2026-10-10T11:50:00-06:00",
-      "status": "New",
-      "verdict": "Good lead",
-      "notes": "Landlord inspection scheduled for October 18. Wants estimate for 4 hours."
-    },
-    {
-      "id": "lead-jobber-114",
-      "customerName": "Gail Wilkinson",
-      "phone": "(780) 435-0960",
-      "email": "gwilkinson@shaw.ca",
-      "address": "1517 Bearspaw Dr E Northwest",
-      "city": "Edmonton",
-      "serviceRequested": "Standard Home Cleaning",
-      "bedrooms": 3,
-      "bathrooms": 2,
-      "source": "From Jobber",
-      "sourceTab": "Jobber Client Requests",
-      "dateReceived": "2026-10-09T16:40:00-06:00",
-      "status": "Converted",
-      "verdict": "Client",
-      "isJobberSynced": true,
-      "notes": "Jobber request synced from online client portal."
-    },
-    {
-      "id": "lead-dismiss-115",
-      "customerName": "Crypto Seo Marketing Bot",
-      "phone": "(555) 019-2834",
-      "email": "seo.boost@rankings-crypto.io",
-      "address": "Internet",
-      "city": "Edmonton",
-      "serviceRequested": "Spam Submission",
-      "source": "Website form",
-      "sourceTab": "Website form",
-      "dateReceived": "2026-10-09T12:00:00-06:00",
-      "status": "Dismissed",
-      "verdict": "Spam",
-      "notes": "Automated contact form marketing spam. Automatically flagged."
+      "jobberClientId": "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTY0MjM1NDI=",
+      "quoteId": "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3Mzg5MjY3",
+      "quoteNumber": "QT-4293",
+      "quotedAmount": 221.07,
+      "notes": "3Bed 2Bath Basic Cleaning (4 hrs @ $48.50/hr = $194.00) + $12.50 Fuel Surcharge - $10.00 Google Ad Discount = $221.07 CAD (Deposit: $50.00). Synced with Jobber Client #156423542 & Quote #4293 (https://secure.getjobber.com/quotes/67389267)."
     }
   ],
   "serviceCatalog": [
@@ -8904,13 +9129,18 @@
       "name": "Standard Hourly Rate (1 Cleaner @ $52.50/hr)",
       "shortName": "1 Cleaner @ $52.50/hr",
       "serviceType": "Standard Cleaning",
+      "quantity": 1,
+      "unitPrice": 52.5,
+      "total": 52.5,
+      "basePrice": 52.5,
       "baseHours": 1,
       "cleanersCount": 1,
-      "basePrice": 52.5,
       "depositRequired": 50,
       "taxable": true,
       "jobberItemName": "Solo Cleaner Hourly Rate ($52.50/hr)",
       "description": "Billed per labor hour for 1 professional cleaner with all eco-friendly supplies and commercial vacuum equipment.",
+      "isAddon": false,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 310
     },
@@ -8921,13 +9151,18 @@
       "name": "Tandem Crew Rate (2 Cleaners @ $105.00/hr)",
       "shortName": "2 Cleaners @ $105.00/hr",
       "serviceType": "Deep Cleaning",
+      "quantity": 1,
+      "unitPrice": 105,
+      "total": 105,
+      "basePrice": 105,
       "baseHours": 1,
       "cleanersCount": 2,
-      "basePrice": 105,
       "depositRequired": 50,
       "taxable": true,
       "jobberItemName": "Tandem Crew Hourly Rate ($105.00/hr)",
       "description": "Billed per clock hour for a 2-cleaner tandem crew (provides 2 person-hours per clock hour of service).",
+      "isAddon": false,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 320
     },
@@ -8938,14 +9173,18 @@
       "name": "Inside Oven Deep Cleaning",
       "shortName": "Inside Oven",
       "serviceType": "Add-on",
-      "baseHours": 0.75,
-      "cleanersCount": 1,
+      "quantity": 1,
+      "unitPrice": 45,
+      "total": 45,
       "basePrice": 45,
+      "baseHours": 1,
+      "cleanersCount": 1,
       "depositRequired": 0,
       "taxable": true,
       "jobberItemName": "Inside Oven Cleaning",
       "description": "Degrease and scrub inside of oven, racks, interior glass door, and bottom heating elements.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 400
     },
@@ -8956,14 +9195,18 @@
       "name": "Inside Refrigerator & Freezer Deep Clean",
       "shortName": "Inside Fridge",
       "serviceType": "Add-on",
-      "baseHours": 0.75,
-      "cleanersCount": 1,
+      "quantity": 1,
+      "unitPrice": 45,
+      "total": 45,
       "basePrice": 45,
+      "baseHours": 1,
+      "cleanersCount": 1,
       "depositRequired": 0,
       "taxable": true,
       "jobberItemName": "Inside Refrigerator Sanitization",
       "description": "Remove shelves & crispers, wash, sanitize interior walls, wipe seals, and replace items neatly.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 410
     },
@@ -8974,14 +9217,18 @@
       "name": "Inside Kitchen Cabinets & Drawers Detail",
       "shortName": "Inside Cabinets",
       "serviceType": "Add-on",
+      "quantity": 1,
+      "unitPrice": 55,
+      "total": 55,
+      "basePrice": 55,
       "baseHours": 1,
       "cleanersCount": 1,
-      "basePrice": 55,
       "depositRequired": 0,
       "taxable": true,
       "jobberItemName": "Inside Cabinets & Drawers Cleaning",
       "description": "Vacuum crumbs and wipe down inside shelves and drawers throughout the kitchen.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 420
     },
@@ -8992,14 +9239,18 @@
       "name": "Baseboards Hand-Scrub & Detail",
       "shortName": "Baseboards Detail",
       "serviceType": "Add-on",
+      "quantity": 1,
+      "unitPrice": 60,
+      "total": 60,
+      "basePrice": 60,
       "baseHours": 1,
       "cleanersCount": 1,
-      "basePrice": 60,
       "depositRequired": 0,
       "taxable": true,
       "jobberItemName": "Baseboards Hand-Scrub & Wipe",
       "description": "Detailed hand wipe and scrub of baseboards throughout the entire home to remove scuffs and dust.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 430
     },
@@ -9010,14 +9261,18 @@
       "name": "Interior Windows & Tracks (Up to 10 Panes)",
       "shortName": "Interior Windows",
       "serviceType": "Add-on",
+      "quantity": 1,
+      "unitPrice": 50,
+      "total": 50,
+      "basePrice": 50,
       "baseHours": 1,
       "cleanersCount": 1,
-      "basePrice": 50,
       "depositRequired": 0,
       "taxable": true,
       "jobberItemName": "Interior Window Panes & Sills Clean",
       "description": "Squeegee and polish interior window glass, vacuum and wipe window tracks and sills.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 440
     },
@@ -9028,14 +9283,18 @@
       "name": "Finished Basement Living Area",
       "shortName": "Basement Area",
       "serviceType": "Add-on",
-      "baseHours": 1.5,
-      "cleanersCount": 1,
+      "quantity": 1,
+      "unitPrice": 85,
+      "total": 85,
       "basePrice": 85,
+      "baseHours": 1,
+      "cleanersCount": 1,
       "depositRequired": 0,
       "taxable": true,
       "jobberItemName": "Basement Living Space Cleaning",
       "description": "Clean finished basement family room, rec space, dust surfaces, vacuum carpets, and mop hard floors.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 450
     },
@@ -9046,14 +9305,18 @@
       "name": "Full Basement Suite (Kitchenette + Bath)",
       "shortName": "Basement Suite",
       "serviceType": "Add-on",
-      "baseHours": 2,
-      "cleanersCount": 1,
+      "quantity": 1,
+      "unitPrice": 125,
+      "total": 125,
       "basePrice": 125,
+      "baseHours": 1,
+      "cleanersCount": 1,
       "depositRequired": 25,
       "taxable": true,
       "jobberItemName": "Basement Suite Complete Detail",
       "description": "Complete clean of basement rental or mother-in-law suite including kitchen/wet bar and full bathroom.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 460
     },
@@ -9064,14 +9327,18 @@
       "name": "Pet Hair & Heavy Dander Detail Treatment",
       "shortName": "Pet Hair Detail",
       "serviceType": "Add-on",
-      "baseHours": 0.5,
-      "cleanersCount": 1,
+      "quantity": 1,
+      "unitPrice": 35,
+      "total": 35,
       "basePrice": 35,
+      "baseHours": 1,
+      "cleanersCount": 1,
       "depositRequired": 0,
       "taxable": true,
       "jobberItemName": "Pet Hair & Dander Sanitizer Treatment",
       "description": "Specialized rubber squeegee carpet raking and pet-safe botanical enzyme sanitizer application.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 470
     },
@@ -9082,14 +9349,18 @@
       "name": "Blinds Hand-Dusting & Wipe (Per Room)",
       "shortName": "Blinds Detail",
       "serviceType": "Add-on",
-      "baseHours": 0.5,
-      "cleanersCount": 1,
+      "quantity": 1,
+      "unitPrice": 40,
+      "total": 40,
       "basePrice": 40,
+      "baseHours": 1,
+      "cleanersCount": 1,
       "depositRequired": 0,
       "taxable": true,
       "jobberItemName": "Horizontal / Faux-Wood Blinds Detail",
       "description": "Hand dusting and microfiber wiping of horizontal slats on faux-wood or vinyl window blinds.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 480
     },
@@ -9100,14 +9371,18 @@
       "name": "Balcony / Patio Sweep & Glass Clean",
       "shortName": "Balcony Sweep",
       "serviceType": "Add-on",
-      "baseHours": 0.5,
-      "cleanersCount": 1,
+      "quantity": 1,
+      "unitPrice": 35,
+      "total": 35,
       "basePrice": 35,
+      "baseHours": 1,
+      "cleanersCount": 1,
       "depositRequired": 0,
       "taxable": true,
       "jobberItemName": "Balcony / Deck Sweep & Sliding Glass Door",
       "description": "Sweep exterior debris, wipe railings, and clean exterior of sliding patio glass doors.",
       "isAddon": true,
+      "status": "Active",
       "isActive": true,
       "sortOrder": 490
     },

@@ -32,13 +32,15 @@ import {
   CalendarDays,
   PhoneCall,
   UserCheck,
-  Edit2
+  Edit2,
+  Route
 } from 'lucide-react';
 import { 
   ScheduledJobItem, 
   getCleanerColor, 
   getCleanerInitials, 
-  formatDateTime 
+  formatDateTime,
+  getEdmontonToday
 } from '../data/jobberCalendarData';
 import { VanHubEditModal } from './VanHubEditModal';
 
@@ -447,9 +449,7 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
   const [showScheduledJobs, setShowScheduledJobs] = useState(true);
   const [showRoutes, setShowRoutes] = useState(true);
   const [mapType, setMapType] = useState<'roadmap' | 'hybrid' | 'terrain'>('roadmap');
-  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [localMapError, setLocalMapError] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [isFilterBarCollapsed, setIsFilterBarCollapsed] = useState(
     typeof window !== 'undefined' ? window.innerWidth < 640 : false
@@ -459,6 +459,135 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
   // Van & Hub Editor modal state
   const [editingVanHubTech, setEditingVanHubTech] = useState<Technician | null>(null);
   const [isVanHubModalOpen, setIsVanHubModalOpen] = useState<boolean>(false);
+
+  // Live Edmonton Today tracker (e.g., Wednesday, October 14, 2026) — updates automatically every 60s
+  const [liveToday, setLiveToday] = useState(() => getEdmontonToday());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const next = getEdmontonToday();
+      setLiveToday((prev) => (prev.dateString !== next.dateString ? next : prev));
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Schedule Horizon Filter (Today / Week Forward / Last 2 Weeks / Full Month / Specific Week / All) & Schedule Drawer
+  const [scheduleHorizon, setScheduleHorizon] = useState<
+    'TODAY' | 'WEEK' | 'WEEKS_3_4' | 'MONTH' | 'WEEK_1' | 'WEEK_2' | 'WEEK_3' | 'WEEK_4' | 'ALL'
+  >('MONTH');
+  const [showScheduleDrawer, setShowScheduleDrawer] = useState<boolean>(false);
+
+  // 2-Address Route & Distance Comparison Tool on Map
+  const [showTwoAddressPanel, setShowTwoAddressPanel] = useState<boolean>(false);
+  const [addressAInput, setAddressAInput] = useState<string>('10420 103 Ave NW, Edmonton, AB');
+  const [addressBInput, setAddressBInput] = useState<string>('5230 Windermere Blvd SW, Edmonton, AB');
+
+  const resolveEdmontonAddressCoords = (addr: string, fallbackLat: number, fallbackLng: number) => {
+    const clean = (addr || '').trim();
+    if (!clean) return { lat: fallbackLat, lng: fallbackLng };
+    const lower = clean.toLowerCase();
+    const matchedJob = scheduledJobs.find(
+      (j) =>
+        j.serviceAddress.toLowerCase().includes(lower) ||
+        lower.includes(j.serviceAddress.toLowerCase().split(',')[0]) ||
+        j.clientName.toLowerCase() === lower
+    );
+    if (matchedJob) return { lat: matchedJob.lat, lng: matchedJob.lng };
+
+    const matchedTicket = tickets.find(
+      (t) =>
+        t.location.address.toLowerCase().includes(lower) ||
+        lower.includes(t.location.address.toLowerCase().split(',')[0])
+    );
+    if (matchedTicket) return { lat: matchedTicket.location.lat, lng: matchedTicket.location.lng };
+
+    if (lower.includes('windermere') || lower.includes('amblesside')) return { lat: 53.4312, lng: -113.6054 };
+    if (lower.includes('summerside')) return { lat: 53.4148, lng: -113.4625 };
+    if (lower.includes('st. albert') || lower.includes('st albert')) return { lat: 53.6305, lng: -113.6256 };
+    if (lower.includes('sherwood')) return { lat: 53.5168, lng: -113.3187 };
+    if (lower.includes('whyte') || lower.includes('82 ave')) return { lat: 53.5181, lng: -113.4982 };
+    if (lower.includes('103 ave') || lower.includes('downtown') || lower.includes('jasper')) return { lat: 53.5461, lng: -113.4938 };
+    if (lower.includes('glenora') || lower.includes('142 st')) return { lat: 53.5442, lng: -113.5621 };
+    if (lower.includes('terwillegar')) return { lat: 53.4581, lng: -113.5812 };
+
+    let hash = 0;
+    for (let i = 0; i < clean.length; i++) {
+      hash = (hash * 31 + clean.charCodeAt(i)) % 10000;
+    }
+    const latOffset = ((hash % 100) / 100) * 0.14 - 0.07;
+    const lngOffset = ((Math.floor(hash / 100) % 100) / 100) * 0.22 - 0.11;
+    return {
+      lat: Number((53.535 + latOffset).toFixed(5)),
+      lng: Number((-113.495 + lngOffset).toFixed(5)),
+    };
+  };
+
+  const coordsA = resolveEdmontonAddressCoords(addressAInput, 53.5461, -113.4938);
+  const coordsB = resolveEdmontonAddressCoords(addressBInput, 53.4312, -113.6054);
+
+  const twoAddrDistanceKm = (() => {
+    const R = 6371;
+    const dLat = ((coordsB.lat - coordsA.lat) * Math.PI) / 180;
+    const dLng = ((coordsB.lng - coordsA.lng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((coordsA.lat * Math.PI) / 180) *
+        Math.cos((coordsB.lat * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.max(0.8, Math.round(R * c * 1.28 * 10) / 10);
+  })();
+
+  const twoAddrDriveMins = Math.max(4, Math.round(twoAddrDistanceKm * 1.65 + 4));
+
+  // Filter scheduled jobs by Schedule Horizon using live Edmonton Today (e.g. Wednesday, October 14, 2026)
+  const horizonFilteredScheduledJobs = (() => {
+    if (!scheduledJobs || scheduledJobs.length === 0) return [];
+    const sortedAll = [...scheduledJobs].sort((a, b) => String(a.startAt).localeCompare(String(b.startAt)));
+    if (scheduleHorizon === 'ALL') return sortedAll;
+
+    const todayIso = liveToday.dateString; // e.g. '2026-10-14'
+    const currentMonthPrefix = `${liveToday.year}-${String(liveToday.month).padStart(2, '0')}`; // e.g. '2026-10'
+    const anchorMs = new Date(liveToday.year, liveToday.monthIndex, liveToday.day).getTime();
+
+    const filtered = sortedAll.filter((j) => {
+      const jobDateStr = j.startAt.slice(0, 10);
+      const parts = jobDateStr.split('-').map(Number);
+      const jobDay = parts[2] || 1;
+      const jobMs = parts.length === 3 ? new Date(parts[0], parts[1] - 1, parts[2]).getTime() : anchorMs;
+      const diffDays = Math.round((jobMs - anchorMs) / (1000 * 60 * 60 * 24));
+
+      if (scheduleHorizon === 'TODAY') {
+        return jobDateStr === todayIso;
+      }
+      if (scheduleHorizon === 'WEEK') {
+        return diffDays >= 0 && diffDays <= 7;
+      }
+      if (scheduleHorizon === 'WEEKS_3_4') {
+        // Last 2 weeks of the current month (Days 15 to 31)
+        return jobDateStr.startsWith(currentMonthPrefix) && jobDay >= 15;
+      }
+      if (scheduleHorizon === 'WEEK_1') {
+        return jobDateStr.startsWith(currentMonthPrefix) && jobDay >= 1 && jobDay <= 7;
+      }
+      if (scheduleHorizon === 'WEEK_2') {
+        return jobDateStr.startsWith(currentMonthPrefix) && jobDay >= 8 && jobDay <= 14;
+      }
+      if (scheduleHorizon === 'WEEK_3') {
+        return jobDateStr.startsWith(currentMonthPrefix) && jobDay >= 15 && jobDay <= 21;
+      }
+      if (scheduleHorizon === 'WEEK_4') {
+        return jobDateStr.startsWith(currentMonthPrefix) && jobDay >= 22 && jobDay <= 31;
+      }
+      if (scheduleHorizon === 'MONTH') {
+        // Full current month (all 4+ weeks, Oct 1 – Oct 31) + 30 days forward
+        return jobDateStr.startsWith(currentMonthPrefix) || (diffDays >= 0 && diffDays <= 31);
+      }
+      return true;
+    });
+
+    return filtered;
+  })();
 
   // Auto-focus and open info window when selectedScheduledJobId is set
   useEffect(() => {
@@ -667,70 +796,6 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
 
   return (
     <div id="territory-map-container" className="relative w-full h-full flex flex-col bg-slate-100 overflow-hidden select-none">
-      {/* Top Notification Banner if ApiProjectMapError, RefererNotAllowedMapError, or Auth Missing */}
-      {isMapFallbackActive && !bannerDismissed && (
-        <div className="absolute top-14 left-3 right-3 z-30 bg-amber-50 border border-amber-300 rounded-xl p-3.5 shadow-lg flex items-start justify-between gap-3 text-xs animate-fadeIn">
-          <div className="flex items-start gap-2.5">
-            <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="space-y-1.5">
-              <div className="font-bold text-amber-950 flex flex-wrap items-center gap-2">
-                <span>Google Maps API Key Notice: Interactive Territory Mode Active</span>
-                <span className="px-1.5 py-0.5 bg-amber-200 text-amber-900 rounded text-[10px] font-mono font-semibold">
-                  Edmonton Dispatch Engine
-                </span>
-              </div>
-              {refererErrorUrl ? (
-                <div className="text-amber-900 text-[11px] leading-relaxed space-y-1.5">
-                  <p>
-                    <strong>HTTP Referrer Restriction (RefererNotAllowedMapError):</strong> Your Google Cloud API key has HTTP referrer restrictions enabled that block requests from this origin.
-                  </p>
-                  <p>
-                    To enable Google Maps for this preview deployment, add this URL pattern to your API Key's <strong>Allowed Websites</strong> in Google Cloud Console:
-                  </p>
-                  <div className="flex items-center gap-2 bg-amber-100/90 border border-amber-300 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-amber-950">
-                    <span className="truncate select-all">{refererErrorUrl}/*</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(`${refererErrorUrl}/*`);
-                        setCopiedUrl(true);
-                        setTimeout(() => setCopiedUrl(false), 2500);
-                      }}
-                      className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-900 font-sans font-bold text-[10px] cursor-pointer shrink-0 transition-colors"
-                      title="Copy URL pattern to clipboard"
-                    >
-                      {copiedUrl ? <Check className="w-3 h-3 text-emerald-700" /> : <Copy className="w-3 h-3 text-amber-800" />}
-                      <span>{copiedUrl ? 'Copied!' : 'Copy URL'}</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-amber-800 text-[11px] leading-relaxed">
-                  The Google Maps JavaScript API is restricted or not authorized on this API key. The application is seamlessly utilizing the built-in <strong>Edmonton Territory Dispatch Engine</strong> with real coordinates, 15 live service vans, SLA ticket routes, real-time Routes API simulation, and reverse geocoding.
-                </p>
-              )}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-                <a
-                  href="https://console.cloud.google.com/google/maps-apis/credentials?utm_campaign=gmp_mcp_codeassist_v1_aistudio"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-slate-800 hover:text-slate-950 underline flex items-center gap-1"
-                >
-                  <span>Configure Google Cloud Key Credentials</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => setBannerDismissed(true)}
-            className="text-slate-400 hover:text-slate-700 p-1 rounded-lg text-sm font-bold shrink-0 cursor-pointer"
-            aria-label="Dismiss banner"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       {/* Screen Reader Live Region for Territory Status Announcements */}
       <div className="sr-only" aria-live="polite" aria-atomic="true">
@@ -964,6 +1029,367 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
               >
                 <ChevronUp className="w-4 h-4" />
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Schedule Horizon & 2-Address Picker Interactive Bar */}
+        <div className="pointer-events-auto flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md rounded-xl border border-slate-200 px-2.5 py-1.5 shadow-md self-start max-w-full">
+          <div className="flex items-center gap-1 pr-1.5 border-r border-slate-200 flex-wrap">
+            <CalendarDays className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 hidden sm:inline">
+              Schedule ({liveToday.formattedShort}):
+            </span>
+            {([
+              { id: 'TODAY', label: `Today (${liveToday.formattedShort})` },
+              { id: 'WEEK', label: '7 Days Forward' },
+              { id: 'WEEKS_3_4', label: 'Last 2 Weeks (15th–31st)' },
+              { id: 'MONTH', label: 'Full Month (All 4 Weeks)' },
+              { id: 'ALL', label: 'All Dates' },
+            ] as const).map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => {
+                  setScheduleHorizon(h.id);
+                  setShowScheduledJobs(true);
+                  setShowScheduleDrawer(true);
+                }}
+                className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                  scheduleHorizon === h.id
+                    ? 'bg-purple-600 text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {h.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setShowScheduleDrawer(!showScheduleDrawer)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold border transition-all cursor-pointer flex items-center gap-1 ${
+                showScheduleDrawer
+                  ? 'bg-purple-700 text-white border-purple-800 shadow-xs'
+                  : 'bg-purple-50 text-purple-900 border-purple-300 hover:bg-purple-100'
+              }`}
+            >
+              <span>{showScheduleDrawer ? 'Hide Schedule List' : `Scroll Schedule (${horizonFilteredScheduledJobs.length} Jobs)`}</span>
+              {showScheduleDrawer ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
+
+          {/* 2-Address Picker Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowTwoAddressPanel(!showTwoAddressPanel)}
+            className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 transition-all cursor-pointer border ${
+              showTwoAddressPanel
+                ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
+                : 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100'
+            }`}
+          >
+            <Route className="w-3.5 h-3.5" />
+            <span>Pick 2 Addresses ({twoAddrDistanceKm} km • ~{twoAddrDriveMins}m)</span>
+          </button>
+        </div>
+
+        {/* Expandable 2-Address Route & Distance Comparison Panel */}
+        {showTwoAddressPanel && (
+          <div className="pointer-events-auto bg-white/95 backdrop-blur-md border border-indigo-200 rounded-xl p-3 shadow-xl max-w-2xl w-full animate-fadeIn space-y-2.5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-indigo-600 text-white">
+                  <Route className="w-3.5 h-3.5" />
+                </span>
+                <div>
+                  <h4 className="text-xs font-black text-slate-900">Compare Two Addresses &amp; Route Distance</h4>
+                  <p className="text-[10px] text-slate-500">Type any 2 addresses or select directly from scheduled jobs</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(addressAInput)}&destination=${encodeURIComponent(addressBInput)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-extrabold flex items-center gap-1 shadow-xs"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Google Directions</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowTwoAddressPanel(false)}
+                  className="text-slate-400 hover:text-slate-700 font-bold text-xs px-1.5 py-0.5 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-lg p-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-emerald-900 flex items-center gap-1">
+                    <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[9px]">A</span>
+                    Address 1 (Origin)
+                  </span>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) setAddressAInput(e.target.value);
+                    }}
+                    value=""
+                    className="text-[10px] bg-white border border-emerald-300 rounded px-1.5 py-0.5 font-semibold text-emerald-900 max-w-[140px]"
+                  >
+                    <option value="">Pick Scheduled Job...</option>
+                    {scheduledJobs.map((j) => (
+                      <option key={`a-${j.id}`} value={j.serviceAddress}>
+                        {j.clientName} ({j.serviceAddress.split(',')[0]})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={addressAInput}
+                  onChange={(e) => setAddressAInput(e.target.value)}
+                  placeholder="Enter first address..."
+                  className="w-full px-2 py-1.5 text-xs bg-white border border-emerald-300 rounded-md font-semibold text-slate-900 focus:outline-none focus:border-emerald-600"
+                />
+              </div>
+
+              <div className="bg-rose-50/70 border border-rose-200 rounded-lg p-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-rose-900 flex items-center gap-1">
+                    <span className="w-4 h-4 rounded-full bg-rose-600 text-white flex items-center justify-center text-[9px]">B</span>
+                    Address 2 (Destination)
+                  </span>
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) setAddressBInput(e.target.value);
+                    }}
+                    value=""
+                    className="text-[10px] bg-white border border-rose-300 rounded px-1.5 py-0.5 font-semibold text-rose-900 max-w-[140px]"
+                  >
+                    <option value="">Pick Scheduled Job...</option>
+                    {scheduledJobs.map((j) => (
+                      <option key={`b-${j.id}`} value={j.serviceAddress}>
+                        {j.clientName} ({j.serviceAddress.split(',')[0]})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={addressBInput}
+                  onChange={(e) => setAddressBInput(e.target.value)}
+                  placeholder="Enter second address..."
+                  className="w-full px-2 py-1.5 text-xs bg-white border border-rose-300 rounded-md font-semibold text-slate-900 focus:outline-none focus:border-rose-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-1.5 text-xs">
+              <div className="flex items-center gap-3">
+                <span className="font-black text-indigo-950">
+                  Est. Route Distance: <span className="font-mono text-indigo-700">{twoAddrDistanceKm} km</span>
+                </span>
+                <span className="text-indigo-400">•</span>
+                <span className="font-black text-indigo-950">
+                  Drive Time: <span className="font-mono text-indigo-700">~{twoAddrDriveMins} mins</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const temp = addressAInput;
+                  setAddressAInput(addressBInput);
+                  setAddressBInput(temp);
+                }}
+                className="text-[10px] font-extrabold text-indigo-700 hover:text-indigo-900 underline cursor-pointer"
+              >
+                Swap A ↔ B
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Expandable & Fully Scrollable 4-Week / Full-Month Schedule Drawer on Map View */}
+        {showScheduleDrawer && (
+          <div
+            onWheel={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="pointer-events-auto bg-white/98 backdrop-blur-md border-2 border-purple-300 rounded-2xl p-3.5 shadow-2xl max-w-3xl w-full flex flex-col max-h-[68vh] animate-fadeIn space-y-2.5"
+          >
+            {/* Header + Week-by-Week Switcher so all 4 weeks are 1 click away */}
+            <div className="flex flex-col gap-2 border-b border-slate-200 pb-2.5 shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <CalendarDays className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span className="text-xs sm:text-sm font-black text-purple-950">
+                    Live Map Schedule • Today is {liveToday.formattedFull}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-extrabold bg-purple-100 text-purple-800 border border-purple-300">
+                    Showing {horizonFilteredScheduledJobs.length} Visits (Scroll Down for All Weeks)
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {onNavigateToCalendar && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToCalendar(liveToday.dateString)}
+                      className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-extrabold cursor-pointer"
+                    >
+                      Full Screen Calendar →
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowScheduleDrawer(false)}
+                    className="text-slate-400 hover:text-slate-700 text-xs font-bold px-2 py-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Direct Week 1 / Week 2 / Week 3 / Week 4 / Last 2 Weeks Filter Bar */}
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase mr-1">Jump to Week:</span>
+                {([
+                  { id: 'TODAY', label: `Today (${liveToday.formattedShort})` },
+                  { id: 'WEEK_1', label: 'Week 1 (1st–7th)' },
+                  { id: 'WEEK_2', label: 'Week 2 (8th–14th)' },
+                  { id: 'WEEK_3', label: 'Week 3 (15th–21st)' },
+                  { id: 'WEEK_4', label: 'Week 4 (22nd–31st)' },
+                  { id: 'WEEKS_3_4', label: 'Last 2 Weeks (15th–31st)' },
+                  { id: 'MONTH', label: 'All 4 Weeks (Full Month)' },
+                  { id: 'ALL', label: 'All Months (120d)' },
+                ] as const).map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setScheduleHorizon(w.id)}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-all cursor-pointer ${
+                      scheduleHorizon === w.id
+                        ? 'bg-purple-700 text-white border-purple-800 shadow-2xs'
+                        : 'bg-slate-50 hover:bg-purple-50 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {w.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Scrollable Schedule List across all weeks */}
+            <div className="flex-1 overflow-y-auto pr-1.5 space-y-1.5 min-h-[220px] max-h-[52vh]">
+              {horizonFilteredScheduledJobs.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                  No visits scheduled in this filter window. Click <strong>"All 4 Weeks (Full Month)"</strong> or <strong>"Last 2 Weeks (15th–31st)"</strong> above to view more dates.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {horizonFilteredScheduledJobs.map((job) => {
+                    const dt = formatDateTime(job.startAt);
+                    const isJobToday = dt.dateString === liveToday.dateString;
+                    const cleaner = job.assignedCleaners.join(' & ') || 'Unassigned';
+                    const primaryCleaner = job.assignedCleaners[0] || 'Unassigned';
+                    const color = getCleanerColor(primaryCleaner);
+                    return (
+                      <div
+                        key={`sched-drawer-${job.id}`}
+                        className={`p-2.5 rounded-xl border transition-all flex flex-col justify-between gap-1.5 text-[11px] ${
+                          isJobToday
+                            ? 'bg-amber-50/90 border-amber-400 ring-1 ring-amber-300 shadow-xs'
+                            : 'bg-slate-50/80 border-slate-200 hover:border-purple-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span
+                              className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-black shrink-0 ${
+                                isJobToday
+                                  ? 'bg-amber-500 text-slate-950'
+                                  : 'bg-purple-100 text-purple-900'
+                              }`}
+                            >
+                              {isJobToday ? `TODAY • ${dt.dateStr}` : dt.dateStr}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectScheduledJob?.(job.id);
+                                setActiveInfoWindow({
+                                  type: 'JOB',
+                                  id: job.id,
+                                  position: { lat: job.lat, lng: job.lng },
+                                });
+                              }}
+                              className="font-black text-slate-900 hover:text-purple-700 truncate text-left cursor-pointer"
+                            >
+                              {job.clientName}
+                            </button>
+                          </div>
+                          <span
+                            className="px-2 py-0.5 rounded-md text-[9.5px] font-extrabold text-white shrink-0 shadow-2xs"
+                            style={{ backgroundColor: color }}
+                          >
+                            {cleaner}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-600 truncate">
+                          📍 {job.serviceAddress} • <span className="font-semibold text-slate-700">{job.serviceType}</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/80">
+                          <span className="font-mono text-[10px] font-bold text-purple-700">
+                            ⏰ {dt.timeStr} ({job.visitNumber})
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectScheduledJob?.(job.id);
+                                setActiveInfoWindow({
+                                  type: 'JOB',
+                                  id: job.id,
+                                  position: { lat: job.lat, lng: job.lng },
+                                });
+                              }}
+                              className="px-1.5 py-0.5 rounded bg-purple-100 hover:bg-purple-200 text-purple-900 font-black text-[9px] cursor-pointer"
+                              title="Focus pin on map"
+                            >
+                              View Pin
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddressAInput(job.serviceAddress);
+                                setShowTwoAddressPanel(true);
+                              }}
+                              className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-black text-[9px] cursor-pointer"
+                              title="Set as Address A"
+                            >
+                              Set A
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddressBInput(job.serviceAddress);
+                                setShowTwoAddressPanel(true);
+                              }}
+                              className="px-1.5 py-0.5 rounded bg-rose-100 hover:bg-rose-200 text-rose-900 font-black text-[9px] cursor-pointer"
+                              title="Set as Address B"
+                            >
+                              Set B
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1261,7 +1687,7 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
 
             {/* Scheduled Calendar Cleaner Jobs with Individual Cleaner Colors & Done Lighter Shading */}
             {showScheduledJobs &&
-              scheduledJobs.map((job) => {
+              horizonFilteredScheduledJobs.map((job) => {
                 const isSelected = selectedScheduledJobId === job.id;
                 const primaryCleaner = job.assignedCleaners[0] || 'Unassigned';
                 const cleanerColor = getCleanerColor(primaryCleaner);
@@ -1666,7 +2092,7 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
           </Map>
           </MapErrorBoundary>
         ) : (
-          /* Interactive Fallback Edmonton Territory Dispatch Canvas */
+          /* Interactive High-Resolution Edmonton Street & Satellite Map */
           <div
             ref={vectorContainerRef}
             onMouseDown={handleMouseDown}
@@ -1675,9 +2101,13 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className={`w-full h-full relative bg-slate-100 overflow-hidden cursor-${isDragging ? 'grabbing' : 'grab'}`}
+            onWheel={(e) => {
+              const delta = e.deltaY < 0 ? 0.2 : -0.2;
+              setZoomLevel((prev) => Math.max(0.8, Math.min(3.5, Number((prev + delta).toFixed(2)))));
+            }}
+            className={`w-full h-full relative bg-slate-200 overflow-hidden cursor-${isDragging ? 'grabbing' : 'grab'}`}
           >
-            {/* Background Corridor Grid & Edmonton Landmarks */}
+            {/* Real Web Mercator Street & Satellite Tile Layer + Live Route Polylines */}
             <div
               className="absolute inset-0 transition-transform duration-75 origin-center"
               style={{
@@ -1686,47 +2116,72 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
                 height: '100%',
               }}
             >
-              {/* Edmonton Regional Highways & North Saskatchewan River SVG Network */}
+              {/* High-Resolution Georeferenced Edmonton Street & Satellite Tiles (z=11 Retina @2x) */}
+              <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden">
+                {[665, 666, 667, 668, 669, 670].map((ty) =>
+                  [376, 377, 378, 379, 380].map((tx) => {
+                    const z = 11;
+                    const nTiles = Math.pow(2, z);
+                    const tileMinLng = (tx / nTiles) * 360 - 180;
+                    const tileMaxLng = ((tx + 1) / nTiles) * 360 - 180;
+                    const tileMaxLat = (180 / Math.PI) * Math.atan(Math.sinh(Math.PI * (1 - (2 * ty) / nTiles)));
+                    const tileMinLat = (180 / Math.PI) * Math.atan(Math.sinh(Math.PI * (1 - (2 * (ty + 1)) / nTiles)));
+
+                    const leftPct = ((tileMinLng - EDMONTON_BOUNDS.minLng) / (EDMONTON_BOUNDS.maxLng - EDMONTON_BOUNDS.minLng)) * 100;
+                    const rightPct = ((tileMaxLng - EDMONTON_BOUNDS.minLng) / (EDMONTON_BOUNDS.maxLng - EDMONTON_BOUNDS.minLng)) * 100;
+                    const topPct = ((EDMONTON_BOUNDS.maxLat - tileMaxLat) / (EDMONTON_BOUNDS.maxLat - EDMONTON_BOUNDS.minLat)) * 100;
+                    const bottomPct = ((EDMONTON_BOUNDS.maxLat - tileMinLat) / (EDMONTON_BOUNDS.maxLat - EDMONTON_BOUNDS.minLat)) * 100;
+
+                    const isSatellite = mapType === 'hybrid';
+                    const baseTileUrl = isSatellite
+                      ? `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${ty}/${tx}`
+                      : `https://basemaps.cartocdn.com/rastertiles/voyager/${z}/${tx}/${ty}@2x.png`;
+
+                    return (
+                      <React.Fragment key={`tile-${z}-${tx}-${ty}`}>
+                        <img
+                          src={baseTileUrl}
+                          alt=""
+                          draggable={false}
+                          onError={(e) => {
+                            if (!isSatellite) {
+                              (e.currentTarget as HTMLImageElement).src = `https://tile.openstreetmap.org/${z}/${tx}/${ty}.png`;
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            left: `${leftPct}%`,
+                            top: `${topPct}%`,
+                            width: `${rightPct - leftPct + 0.08}%`,
+                            height: `${bottomPct - topPct + 0.08}%`,
+                            maxWidth: 'none',
+                          }}
+                          className="select-none pointer-events-none object-fill"
+                        />
+                        {isSatellite && (
+                          <img
+                            src={`https://basemaps.cartocdn.com/rastertiles/voyager_only_labels/${z}/${tx}/${ty}@2x.png`}
+                            alt=""
+                            draggable={false}
+                            style={{
+                              position: 'absolute',
+                              left: `${leftPct}%`,
+                              top: `${topPct}%`,
+                              width: `${rightPct - leftPct + 0.08}%`,
+                              height: `${bottomPct - topPct + 0.08}%`,
+                              maxWidth: 'none',
+                            }}
+                            className="select-none pointer-events-none object-fill"
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Live Route Polylines Between Techs and Assigned Tickets */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {/* North Saskatchewan River Valley (Winding southwest to northeast) */}
-                <path
-                  d="M 10 74 Q 28 62 44 54 T 66 40 T 92 24"
-                  stroke="#BFDBFE"
-                  strokeWidth="3.2"
-                  fill="none"
-                  opacity="0.8"
-                  strokeLinecap="round"
-                />
-
-                {/* Anthony Henday Drive (Ring Road Loop around Edmonton) */}
-                <path
-                  d="M 50 16 C 82 16 86 38 86 50 C 86 68 82 84 50 84 C 18 84 14 68 14 50 C 14 38 18 16 50 16 Z"
-                  stroke="#CBD5E1"
-                  strokeWidth="1.6"
-                  fill="none"
-                  strokeDasharray="3,1"
-                />
-
-                {/* Yellowhead Trail / Hwy 16 (East-West northern freeway) */}
-                <path d="M 4 33 Q 50 31 96 33" stroke="#CBD5E1" strokeWidth="1.5" fill="none" />
-
-                {/* Whitemud Drive (East-West southern freeway) */}
-                <path d="M 12 65 Q 50 62 90 64" stroke="#CBD5E1" strokeWidth="1.5" fill="none" />
-
-                {/* Calgary Trail & Gateway Blvd (South arterial to Nisku / Airport) */}
-                <path d="M 52 48 L 52 95" stroke="#CBD5E1" strokeWidth="1.5" fill="none" />
-
-                {/* St. Albert Trail / Mark Messier Trail (Northwest) */}
-                <path d="M 45 40 L 22 10" stroke="#CBD5E1" strokeWidth="1.2" fill="none" />
-
-                {/* Sherwood Park Freeway & Baseline Rd (East corridors) */}
-                <path d="M 58 54 L 95 56" stroke="#CBD5E1" strokeWidth="1.2" fill="none" />
-                <path d="M 60 40 L 95 40" stroke="#E2E8F0" strokeWidth="1.0" fill="none" />
-
-                {/* 170th Street West Industrial Corridor */}
-                <path d="M 22 18 L 22 82" stroke="#E2E8F0" strokeWidth="1.1" fill="none" />
-
-                {/* Live Route Polylines Between Techs and Assigned Tickets */}
                 {showRoutes &&
                   technicians.map((tech) => {
                     const isSelected = selectedTechId === tech.id;
@@ -1752,24 +2207,15 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
                         <path
                           d={pathD}
                           stroke={tech.color || '#2563EB'}
-                          strokeWidth={isSelected ? '2.5' : '1.2'}
-                          strokeOpacity={isSelected ? 0.9 : 0.4}
-                          strokeDasharray={isSelected ? '4,2' : '2,2'}
+                          strokeWidth={isSelected ? '0.9' : '0.5'}
+                          strokeOpacity={isSelected ? 0.95 : 0.7}
+                          strokeDasharray={isSelected ? '1.5,0.8' : '1,1'}
                           fill="none"
                         />
                       </g>
                     );
                   })}
               </svg>
-
-              {/* Geographic Labels */}
-              <div className="absolute top-[8%] left-[20%] text-[11px] font-extrabold text-slate-400 tracking-wider">ST. ALBERT</div>
-              <div className="absolute top-[42%] left-[45%] text-xs font-black text-slate-600 tracking-widest bg-white/70 px-1.5 py-0.5 rounded shadow-2xs">DOWNTOWN / ICE DISTRICT</div>
-              <div className="absolute top-[52%] left-[40%] text-[11px] font-bold text-slate-500">WHYTE AVE / U OF A</div>
-              <div className="absolute top-[48%] left-[16%] text-[11px] font-bold text-slate-500">WEST EDMONTON / WEM</div>
-              <div className="absolute top-[72%] left-[44%] text-[11px] font-bold text-slate-500">SOUTH EDMONTON COMMON</div>
-              <div className="absolute top-[42%] left-[78%] text-[11px] font-extrabold text-slate-400 tracking-wider">SHERWOOD PARK</div>
-              <div className="absolute top-[90%] left-[44%] text-[10px] font-bold text-slate-400">NISKU / YEG AIRPORT</div>
 
               {/* Regional Depots */}
               {showDepots &&
@@ -1976,9 +2422,52 @@ export const TerritoryMap: React.FC<TerritoryMapProps> = ({
                 );
               })}
 
+              {/* Two-Address Comparison Route Line & Pins on Vector Map */}
+              {showTwoAddressPanel && (() => {
+                const posA = projectCoords(coordsA.lat, coordsA.lng);
+                const posB = projectCoords(coordsB.lat, coordsB.lng);
+                return (
+                  <>
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-30" viewBox="0 0 100 100" preserveAspectRatio="none">
+                      <line
+                        x1={posA.x}
+                        y1={posA.y}
+                        x2={posB.x}
+                        y2={posB.y}
+                        stroke="#4F46E5"
+                        strokeWidth="0.9"
+                        strokeDasharray="1.5,0.8"
+                      />
+                    </svg>
+                    <div
+                      style={{ left: `${posA.x}%`, top: `${posA.y}%` }}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 z-45 flex flex-col items-center pointer-events-none"
+                    >
+                      <div className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-black shadow-md border border-white whitespace-nowrap mb-0.5">
+                        Address A • {addressAInput.split(',')[0]}
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-emerald-600 border-2 border-white text-white font-black text-xs flex items-center justify-center shadow-xl">
+                        A
+                      </div>
+                    </div>
+                    <div
+                      style={{ left: `${posB.x}%`, top: `${posB.y}%` }}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 z-45 flex flex-col items-center pointer-events-none"
+                    >
+                      <div className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[9px] font-black shadow-md border border-white whitespace-nowrap mb-0.5">
+                        Address B • {addressBInput.split(',')[0]} ({twoAddrDistanceKm} km)
+                      </div>
+                      <div className="w-7 h-7 rounded-full bg-rose-600 border-2 border-white text-white font-black text-xs flex items-center justify-center shadow-xl">
+                        B
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
               {/* Scheduled Calendar Cleaner Jobs on Vector Map */}
               {showScheduledJobs &&
-                scheduledJobs.map((job) => {
+                horizonFilteredScheduledJobs.map((job) => {
                   const pos = projectCoords(job.lat, job.lng);
                   const isSelected = selectedScheduledJobId === job.id;
                   const primaryCleaner = job.assignedCleaners[0] || 'Unassigned';

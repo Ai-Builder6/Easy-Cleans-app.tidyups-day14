@@ -96,6 +96,7 @@ interface QuickQuoteViewProps {
   onOpenSpamShield?: (num?: string) => void;
   onOpenProjectBackup?: () => void;
   onClientsUpdated?: (clients: any[]) => void;
+  onLeadsUpdated?: (leads: AdLeadItem[]) => void;
   serviceCatalog?: ServiceCatalogItem[];
   onCatalogUpdated?: (newCatalog: ServiceCatalogItem[]) => void;
 }
@@ -179,6 +180,7 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
   onOpenSpamShield,
   onOpenProjectBackup,
   onClientsUpdated,
+  onLeadsUpdated,
   serviceCatalog,
   onCatalogUpdated,
 }) => {
@@ -713,6 +715,9 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
         if (gData.clients && onClientsUpdated) {
           onClientsUpdated(gData.clients);
         }
+        if (gData.leads && onLeadsUpdated) {
+          onLeadsUpdated(gData.leads);
+        }
       }
       return gData;
     } catch (e) {
@@ -790,12 +795,12 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
     }
   };
 
-  // Create official Jobber Quote & Sync Client + Google Sheet (Includes Bedrooms, Bathrooms, Custom Discount & Deposit)
-  const handleSaveJobberQuote = async () => {
+  // Create official Jobber Client FIRST (Step 1), then Jobber Request or Quote (Step 2) & Sync to Clean Google Sheet
+  const handleSaveJobberQuote = async (createRequestOnly: boolean = false) => {
     setIsSubmitting(true);
     setFeedbackNotice(null);
     try {
-      await syncClientAndQuoteToGoogle();
+      const gData = await syncClientAndQuoteToGoogle();
 
       const primaryLineItemName = matchedCatalogItem
         ? matchedCatalogItem.jobberItemName
@@ -870,24 +875,38 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
           clientEmail: customerEmail,
           serviceAddress: serviceAddress || `${city}, AB`,
           service: `${serviceType} (${bedrooms}, ${bathrooms} • ${hours} hrs)`,
+          bedrooms,
+          bathrooms,
           total: calculations.total,
           depositRequired: depositAmount,
           lineItems,
+          createRequestOnly,
           notes: `${combinedPropertyAndNotesSummary} | Quick Quoted: ${hours} hrs @ $${hourlyRate}/hr + $${fuelSurcharge} fuel - $${discountAmount} discount = $${calculations.total.toFixed(2)} CAD | Deposit Required: $${depositAmount} (Balance Due: $${calculations.balanceDue.toFixed(2)}). Source: ${selectedSource}.`,
         }),
       });
       const data = await res.json();
-      if (data.success && data.quote) {
+      if (data.success) {
         if (data.clients && onClientsUpdated) {
           onClientsUpdated(data.clients);
         }
-        setFeedbackNotice(
-          `✓ Synced ${customerName || 'Client'} & Quote ${data.quote.quoteNumber} to Jobber + Google (Exact Layout: Total $${calculations.total.toFixed(2)}, Discount -$${discountAmount}, Deposit $${depositAmount})!`
-        );
-        if (onQuoteCreated) onQuoteCreated(data.quote);
-        setCreatedQuoteModalItem(data.quote);
+        if ((data.leads || gData?.leads) && onLeadsUpdated) {
+          onLeadsUpdated(data.leads || gData.leads);
+        }
+        if (createRequestOnly) {
+          setFeedbackNotice(
+            data.message ||
+              `✓ Step 1: Created Client "${customerName || 'Client'}" & Service Property in Jobber → Step 2: Created Jobber Request & Added to Clean Google Sheet!`
+          );
+        } else if (data.quote) {
+          setFeedbackNotice(
+            data.message ||
+              `✓ Step 1: Created Client "${customerName || 'Client'}" in Jobber → Step 2: Created Jobber Quote ${data.quote.quoteNumber} ($${calculations.total.toFixed(2)}, Deposit $${depositAmount}) & Synced to Clean Google Sheet!`
+          );
+          if (onQuoteCreated) onQuoteCreated(data.quote);
+          setCreatedQuoteModalItem(data.quote);
+        }
       } else {
-        setFeedbackNotice(data.error || 'Failed to create quote.');
+        setFeedbackNotice(data.error || 'Failed to sync with Jobber.');
       }
     } catch (err: any) {
       setFeedbackNotice(`Error: ${err.message}`);
@@ -1910,16 +1929,31 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
             )}
           </div>
 
-          {/* 6. Primary Action Buttons: Jobber + Google Sync + Booking System Dispatch */}
+          {/* 6. Primary Action Buttons: Strict Jobber Order (Step 1: Create Client -> Step 2: Create Request or Quote) + Clean Google Sheet Sync */}
           <div className="space-y-2.5 pt-1">
+            <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between gap-2 text-[11px] text-emerald-200 font-bold">
+              <span>Jobber Sync Order: <strong>1. Create Client &amp; Property</strong> → <strong>2. Create Request or Quote</strong> → <strong>3. Clean Google Sheet</strong></span>
+              <span className="px-2 py-0.5 rounded bg-emerald-600/30 text-emerald-300 font-mono text-[10px]">Client ID: 27966135...</span>
+            </div>
+
             <button
               type="button"
               disabled={isSubmitting}
-              onClick={handleSaveJobberQuote}
+              onClick={() => handleSaveJobberQuote(false)}
               className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl text-xs sm:text-sm font-black shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Sync Client, Prices &amp; ${depositAmount} Deposit to Google + Jobber Quote</span>
+              <span>1. Create Client in Jobber → 2. Create Quote (${calculations.total.toFixed(2)}, ${depositAmount} Dep) + Clean Sheet</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => handleSaveJobberQuote(true)}
+              className="w-full py-2.5 px-4 bg-[#182235] hover:bg-[#1f2c44] border border-cyan-500/40 text-cyan-200 rounded-2xl text-xs font-extrabold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+            >
+              <User className="w-3.5 h-3.5 text-cyan-400" />
+              <span>1. Create Client in Jobber → 2. Create Service Request Only + Add to Clean Sheet</span>
             </button>
 
             <button
@@ -1929,7 +1963,7 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
               className="w-full py-3.5 px-4 bg-gradient-to-r from-pink-600 via-fuchsia-600 to-purple-600 hover:opacity-95 text-white rounded-2xl text-xs sm:text-sm font-black shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <Send className="w-4 h-4" />
-              <span>Send to Booking System, Google &amp; Dispatch (${calculations.total.toFixed(2)})</span>
+              <span>Send to Booking System, Clean Google Sheet &amp; Dispatch (${calculations.total.toFixed(2)})</span>
             </button>
           </div>
 

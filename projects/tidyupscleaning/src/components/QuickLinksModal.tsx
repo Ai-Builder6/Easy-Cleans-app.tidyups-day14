@@ -21,17 +21,19 @@ import {
   FileSpreadsheet,
   Compass,
   Calculator,
-  Flame
+  Flame,
+  ShieldAlert
 } from 'lucide-react';
 import { JOBBER_TEAM_MEMBERS } from '../data/jobberCalendarData';
 
 interface QuickLinksModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigateTo: (view: 'MAP' | 'CUSTOMER_PORTAL' | 'SCHEDULED_JOBS' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'ADDRESS_SEARCH' | 'LEADS' | 'QUICK_QUOTE', subTab?: string) => void;
+  onNavigateTo: (view: 'MAP' | 'CUSTOMER_PORTAL' | 'SCHEDULED_JOBS' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'ADDRESS_SEARCH' | 'LEADS' | 'QUICK_QUOTE' | 'SPAM_SHIELD', subTab?: string) => void;
   onOpenNewTicket?: () => void;
   onOpenTeamChat?: () => void;
   onOpenQuoPhone?: () => void;
+  onOpenSpamShield?: () => void;
   onOpenStaffRoster?: () => void;
   onOpenQuickReplies?: () => void;
   staffCount?: number;
@@ -46,6 +48,7 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
   onOpenNewTicket,
   onOpenTeamChat,
   onOpenQuoPhone,
+  onOpenSpamShield,
   onOpenStaffRoster,
   onOpenQuickReplies,
   staffCount = 15,
@@ -272,6 +275,33 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
                 </div>
                 <ChevronRight className="w-4 h-4 text-fuchsia-400 group-hover:translate-x-0.5 transition-transform shrink-0 mt-1" />
               </button>
+
+              {/* Twilio Spam Shield & Call Blocker */}
+              <button
+                onClick={() => {
+                  onNavigateTo('SPAM_SHIELD');
+                  onClose();
+                }}
+                className="p-3.5 rounded-2xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-all text-left flex items-start justify-between gap-3 group cursor-pointer"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-rose-600 to-red-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <ShieldAlert className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900 group-hover:text-rose-700 transition-colors flex items-center gap-1.5">
+                      <span>Twilio Spam Shield</span>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-rose-200 text-rose-900 font-bold">
+                        Live Filter
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Block foreign country codes, rotating numbers &amp; robocalls
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-rose-400 group-hover:translate-x-0.5 transition-transform shrink-0 mt-1" />
+              </button>
             </div>
           </div>
 
@@ -425,49 +455,24 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
                 </div>
                 <div>
                   <p className="font-extrabold text-indigo-950 flex items-center gap-2 flex-wrap">
-                    <span>Two Separate Standalone Projects &amp; Archives</span>
+                    <span>Dedicated Standalone Project Archive (app.tidyupscleaning.com)</span>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-200 text-emerald-950 font-bold border border-emerald-300">
-                      Isolated Databases
+                      Single Domain Connected
                     </span>
                   </p>
                   <p className="text-[11px] text-indigo-700 mt-0.5 leading-relaxed">
-                    The codebase is decoupled into two complete, independent projects with separate persistent stores and distinct Jobber OAuth configurations.
+                    This project is strictly dedicated to TidyUps Cleaning Operations (app.tidyupscleaning.com) with its own persistent store and Jobber OAuth configuration.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Project 1: dispatchgeeni.com */}
-            <div className="p-3 bg-white/90 rounded-xl border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">🚀</span>
-                  <span className="font-extrabold text-purple-950 text-xs">Project 1: Dispatch Genie</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-100 text-purple-800 font-bold">
-                    dispatchgeeni.com
-                  </span>
-                </div>
-                <span className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                  Store: data/dispatch_geeni_store.json • Jobber: https://dispatchgeeni.com/api/jobber/oauth/callback
-                </span>
-              </div>
-              <a
-                href="/dispatch-genie-v1.zip"
-                download="dispatch-genie-v1.zip"
-                className="px-3.5 py-1.5 bg-gradient-to-r from-purple-700 to-pink-600 hover:opacity-95 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer shrink-0 active:scale-95 text-xs self-start sm:self-auto"
-                title="Download dispatch-genie-v1.zip standalone project archive"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>dispatch-genie-v1.zip</span>
-              </a>
-            </div>
-
-            {/* Project 2: app.tidyupscleaning.com */}
+            {/* Dedicated Project: app.tidyupscleaning.com */}
             <div className="p-3 bg-white/90 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="text-sm">✨</span>
-                  <span className="font-extrabold text-emerald-950 text-xs">Project 2: TidyUps Cleaning Operations</span>
+                  <span className="font-extrabold text-emerald-950 text-xs">TidyUps Cleaning Operations</span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-100 text-emerald-800 font-bold">
                     app.tidyupscleaning.com
                   </span>
@@ -490,16 +495,6 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
             {/* Daily Version Checkpoints Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-indigo-200/60">
               <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider">Next Checkpoints:</span>
-              <a
-                href="/api/download-zip?name=dispatch-genie-v2"
-                download="dispatch-genie-v2.zip"
-                className="px-2.5 py-1 bg-white hover:bg-indigo-100 text-indigo-800 border border-indigo-300 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer text-[11px] active:scale-95"
-                title="Generate dispatch-genie-v2 archive"
-              >
-                <Download className="w-3 h-3 text-indigo-600" />
-                <span>dispatch-genie-v2</span>
-              </a>
-
               <a
                 href="/api/download-zip?name=tidyups-cleaning-v2"
                 download="tidyups-cleaning-v2.zip"

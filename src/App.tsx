@@ -1772,6 +1772,26 @@ export function App() {
                     <span>Intakes</span>
                   </button>
 
+                  {/* 5b. Clean Google Sheet (FB Leads, Google Leads, Voice Quotes & Paste Table) */}
+                  <button
+                    id="nav-tab-clean-sheet"
+                    onClick={() => setActiveTopView('LEADS')}
+                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      activeTopView === 'LEADS'
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xs font-extrabold ring-2 ring-emerald-500/30'
+                        : 'text-emerald-800 bg-emerald-50/80 hover:text-emerald-950 hover:bg-emerald-100 border border-emerald-200/80'
+                    }`}
+                    title="Clean Google Sheet Hub: Facebook Leads, Google Leads, Voice Quotes & Paste Table (/leads)"
+                  >
+                    <FileSpreadsheet className={`w-3.5 h-3.5 ${activeTopView === 'LEADS' ? 'text-white' : 'text-emerald-600'}`} />
+                    <span>Clean Google Sheet</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      activeTopView === 'LEADS' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      {leadsList.length}
+                    </span>
+                  </button>
+
                   {/* 6. Dedicated Twilio Spam Shield & Call Blocker Tab */}
                   <button
                     id="nav-tab-spam-shield"
@@ -2375,6 +2395,7 @@ export function App() {
             onOpenSpamShield={handleOpenSpamShield}
             onOpenProjectBackup={() => setIsProjectBackupModalOpen(true)}
             onClientsUpdated={(updated) => setClientsList(updated)}
+            onLeadsUpdated={(updated) => setLeadsList(updated)}
           />
         ) : activeTopView === 'SPAM_SHIELD' ? (
           <SpamShieldView

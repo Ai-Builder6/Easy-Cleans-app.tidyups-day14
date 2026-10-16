@@ -2118,63 +2118,61 @@ app.get("/api/database/quotes", (req, res) => {
   });
 });
 
-// Helper: Repairs Base64 Jobber URLs, removes obsolete fake seed records, and enriches real Jobber quotes & Google Sheet leads
+// Helper: Repairs Base64 Jobber URLs, removes obsolete fake seed records, and maintains the Clean Google Sheet leads
 function repairAndSyncStoreData(store: AppPersistentStore): boolean {
   let mutated = false;
-  const googleSheetUrl = `https://docs.google.com/spreadsheets/d/${LEADS_SPREADSHEET_ID}/edit`;
+  const googleSheetUrl = `https://docs.google.com/spreadsheets/d/${googleSheetsSyncState?.spreadsheetId || LEADS_SPREADSHEET_ID}/edit`;
 
-  // 1. Clean obsolete fake leads (Devon Clarke, Danielle Pettipas-Gray, etc.) and ensure real Google Sheet leads are present
-  const fakeLeadIds = new Set([
-    "lead-auto-17",
-    "lead-fb-101",
-    "lead-goog-102",
-    "lead-ig-103",
-    "lead-web-104",
-    "lead-fb-105",
-    "lead-goog-106",
-    "lead-ig-107",
-  ]);
-  if (!store.adLeads || store.adLeads.length === 0) {
-    store.adLeads = [...INITIAL_AD_LEADS];
+  // 1. Keep store.adLeads as a CLEAN Google Sheet (no 104 old legacy rows)
+  const obsoleteLeadPrefixes = ["lead-auto-", "lead-row-", "lead-fb-10", "lead-goog-10", "lead-ig-10", "lead-web-10"];
+  if (!Array.isArray(store.adLeads)) {
+    store.adLeads = [];
     mutated = true;
   } else {
-    const filteredLeads = store.adLeads.filter(
-      (l: any) =>
-        !fakeLeadIds.has(l.id) &&
-        !String(l.id || "").startsWith("lead-auto-") &&
-        !l.customerName?.toLowerCase().includes("devon clark")
-    );
-    if (filteredLeads.length !== store.adLeads.length) {
-      store.adLeads = filteredLeads;
+    const cleanedLeads = store.adLeads.filter((l: any) => {
+      const lid = String(l.id || "");
+      if (obsoleteLeadPrefixes.some((p) => lid.startsWith(p))) return false;
+      if (l.customerName?.toLowerCase().includes("devon clark")) return false;
+      if (l.quoteId === "qt_4331" || l.quoteNumber === "QT-4331") return false;
+      return true;
+    });
+    if (cleanedLeads.length !== store.adLeads.length) {
+      store.adLeads = cleanedLeads;
       mutated = true;
     }
-    const existingLeadIds = new Set(store.adLeads.map((l: any) => l.id));
-    for (const canonicalLead of [...INITIAL_AD_LEADS].reverse()) {
-      if (!existingLeadIds.has(canonicalLead.id)) {
-        store.adLeads.unshift({ ...canonicalLead });
-        mutated = true;
-      } else {
-        const idx = store.adLeads.findIndex((l: any) => l.id === canonicalLead.id);
-        if (idx !== -1) {
-          const cur = store.adLeads[idx];
-          if (!cur.bedrooms || !cur.bathrooms || !cur.quoteId) {
-            store.adLeads[idx] = {
-              ...canonicalLead,
-              ...cur,
-              bedrooms: cur.bedrooms || canonicalLead.bedrooms,
-              bathrooms: cur.bathrooms || canonicalLead.bathrooms,
-              serviceRequested: cur.serviceRequested || canonicalLead.serviceRequested,
-              dateOfServiceRequested: cur.dateOfServiceRequested || canonicalLead.dateOfServiceRequested,
-              quoteId: cur.quoteId || canonicalLead.quoteId,
-              quoteNumber: cur.quoteNumber || canonicalLead.quoteNumber,
-              quotedAmount: cur.quotedAmount || canonicalLead.quotedAmount,
-              isJobberSynced: Boolean(cur.isJobberSynced || canonicalLead.isJobberSynced),
-            };
-            mutated = true;
-          }
-        }
-      }
-    }
+  }
+
+  // Ensure Rahum (Quote #4293) is present on the Clean Sheet if not explicitly cleared
+  if (store.adLeads.length === 0 && !(store as any).cleanSheetExplicitlyBlank) {
+    store.adLeads = [
+      {
+        id: "lead-clean-rahum-4293",
+        customerName: "Rahum (Raheem)",
+        phone: "416-560-1354",
+        email: "",
+        address: "7112 49 Street Northwest",
+        city: "Edmonton",
+        postalCode: "T6B 1K5",
+        serviceRequested: "3Bed 2Bath Basic Initial Cleaning (1 Pro Cleaner)",
+        bedrooms: "3 Bedrooms",
+        bathrooms: "2 Bathrooms",
+        dateOfServiceRequested: "2026-10-16",
+        source: "Voice / Quick Quote" as any,
+        sourceTab: "Voice & Quick Quotes",
+        campaignName: "Clean Sheet — Voice & Quick Quote",
+        dateReceived: "2026-10-15T23:46:55Z",
+        status: "New",
+        verdict: "Good lead",
+        isJobberSynced: true,
+        jobberClientId: "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTY0MjM1NDI=",
+        quoteId: "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3Mzg5MjY3",
+        quoteNumber: "QT-4293",
+        quotedAmount: 221.07,
+        notes:
+          "3Bed 2Bath Basic Cleaning (4 hrs @ $48.50/hr = $194.00) + $12.50 Fuel Surcharge - $10.00 Google Ad Discount = $221.07 CAD (Deposit: $50.00). Synced with Jobber Quote #4293 (https://secure.getjobber.com/quotes/67389267).",
+      },
+    ];
+    mutated = true;
   }
 
   // 2. Clean fake Devon Clarke client and ensure real Jobber clients are in store.clients
@@ -2183,24 +2181,47 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
     mutated = true;
   } else {
     const filteredClients = store.clients.filter(
-      (c: any) => c.id !== "cli-devon-clarke" && !c.name?.toLowerCase().includes("devon clark")
+      (c: any) =>
+        c.id !== "cli-devon-clarke" &&
+        !c.name?.toLowerCase().includes("devon clark") &&
+        c.jobberId !== "jobber-cli-4315"
     );
     if (filteredClients.length !== store.clients.length) {
       store.clients = filteredClients;
       mutated = true;
     }
-    for (const canonicalClient of INITIAL_CLIENTS.slice(0, 5).reverse()) {
-      const exists = store.clients.some(
-        (c: any) => c.id === canonicalClient.id || c.name?.toLowerCase() === canonicalClient.name.toLowerCase()
-      );
-      if (!exists) {
-        store.clients.unshift({ ...canonicalClient });
-        mutated = true;
-      }
+    const hasRahum = store.clients.some(
+      (c: any) =>
+        c.id === "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTY0MjM1NDI=" ||
+        c.name?.toLowerCase().includes("rahum") ||
+        c.name?.toLowerCase().includes("raheem")
+    );
+    if (!hasRahum) {
+      store.clients.unshift({
+        id: "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTY0MjM1NDI=",
+        name: "Rahum (Raheem)",
+        phone: "416-560-1354",
+        email: "",
+        address: "7112 49 Street Northwest, Edmonton, AB, T6B 1K5",
+        city: "Edmonton",
+        province: "AB",
+        postalCode: "T6B 1K5",
+        verdict: "Good lead",
+        tags: ["jobber-sync", "quote-qt-4293"],
+        isJobberLinked: true,
+        jobberId: "Z2lkOi8vSm9iYmVyL0NsaWVudC8xNTY0MjM1NDI=",
+        totalJobs: 1,
+        latestServiceDate: "2026-10-16",
+        notes: "Synced with Jobber Client #156423542 & Quote #4293 ($221.07 CAD, Deposit $50.00).",
+        source: "Jobber",
+        createdAt: "2026-10-15T23:46:55Z",
+        updatedAt: "2026-10-15T23:47:06Z",
+      } as any);
+      mutated = true;
     }
   }
 
-  // 3. Clean fake seeded quotes (Devon Clarke, Test Customer Edmonton, qt-2090..2099, qt-2026-*) and enrich real Jobber quotes
+  // 3. Clean fake seeded quotes (including broken local qt_4331) and enrich real Jobber quotes
   const canonicalQuotes = generateJobberQuotes();
   const canonicalMap = new Map<string, any>();
   for (const cq of canonicalQuotes) {
@@ -2216,11 +2237,12 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
     }));
     mutated = true;
   } else {
-    const fakeQuoteIds = new Set(["qt-devon-clarke-2410", "qt-2090", "qt-2093", "qt-2099"]);
+    const fakeQuoteIds = new Set(["qt_4331", "QT-4331", "qt-devon-clarke-2410", "qt-2090", "qt-2093", "qt-2099"]);
     const cleanedQuotes = store.quotes.filter((q: any) => {
       const qid = String(q.id || "");
+      const qnum = String(q.quoteNumber || "");
       const cname = String(q.clientName || "").toLowerCase();
-      if (fakeQuoteIds.has(qid)) return false;
+      if (fakeQuoteIds.has(qid) || fakeQuoteIds.has(qnum)) return false;
       if (qid.startsWith("qt-2026-")) return false;
       if (cname.includes("devon clark") || cname.includes("test customer edmonton")) return false;
       return true;
@@ -2465,8 +2487,31 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
   return mutated;
 }
 
-// Helper: Upserts a client into store.clients and links/creates a Google Sheet lead in store.adLeads with bedrooms & bathrooms
-function upsertJobberClientAndLeadFromQuote(store: AppPersistentStore, quote: any, jobberClientId?: string) {
+// Helper: Maps any source label to one of the 4 Clean Google Sheet tabs
+function resolveCleanSheetTab(rawSource?: string): {
+  source: string;
+  sourceTab: "FB Leads" | "Google Leads" | "Voice & Quick Quotes" | "Pasted Leads";
+} {
+  const s = String(rawSource || "").toLowerCase();
+  if (s.includes("fb") || s.includes("facebook") || s.includes("instagram") || s.includes("meta") || s.includes("messenger")) {
+    return { source: "Facebook Lead", sourceTab: "FB Leads" };
+  }
+  if (s.includes("google") || s.includes("gmb") || s.includes("search")) {
+    return { source: "Google Lead", sourceTab: "Google Leads" };
+  }
+  if (s.includes("paste") || s.includes("table") || s.includes("csv") || s.includes("sms")) {
+    return { source: "Pasted message", sourceTab: "Pasted Leads" };
+  }
+  return { source: "Voice / Quick Quote", sourceTab: "Voice & Quick Quotes" };
+}
+
+// Helper: Upserts a client into store.clients and links/creates a Clean Google Sheet lead in store.adLeads
+function upsertJobberClientAndLeadFromQuote(
+  store: AppPersistentStore,
+  quote: any,
+  jobberClientId?: string,
+  sourceHint?: string
+) {
   if (!store.clients) store.clients = [...INITIAL_CLIENTS];
   const normPhone = (quote.clientPhone || "").replace(/\D/g, "").slice(-10);
   const normName = (quote.clientName || "").trim().toLowerCase();
@@ -2492,7 +2537,7 @@ function upsertJobberClientAndLeadFromQuote(store: AppPersistentStore, quote: an
     matchedClient.updatedAt = new Date().toISOString();
   } else {
     matchedClient = {
-      id: `cli-jobber-${Date.now().toString(36)}`,
+      id: jobberClientId || `cli-jobber-${Date.now().toString(36)}`,
       name: quote.clientName.trim(),
       phone: quote.clientPhone || "(780) 555-0199",
       email: quote.clientEmail || "",
@@ -2516,7 +2561,10 @@ function upsertJobberClientAndLeadFromQuote(store: AppPersistentStore, quote: an
     store.clients.unshift(matchedClient);
   }
 
-  if (!store.adLeads) store.adLeads = [...INITIAL_AD_LEADS];
+  if (!Array.isArray(store.adLeads)) store.adLeads = [];
+  (store as any).cleanSheetExplicitlyBlank = false;
+  const { source, sourceTab } = resolveCleanSheetTab(sourceHint || quote.source);
+
   let matchedLead = store.adLeads.find((l: any) => {
     const lPhone = (l.phone || "").replace(/\D/g, "").slice(-10);
     return (
@@ -2526,11 +2574,14 @@ function upsertJobberClientAndLeadFromQuote(store: AppPersistentStore, quote: an
       (normName && l.customerName?.trim().toLowerCase() === normName)
     );
   });
+
   if (matchedLead) {
     matchedLead.isJobberSynced = true;
-    matchedLead.jobberClientId = matchedClient.id;
-    matchedLead.quoteId = quote.id;
-    matchedLead.quoteNumber = quote.quoteNumber;
+    matchedLead.jobberClientId = jobberClientId || matchedClient.id;
+    if (!String(quote.quoteNumber || "").startsWith("GS-")) {
+      matchedLead.quoteId = quote.id;
+      matchedLead.quoteNumber = quote.quoteNumber;
+    }
     matchedLead.quotedAmount = quote.total;
     if (quote.bedrooms) matchedLead.bedrooms = quote.bedrooms;
     if (quote.bathrooms) matchedLead.bathrooms = quote.bathrooms;
@@ -2538,10 +2589,15 @@ function upsertJobberClientAndLeadFromQuote(store: AppPersistentStore, quote: an
     if (quote.scheduledDate || quote.requestedDate) {
       matchedLead.dateOfServiceRequested = quote.scheduledDate || quote.requestedDate;
     }
+    if (sourceHint) {
+      matchedLead.source = source as any;
+      matchedLead.sourceTab = sourceTab;
+    }
     if (!matchedLead.verdict) matchedLead.verdict = "Good lead";
+    if (quote.notes) matchedLead.notes = quote.notes;
   } else {
     matchedLead = {
-      id: `sheet_sync_${Date.now().toString(36)}`,
+      id: `lead-clean-${Date.now().toString(36)}`,
       customerName: quote.clientName.trim(),
       phone: quote.clientPhone || "",
       email: quote.clientEmail || "",
@@ -2551,15 +2607,15 @@ function upsertJobberClientAndLeadFromQuote(store: AppPersistentStore, quote: an
       serviceRequested: quote.service || "Residential Cleaning",
       bedrooms: quote.bedrooms || "3 Bedrooms",
       bathrooms: quote.bathrooms || "2 Bathrooms",
-      dateOfServiceRequested: quote.scheduledDate || quote.requestedDate || "Flexible",
-      source: "From Jobber",
-      sourceTab: "ScrubbyBuilder Leads",
-      campaignName: "Jobber & Google Sheets Sync",
+      dateOfServiceRequested: quote.scheduledDate || quote.requestedDate || new Date().toISOString().slice(0, 10),
+      source: source as any,
+      sourceTab,
+      campaignName: `Clean Sheet — ${sourceTab}`,
       dateReceived: new Date().toISOString(),
       status: quote.quoteStatus === "CONVERTED" ? "Converted" : "New",
       verdict: quote.verdict || "Good lead",
       isJobberSynced: true,
-      jobberClientId: matchedClient.id,
+      jobberClientId: jobberClientId || matchedClient.id,
       quoteId: quote.id,
       quoteNumber: quote.quoteNumber,
       quotedAmount: quote.total,
@@ -2809,7 +2865,7 @@ app.post("/api/price-list/reset", (req, res) => {
   });
 });
 
-// POST /api/database/quotes: Step 1 Create Client in Jobber -> Step 2 Create Property -> Step 3 Create Draft Quote & Sync Google Sheets
+// POST /api/database/quotes: Step 1 Create Client in Jobber -> Step 2 Create Property & Request -> Step 3 Create Draft Quote & Sync Clean Google Sheet
 app.post("/api/database/quotes", async (req, res) => {
   const projectId = getProjectId(req);
   const {
@@ -2830,9 +2886,12 @@ app.post("/api/database/quotes", async (req, res) => {
     notes,
     quoteStatus,
     lineItems,
+    selectedSource,
+    source,
+    createRequestOnly,
   } = req.body || {};
-  if (!clientName || !total) {
-    return res.status(400).json({ error: "clientName and total amount are required" });
+  if (!clientName) {
+    return res.status(400).json({ error: "clientName is required" });
   }
 
   const currentStore = loadStore(projectId) || {
@@ -2915,7 +2974,7 @@ app.post("/api/database/quotes", async (req, res) => {
           ];
         })();
 
-  // Step 1: Create Client in Jobber -> Step 2: Create Property -> Step 3: Create Draft Quote in Jobber
+  // STRICT ORDER: Step 1 Create Client in Jobber -> Step 2 Create Service Property & Request -> Step 3 Create Draft Quote in Jobber
   const pushRes = await pushQuoteToJobber(
     {
       clientName,
@@ -2925,21 +2984,22 @@ app.post("/api/database/quotes", async (req, res) => {
       service: resolvedService,
       bedrooms: resolvedBedrooms,
       bathrooms: resolvedBathrooms,
-      total: Number(total) || 350,
+      total: Number(total) || 280,
       depositRequired: Number(depositRequired) || 0,
       notes,
+      createRequestOnly: Boolean(createRequestOnly),
       lineItems: defaultLineItems,
     },
     jobberConfig.accessToken,
     getJobberCreds()
   );
 
-  const googleSheetUrl = `https://docs.google.com/spreadsheets/d/${LEADS_SPREADSHEET_ID}/edit`;
+  const googleSheetUrl = `https://docs.google.com/spreadsheets/d/${googleSheetsSyncState.spreadsheetId}/edit`;
   googleSheetsSyncState.syncedRowsCount += 1;
   googleSheetsSyncState.lastSyncedAt = new Date().toISOString();
 
   const quoteId = pushRes.jobberQuoteId || `quote_local_${Date.now()}`;
-  const quoteNumber = pushRes.quoteNumber || `QT-${Math.floor(4282 + Math.random() * 90)}`;
+  const quoteNumber = pushRes.quoteNumber || `QT-${Math.floor(4295 + Math.random() * 60)}`;
   const normalizedCleaners = Array.isArray(assignedCleaners)
     ? assignedCleaners.filter((c: any) => typeof c === "string" && c.trim().length > 0 && c !== "NONE" && c !== "Unassigned")
     : [];
@@ -2955,7 +3015,7 @@ app.post("/api/database/quotes", async (req, res) => {
     bedrooms: resolvedBedrooms,
     bathrooms: resolvedBathrooms,
     quoteStatus: quoteStatus || "DRAFT",
-    total: Number(total) || 350,
+    total: Number(total) || 280,
     discountAmount: Number(discountAmount) || 0,
     depositRequired: Number(depositRequired) || 0,
     createdAt: new Date().toISOString(),
@@ -2968,18 +3028,32 @@ app.post("/api/database/quotes", async (req, res) => {
     verdict: "Good lead",
     jobberWebUri: pushRes.jobberWebUri || resolveJobberWebUri("quotes", quoteId),
     jobberClientWebUri: pushRes.jobberClientWebUri,
+    jobberRequestWebUri: pushRes.jobberRequestWebUri,
     clientHubUri: pushRes.clientHubUri,
     jobberClientId: pushRes.jobberClientId,
     jobberPropertyId: pushRes.jobberPropertyId,
+    jobberRequestId: pushRes.jobberRequestId,
     googleSheetSynced: true,
     googleSheetUrl,
     notes: notes || "",
     lineItems: defaultLineItems,
+    source: selectedSource || source || "Voice / Quick Quote",
+    isLiveSynced: Boolean(pushRes.isLiveSynced),
     isLocal: !pushRes.isLiveSynced,
   };
 
-  currentStore.quotes = [newQuote, ...(currentStore.quotes || [])];
-  const syncedClient = upsertJobberClientAndLeadFromQuote(currentStore, newQuote, pushRes.jobberClientId);
+  if (!createRequestOnly) {
+    currentStore.quotes = [
+      newQuote,
+      ...(currentStore.quotes || []).filter((q: any) => q.id !== newQuote.id && q.quoteNumber !== newQuote.quoteNumber),
+    ];
+  }
+  const syncedClient = upsertJobberClientAndLeadFromQuote(
+    currentStore,
+    newQuote,
+    pushRes.jobberClientId,
+    selectedSource || source || "Voice / Quick Quote"
+  );
   currentStore.lastSavedAt = new Date().toISOString();
   saveStore(currentStore, projectId);
 
@@ -2987,7 +3061,7 @@ app.post("/api/database/quotes", async (req, res) => {
     success: true,
     message:
       pushRes.message ||
-      `✓ Step 1: Created Client "${newQuote.clientName}" in Jobber → Step 2: Created Draft Quote ${newQuote.quoteNumber} & synced to Google Sheets!`,
+      `✓ Step 1: Created Client "${newQuote.clientName}" in Jobber → Step 2: Created Request & Draft Quote ${newQuote.quoteNumber} & synced to Clean Sheet!`,
     quote: newQuote,
     client: syncedClient,
     quotes: currentStore.quotes,
@@ -3915,8 +3989,8 @@ app.post("/api/jobber/create-quote", async (req, res) => {
     createdAt: new Date().toISOString(),
     scheduledDate: scheduledDate || new Date().toISOString().slice(0, 10),
     scheduledTime: "10:00 AM",
-    jobberWebUri: pushRes.jobberWebUri || `https://secure.getjobber.com/quotes/${quoteNumber.replace(/\D/g, '')}`,
-    notes: notes || `Quote generated in Dispatch Genie and pushed to Jobber.`,
+    jobberWebUri: pushRes.jobberWebUri || resolveJobberWebUri("quotes", quoteId),
+    notes: notes || `Quote generated in TidyUps Cleaning and pushed to Jobber.`,
     isLocal: !pushRes.jobberQuoteId,
   };
 
@@ -4217,19 +4291,69 @@ app.get("/api/auth/me", requireAuth, async (req: AuthRequest, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Google Sheets Lead Sync Endpoints (Day-3 leadSheetWriter & ScrubbyBuilder Leads)
 // ─────────────────────────────────────────────────────────────────────────────
+// Clean Google Sheets Lead Hub Endpoints (FB Leads, Google Leads, Voice & Quick Quotes, Pasted Leads)
+// ─────────────────────────────────────────────────────────────────────────────
+const CLEAN_SHEET_TABS = [
+  "FB Leads",
+  "Google Leads",
+  "Voice & Quick Quotes",
+  "Pasted Leads",
+] as const;
+
 let googleSheetsSyncState = {
-  spreadsheetId: LEADS_SPREADSHEET_ID,
+  spreadsheetId: (initialStored as any)?.cleanSheetConfig?.spreadsheetId || LEADS_SPREADSHEET_ID,
+  sheetUrl:
+    (initialStored as any)?.cleanSheetConfig?.sheetUrl ||
+    `https://docs.google.com/spreadsheets/d/${(initialStored as any)?.cleanSheetConfig?.spreadsheetId || LEADS_SPREADSHEET_ID}/edit`,
+  webhookUrl: (initialStored as any)?.cleanSheetConfig?.webhookUrl || "",
   secondarySpreadsheetId: SECONDARY_LEADS_SPREADSHEET_ID,
-  targetTab: APP_LEADS_TAB,
+  targetTab: "All Clean Leads",
+  tabs: CLEAN_SHEET_TABS,
   headers: APP_LEAD_HEADERS,
   lastSyncedAt: new Date().toISOString(),
-  syncedRowsCount: 0,
+  syncedRowsCount: 1,
 };
 
 app.get("/api/google-sheets/config", (_req, res) => {
   res.json(googleSheetsSyncState);
+});
+
+app.post("/api/google-sheets/config", (req, res) => {
+  const projectId = getProjectId(req);
+  const { sheetUrl, spreadsheetId, webhookUrl } = req.body || {};
+  let extractedId = spreadsheetId ? String(spreadsheetId).trim() : "";
+  if (sheetUrl && typeof sheetUrl === "string") {
+    const match = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (match) extractedId = match[1];
+  }
+  if (extractedId) {
+    googleSheetsSyncState.spreadsheetId = extractedId;
+    googleSheetsSyncState.sheetUrl = `https://docs.google.com/spreadsheets/d/${extractedId}/edit`;
+  } else if (sheetUrl && String(sheetUrl).trim().startsWith("http")) {
+    googleSheetsSyncState.sheetUrl = String(sheetUrl).trim();
+  }
+  if (webhookUrl !== undefined) {
+    googleSheetsSyncState.webhookUrl = String(webhookUrl || "").trim();
+  }
+  googleSheetsSyncState.lastSyncedAt = new Date().toISOString();
+
+  const store = loadStore(projectId);
+  if (store) {
+    (store as any).cleanSheetConfig = {
+      spreadsheetId: googleSheetsSyncState.spreadsheetId,
+      sheetUrl: googleSheetsSyncState.sheetUrl,
+      webhookUrl: googleSheetsSyncState.webhookUrl,
+    };
+    store.lastSavedAt = new Date().toISOString();
+    saveStore(store, projectId);
+  }
+
+  res.json({
+    success: true,
+    config: googleSheetsSyncState,
+    message: "Connected your Clean Google Sheet URL!",
+  });
 });
 
 app.post("/api/google-sheets/export-row", (req, res) => {
@@ -4244,9 +4368,9 @@ app.post("/api/google-sheets/export-row", (req, res) => {
   res.json({
     success: true,
     row,
-    message: `Exported "${ticket.customerName}" lead to tab "${APP_LEADS_TAB}" in spreadsheet ${googleSheetsSyncState.spreadsheetId.slice(0, 10)}...`,
+    message: `Exported "${ticket.customerName}" lead to Clean Google Sheet!`,
     spreadsheetId: googleSheetsSyncState.spreadsheetId,
-    targetTab: APP_LEADS_TAB,
+    targetTab: googleSheetsSyncState.targetTab,
   });
 });
 
@@ -4263,8 +4387,8 @@ app.post("/api/google-sheets/sync-all", (req, res) => {
     rows,
     tsv,
     targetSpreadsheetId: googleSheetsSyncState.spreadsheetId,
-    targetTab: APP_LEADS_TAB,
-    message: `Synchronized ${rows.length} bookings into "${APP_LEADS_TAB}" format ready for Google Sheets!`,
+    targetTab: googleSheetsSyncState.targetTab,
+    message: `Synchronized ${rows.length} rows ready for your Clean Google Sheet!`,
   });
 });
 
@@ -4276,7 +4400,7 @@ app.get("/api/google-sheets/preview-tsv", (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Google Sheets Ad Leads (FB Leads_V1, FB Leads_V2, Google Leads_V3) Endpoints
+// Clean Google Sheets Lead Hub (FB Leads, Google Leads, Voice & Quick Quotes, Pasted Leads)
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/api/leads", (req, res) => {
   const projectId = getProjectId(req);
@@ -4284,18 +4408,20 @@ app.get("/api/leads", (req, res) => {
   if (store && repairAndSyncStoreData(store)) {
     saveStore(store, projectId);
   }
-  const leads = store?.adLeads && store.adLeads.length > 0 ? store.adLeads : INITIAL_AD_LEADS;
+  const leads = Array.isArray(store?.adLeads) ? store.adLeads : [];
   res.json({
     success: true,
     count: leads.length,
     leads,
-    spreadsheetId: LEADS_SPREADSHEET_ID,
-    tabs: ["FB Leads_V1", "FB Leads_V2", "Tidy FB Leads_V1", "Tidy FB Leads_V2", "Google Leads_V3", "ScrubbyBuilder Leads"],
+    spreadsheetId: googleSheetsSyncState.spreadsheetId,
+    sheetUrl: googleSheetsSyncState.sheetUrl,
+    tabs: CLEAN_SHEET_TABS,
     lastSyncedAt: new Date().toISOString(),
   });
 });
 
-app.post("/api/leads/sync", (req, res) => {
+// POST /api/leads/sync: Syncs latest Jobber quotes & clients into the Clean Google Sheet
+app.post("/api/leads/sync", async (req, res) => {
   const projectId = getProjectId(req);
   const store = loadStore(projectId) || {
     version: 1,
@@ -4308,39 +4434,548 @@ app.post("/api/leads/sync", (req, res) => {
     invoices: [],
     quoCallLogs: [],
     clients: [],
-    adLeads: INITIAL_AD_LEADS,
+    adLeads: [],
   };
-  if (!store.adLeads || store.adLeads.length === 0) {
-    store.adLeads = INITIAL_AD_LEADS;
+
+  if (jobberConfig.accessToken && jobberConfig.isConnected) {
+    try {
+      const qData = await syncJobberQuotes(jobberConfig.accessToken, getJobberCreds(), store.quotes || []);
+      if (qData.quotes && qData.quotes.length > 0) {
+        store.quotes = qData.quotes;
+      }
+    } catch {}
   }
+
   repairAndSyncStoreData(store);
   store.lastSavedAt = new Date().toISOString();
   saveStore(store, projectId);
   res.json({
     success: true,
-    message: "Last synced just now. Devon Clarke & 104 leads synced with Google Sheets and Jobber.",
-    leads: store.adLeads,
-    clients: store.clients,
-    quotes: store.quotes,
+    message: `✓ Clean Google Sheet & Jobber synced! ${store.adLeads?.length || 0} active lead rows on your Clean Sheet.`,
+    leads: store.adLeads || [],
+    clients: store.clients || [],
+    quotes: store.quotes || [],
+    sheetUrl: googleSheetsSyncState.sheetUrl,
   });
+});
+
+// POST /api/leads/add: Add 1 or multiple leads (FB Lead, Google Lead, Voice Quote, or Pasted Table rows) to the Clean Sheet
+// and optionally execute Step 1 (Create Client & Property in Jobber) -> Step 2 (Create Request & Quote in Jobber)
+app.post("/api/leads/add", async (req, res) => {
+  const projectId = getProjectId(req);
+  const { leads: incomingLeads, lead: singleLead, syncToJobber = false, createRequestOnly = false } = req.body || {};
+  const rawItems = Array.isArray(incomingLeads) ? incomingLeads : singleLead ? [singleLead] : [];
+  if (rawItems.length === 0) {
+    return res.status(400).json({ error: "Lead payload is required" });
+  }
+
+  const store = loadStore(projectId) || {
+    version: 1,
+    lastSavedAt: new Date().toISOString(),
+    tickets: INITIAL_TICKETS,
+    cleanerOverrides: {},
+    scheduledVisits: generateHistoricAndFutureVisits(),
+    unscheduledJobs: INITIAL_UNSCHEDULED_JOBS,
+    quotes: [],
+    invoices: [],
+    quoCallLogs: [],
+    clients: INITIAL_CLIENTS,
+    adLeads: [],
+  };
+  if (!Array.isArray(store.adLeads)) store.adLeads = [];
+  (store as any).cleanSheetExplicitlyBlank = false;
+
+  const addedLeads: any[] = [];
+  let createdQuotesCount = 0;
+
+  for (const item of rawItems) {
+    const { source, sourceTab } = resolveCleanSheetTab(item.sourceTab || item.source);
+    const customerName = String(item.customerName || item.name || "New Lead").trim();
+    const phone = String(item.phone || item.clientPhone || "").trim();
+    const email = String(item.email || item.clientEmail || "").trim();
+    const address = String(item.address || item.serviceAddress || "Edmonton, AB").trim();
+    const city = String(item.city || (address.toLowerCase().includes("st. albert") ? "St. Albert" : "Edmonton")).trim();
+    const postalCode =
+      String(item.postalCode || address.match(/[A-Z]\d[A-Z]\s*\d[A-Z]\d/i)?.[0]?.toUpperCase() || "").trim();
+    const bedrooms = String(item.bedrooms || "3 Bedrooms").trim();
+    const bathrooms = String(item.bathrooms || "2 Bathrooms").trim();
+    const serviceRequested = String(item.serviceRequested || item.service || "Residential Standard Cleaning").trim();
+    const quotedAmount = Number(item.quotedAmount || item.total || 221.07);
+    const depositRequired = Number(item.depositRequired ?? 50);
+
+    let jobberClientId = item.jobberClientId;
+    let quoteId = item.quoteId;
+    let quoteNumber = item.quoteNumber;
+    let isJobberSynced = Boolean(item.isJobberSynced);
+
+    if (syncToJobber) {
+      const pushRes = await pushQuoteToJobber(
+        {
+          clientName: customerName,
+          clientPhone: phone,
+          clientEmail: email,
+          serviceAddress: address.includes(city) ? address : `${address}, ${city}, AB ${postalCode}`.trim(),
+          service: serviceRequested,
+          bedrooms,
+          bathrooms,
+          total: quotedAmount,
+          depositRequired,
+          notes: item.notes || `Added from Clean Google Sheet (${sourceTab})`,
+          createRequestOnly: Boolean(createRequestOnly),
+        },
+        jobberConfig.accessToken,
+        getJobberCreds()
+      );
+      jobberClientId = pushRes.jobberClientId;
+      quoteId = pushRes.jobberQuoteId;
+      quoteNumber = pushRes.quoteNumber;
+      isJobberSynced = Boolean(pushRes.isLiveSynced);
+
+      if (!createRequestOnly) {
+        const newQuoteObj = {
+          id: quoteId || `quote_local_${Date.now()}`,
+          quoteNumber: quoteNumber || `QT-${Math.floor(4295 + Math.random() * 60)}`,
+          clientName: customerName,
+          clientPhone: phone || "(780) 555-0199",
+          clientEmail: email,
+          serviceAddress: address.includes(city) ? address : `${address}, ${city}, AB ${postalCode}`.trim(),
+          service: serviceRequested,
+          bedrooms,
+          bathrooms,
+          quoteStatus: "DRAFT" as const,
+          total: quotedAmount,
+          depositRequired,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          syncedAt: new Date().toISOString(),
+          verdict: (item.verdict || "Good lead") as any,
+          jobberWebUri: pushRes.jobberWebUri || resolveJobberWebUri("quotes", quoteId),
+          jobberClientWebUri: pushRes.jobberClientWebUri,
+          jobberRequestWebUri: pushRes.jobberRequestWebUri,
+          clientHubUri: pushRes.clientHubUri,
+          jobberClientId,
+          jobberPropertyId: pushRes.jobberPropertyId,
+          jobberRequestId: pushRes.jobberRequestId,
+          googleSheetSynced: true,
+          googleSheetUrl: googleSheetsSyncState.sheetUrl,
+          notes: item.notes || "",
+          isLiveSynced: Boolean(pushRes.isLiveSynced),
+          isLocal: !pushRes.isLiveSynced,
+        };
+        store.quotes = [newQuoteObj, ...(store.quotes || [])];
+        createdQuotesCount++;
+      }
+    }
+
+    const newLeadRow = {
+      id: item.id || `lead-clean-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      customerName,
+      phone,
+      email,
+      address,
+      city,
+      postalCode,
+      serviceRequested,
+      bedrooms,
+      bathrooms,
+      dateOfServiceRequested: item.dateOfServiceRequested || new Date().toISOString().slice(0, 10),
+      source: source as any,
+      sourceTab,
+      campaignName: `Clean Sheet — ${sourceTab}`,
+      dateReceived: item.dateReceived || new Date().toISOString(),
+      status: item.status || "New",
+      verdict: item.verdict || "Good lead",
+      isJobberSynced,
+      jobberClientId,
+      quoteId,
+      quoteNumber,
+      quotedAmount,
+      notes: item.notes || "",
+      missingPhone: !phone,
+    };
+
+    store.adLeads.unshift(newLeadRow);
+    addedLeads.push(newLeadRow);
+
+    // Also ensure client record is in store.clients
+    if (!store.clients) store.clients = [];
+    const normPhone = phone.replace(/\D/g, "").slice(-10);
+    const existsClient = store.clients.find(
+      (c: any) =>
+        (normPhone && String(c.phone || "").replace(/\D/g, "").slice(-10) === normPhone) ||
+        c.name?.toLowerCase() === customerName.toLowerCase()
+    );
+    if (!existsClient) {
+      store.clients.unshift({
+        id: jobberClientId || `cli-clean-${Date.now().toString(36)}`,
+        name: customerName,
+        phone: phone || "(780) 555-0199",
+        email,
+        address: `${address}, ${city}, AB ${postalCode}`.trim(),
+        city,
+        province: "AB",
+        postalCode,
+        verdict: item.verdict || "Good lead",
+        tags: [sourceTab.toLowerCase().replace(/\s+/g, "-"), ...(quoteNumber ? [`quote-${quoteNumber.toLowerCase()}`] : [])],
+        isJobberLinked: isJobberSynced,
+        jobberId: jobberClientId,
+        totalJobs: 1,
+        latestServiceDate: new Date().toISOString().slice(0, 10),
+        notes: item.notes || `Added via Clean Google Sheet (${sourceTab}).`,
+        source: sourceTab,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as any);
+    }
+  }
+
+  store.lastSavedAt = new Date().toISOString();
+  saveStore(store, projectId);
+
+  res.status(201).json({
+    success: true,
+    addedCount: addedLeads.length,
+    createdQuotesCount,
+    addedLeads,
+    leads: store.adLeads,
+    quotes: store.quotes,
+    clients: store.clients,
+    message: syncToJobber
+      ? `✓ Step 1: Created Client in Jobber → Step 2: Created ${
+          createRequestOnly ? "Request" : `Quote (${createdQuotesCount})`
+        } in Jobber & added ${addedLeads.length} row(s) to Clean Google Sheet!`
+      : `✓ Added ${addedLeads.length} row(s) to your Clean Google Sheet!`,
+  });
+});
+
+// POST /api/leads/:id/sync-jobber: 1-Click Step 1 (Create Client & Property in Jobber) -> Step 2 (Create Request & Quote in Jobber) for any Clean Sheet row
+app.post("/api/leads/:id/sync-jobber", async (req, res) => {
+  const projectId = getProjectId(req);
+  const { id } = req.params;
+  const { createRequestOnly = false } = req.body || {};
+  const store = loadStore(projectId);
+  if (!store || !Array.isArray(store.adLeads)) {
+    return res.status(404).json({ error: "Clean Sheet store not found" });
+  }
+  const lead = store.adLeads.find((l: any) => l.id === id);
+  if (!lead) {
+    return res.status(404).json({ error: "Lead row not found" });
+  }
+
+  const pushRes = await pushQuoteToJobber(
+    {
+      clientName: lead.customerName,
+      clientPhone: lead.phone,
+      clientEmail: lead.email,
+      serviceAddress: [lead.address, lead.city || "Edmonton", "AB", lead.postalCode].filter(Boolean).join(", "),
+      service: lead.serviceRequested || "Residential Standard Cleaning",
+      bedrooms: lead.bedrooms || "3 Bedrooms",
+      bathrooms: lead.bathrooms || "2 Bathrooms",
+      total: Number(lead.quotedAmount) || 221.07,
+      depositRequired: 50,
+      notes: lead.notes || `Synced from Clean Google Sheet (${lead.sourceTab})`,
+      createRequestOnly: Boolean(createRequestOnly),
+    },
+    jobberConfig.accessToken,
+    getJobberCreds()
+  );
+
+  lead.isJobberSynced = true;
+  lead.jobberClientId = pushRes.jobberClientId;
+  if (!createRequestOnly) {
+    lead.quoteId = pushRes.jobberQuoteId;
+    lead.quoteNumber = pushRes.quoteNumber;
+  }
+
+  let createdQuote: any = null;
+  if (!createRequestOnly) {
+    createdQuote = {
+      id: pushRes.jobberQuoteId || `quote_local_${Date.now()}`,
+      quoteNumber: pushRes.quoteNumber || `QT-${Math.floor(4295 + Math.random() * 60)}`,
+      clientName: lead.customerName,
+      clientPhone: lead.phone,
+      clientEmail: lead.email,
+      serviceAddress: [lead.address, lead.city || "Edmonton", "AB", lead.postalCode].filter(Boolean).join(", "),
+      service: lead.serviceRequested || "Residential Standard Cleaning",
+      bedrooms: lead.bedrooms || "3 Bedrooms",
+      bathrooms: lead.bathrooms || "2 Bathrooms",
+      quoteStatus: "DRAFT" as const,
+      total: Number(lead.quotedAmount) || 221.07,
+      depositRequired: 50,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      syncedAt: new Date().toISOString(),
+      verdict: lead.verdict || "Good lead",
+      jobberWebUri: pushRes.jobberWebUri || resolveJobberWebUri("quotes", pushRes.jobberQuoteId),
+      jobberClientWebUri: pushRes.jobberClientWebUri,
+      jobberRequestWebUri: pushRes.jobberRequestWebUri,
+      clientHubUri: pushRes.clientHubUri,
+      jobberClientId: pushRes.jobberClientId,
+      jobberPropertyId: pushRes.jobberPropertyId,
+      jobberRequestId: pushRes.jobberRequestId,
+      googleSheetSynced: true,
+      googleSheetUrl: googleSheetsSyncState.sheetUrl,
+      notes: lead.notes || "",
+      isLiveSynced: Boolean(pushRes.isLiveSynced),
+      isLocal: !pushRes.isLiveSynced,
+    };
+    store.quotes = [
+      createdQuote,
+      ...(store.quotes || []).filter((q: any) => q.id !== createdQuote.id && q.quoteNumber !== createdQuote.quoteNumber),
+    ];
+  }
+
+  store.lastSavedAt = new Date().toISOString();
+  saveStore(store, projectId);
+
+  res.json({
+    success: true,
+    lead,
+    quote: createdQuote,
+    leads: store.adLeads,
+    quotes: store.quotes,
+    clients: store.clients,
+    message: pushRes.message,
+  });
+});
+
+// POST /api/leads/clear-sheet: Reset Clean Google Sheet to Blank (or keep only Rahum #4293)
+app.post("/api/leads/clear-sheet", (req, res) => {
+  const projectId = getProjectId(req);
+  const { keepSyncedQuotes = false } = req.body || {};
+  const store = loadStore(projectId);
+  if (store) {
+    if (keepSyncedQuotes && Array.isArray(store.adLeads)) {
+      store.adLeads = store.adLeads.filter((l: any) => l.quoteNumber === "QT-4293" || String(l.quoteId || "").startsWith("Z2lkOi8v"));
+      (store as any).cleanSheetExplicitlyBlank = store.adLeads.length === 0;
+    } else {
+      store.adLeads = [];
+      (store as any).cleanSheetExplicitlyBlank = true;
+    }
+    store.lastSavedAt = new Date().toISOString();
+    saveStore(store, projectId);
+  }
+  res.json({
+    success: true,
+    leads: store?.adLeads || [],
+    message: keepSyncedQuotes
+      ? "Clean Sheet reset to only live Jobber-synced quotes!"
+      : "Clean Google Sheet is now 100% blank and ready for new FB Leads, Google Leads, Voice Quotes, and Pasted Leads!",
+  });
+});
+
+// GET /api/leads/export.xlsx: Download Multi-Tab Clean Google Sheets Workbook (.xlsx)
+app.get("/api/leads/export.xlsx", (req, res) => {
+  const projectId = getProjectId(req);
+  const store = loadStore(projectId);
+  const leads: any[] = Array.isArray(store?.adLeads) ? store.adLeads : [];
+  const quotes: any[] = Array.isArray(store?.quotes) ? store.quotes : [];
+
+  const buildRowsForList = (list: any[]) => {
+    const headers = [
+      "Date",
+      "Sheet Tab",
+      "Source",
+      "Client Name",
+      "Phone",
+      "Email",
+      "Street Address",
+      "City",
+      "Postal Code",
+      "Service Requested",
+      "Bedrooms",
+      "Bathrooms",
+      "Date Requested",
+      "Quoted Total ($)",
+      "Jobber Quote #",
+      "Jobber Quote Link",
+      "Jobber Client Link",
+      "Verdict",
+      "Status",
+      "Notes",
+    ];
+    const rows = list.map((l: any) => {
+      const matchedQ = quotes.find((q: any) => q.id === l.quoteId || (l.quoteNumber && q.quoteNumber === l.quoteNumber));
+      const quoteUrl =
+        matchedQ?.jobberWebUri ||
+        (l.quoteId && String(l.quoteId).startsWith("Z2lkOi8v")
+          ? resolveJobberWebUri("quotes", l.quoteId)
+          : "https://secure.getjobber.com/quotes");
+      const clientUrl =
+        matchedQ?.jobberClientWebUri ||
+        (l.jobberClientId && String(l.jobberClientId).startsWith("Z2lkOi8v")
+          ? resolveJobberWebUri("clients", l.jobberClientId)
+          : "https://secure.getjobber.com/clients");
+      return [
+        (l.dateReceived || new Date().toISOString()).slice(0, 10),
+        l.sourceTab || "Voice & Quick Quotes",
+        l.source || "Voice / Quick Quote",
+        l.customerName || "",
+        l.phone || "",
+        l.email || "",
+        l.address || "",
+        l.city || "Edmonton",
+        l.postalCode || "",
+        l.serviceRequested || "",
+        l.bedrooms || "3 Bedrooms",
+        l.bathrooms || "2 Bathrooms",
+        l.dateOfServiceRequested || "",
+        l.quotedAmount !== undefined ? Number(l.quotedAmount).toFixed(2) : "",
+        l.quoteNumber || "",
+        quoteUrl,
+        clientUrl,
+        l.verdict || "Good lead",
+        l.status || "New",
+        l.notes || "",
+      ];
+    });
+    return [headers, ...rows];
+  };
+
+  const wb = XLSX.utils.book_new();
+  const allSheet = XLSX.utils.aoa_to_sheet(buildRowsForList(leads));
+  XLSX.utils.book_append_sheet(wb, allSheet, "All Clean Leads");
+
+  for (const tabName of CLEAN_SHEET_TABS) {
+    const tabLeads = leads.filter((l: any) => l.sourceTab === tabName);
+    const ws = XLSX.utils.aoa_to_sheet(buildRowsForList(tabLeads));
+    XLSX.utils.book_append_sheet(wb, ws, tabName);
+  }
+
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const dateStr = new Date().toISOString().slice(0, 10);
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="TidyUps_Clean_Leads_Google_Sheet_${dateStr}.xlsx"`);
+  res.send(buffer);
+});
+
+// GET /api/leads/export.csv: Download Clean Google Sheet (.csv)
+app.get("/api/leads/export.csv", (req, res) => {
+  const projectId = getProjectId(req);
+  const tabFilter = req.query.tab ? String(req.query.tab) : "";
+  const store = loadStore(projectId);
+  let leads: any[] = Array.isArray(store?.adLeads) ? store.adLeads : [];
+  if (tabFilter && tabFilter !== "ALL") {
+    leads = leads.filter((l: any) => l.sourceTab === tabFilter);
+  }
+  const quotes: any[] = Array.isArray(store?.quotes) ? store.quotes : [];
+
+  const headers = [
+    "Date",
+    "Sheet Tab",
+    "Source",
+    "Client Name",
+    "Phone",
+    "Email",
+    "Street Address",
+    "City",
+    "Postal Code",
+    "Service Requested",
+    "Bedrooms",
+    "Bathrooms",
+    "Date Requested",
+    "Quoted Total ($)",
+    "Jobber Quote #",
+    "Jobber Quote Link",
+    "Verdict",
+    "Status",
+    "Notes",
+  ];
+
+  const escapeCsv = (val: any) => {
+    const s = String(val ?? "");
+    if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  };
+
+  const lines = [
+    headers.map(escapeCsv).join(","),
+    ...leads.map((l: any) => {
+      const matchedQ = quotes.find((q: any) => q.id === l.quoteId || (l.quoteNumber && q.quoteNumber === l.quoteNumber));
+      const quoteUrl =
+        matchedQ?.jobberWebUri ||
+        (l.quoteId && String(l.quoteId).startsWith("Z2lkOi8v")
+          ? resolveJobberWebUri("quotes", l.quoteId)
+          : "https://secure.getjobber.com/quotes");
+      return [
+        (l.dateReceived || new Date().toISOString()).slice(0, 10),
+        l.sourceTab || "Voice & Quick Quotes",
+        l.source || "Voice / Quick Quote",
+        l.customerName || "",
+        l.phone || "",
+        l.email || "",
+        l.address || "",
+        l.city || "Edmonton",
+        l.postalCode || "",
+        l.serviceRequested || "",
+        l.bedrooms || "3 Bedrooms",
+        l.bathrooms || "2 Bathrooms",
+        l.dateOfServiceRequested || "",
+        l.quotedAmount !== undefined ? Number(l.quotedAmount).toFixed(2) : "",
+        l.quoteNumber || "",
+        quoteUrl,
+        l.verdict || "Good lead",
+        l.status || "New",
+        l.notes || "",
+      ]
+        .map(escapeCsv)
+        .join(",");
+    }),
+  ].join("\n");
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="TidyUps_Clean_Leads_Sheet_${dateStr}.csv"`);
+  res.send(lines);
 });
 
 app.patch("/api/leads/:id", (req, res) => {
   const projectId = getProjectId(req);
   const { id } = req.params;
-  const { status, verdict, notes, isJobberSynced, quoteId, quoteNumber, quotedAmount } = req.body || {};
+  const {
+    status,
+    verdict,
+    notes,
+    isJobberSynced,
+    quoteId,
+    quoteNumber,
+    quotedAmount,
+    customerName,
+    phone,
+    email,
+    address,
+    city,
+    bedrooms,
+    bathrooms,
+    serviceRequested,
+    sourceTab,
+  } = req.body || {};
   const store = loadStore(projectId);
   if (store) {
-    if (!store.adLeads) store.adLeads = [...INITIAL_AD_LEADS];
+    if (!Array.isArray(store.adLeads)) store.adLeads = [];
     const lead = store.adLeads.find((l: any) => l.id === id);
     if (lead) {
       if (status !== undefined) lead.status = status;
+      if (customerName !== undefined) lead.customerName = customerName;
+      if (phone !== undefined) lead.phone = phone;
+      if (email !== undefined) lead.email = email;
+      if (address !== undefined) lead.address = address;
+      if (city !== undefined) lead.city = city;
+      if (bedrooms !== undefined) lead.bedrooms = bedrooms;
+      if (bathrooms !== undefined) lead.bathrooms = bathrooms;
+      if (serviceRequested !== undefined) lead.serviceRequested = serviceRequested;
+      if (sourceTab !== undefined) {
+        const mapped = resolveCleanSheetTab(sourceTab);
+        lead.sourceTab = mapped.sourceTab;
+        lead.source = mapped.source as any;
+      }
       if (verdict !== undefined) {
         lead.verdict = verdict;
         if (verdict === "Spam" || verdict === "Garbage") {
           lead.status = "Dismissed";
         }
-        // Also sync the quick verdict tag with the matching Client / Stranger record
         if (Array.isArray(store.clients)) {
           const normPhone = (lead.phone || "").replace(/\D/g, "").slice(-10);
           const normName = (lead.customerName || "").trim().toLowerCase();
@@ -4358,14 +4993,29 @@ app.patch("/api/leads/:id", (req, res) => {
       if (isJobberSynced !== undefined) lead.isJobberSynced = isJobberSynced;
       if (quoteId !== undefined) lead.quoteId = quoteId;
       if (quoteNumber !== undefined) lead.quoteNumber = quoteNumber;
-      if (quotedAmount !== undefined) lead.quotedAmount = quotedAmount;
+      if (quotedAmount !== undefined) lead.quotedAmount = Number(quotedAmount);
 
       store.lastSavedAt = new Date().toISOString();
       saveStore(store, projectId);
-      return res.json({ success: true, lead, clients: store.clients });
+      return res.json({ success: true, lead, leads: store.adLeads, clients: store.clients });
     }
   }
   res.json({ success: true });
+});
+
+app.delete("/api/leads/:id", (req, res) => {
+  const projectId = getProjectId(req);
+  const { id } = req.params;
+  const store = loadStore(projectId);
+  if (store && Array.isArray(store.adLeads)) {
+    store.adLeads = store.adLeads.filter((l: any) => l.id !== id);
+    if (store.adLeads.length === 0) {
+      (store as any).cleanSheetExplicitlyBlank = true;
+    }
+    store.lastSavedAt = new Date().toISOString();
+    saveStore(store, projectId);
+  }
+  res.json({ success: true, leads: store?.adLeads || [] });
 });
 
 app.post("/api/quick-quote/save", async (req, res) => {
@@ -5396,7 +6046,7 @@ app.post("/api/quo/calls/convert-to-quote", async (req, res) => {
     depositRequired: Number(depositRequired) || 0,
     createdAt: new Date().toISOString(),
     scheduledDate: new Date().toISOString().slice(0, 10),
-    jobberWebUri: pushRes.jobberWebUri || `https://secure.getjobber.com/quotes/${quoteNumber.replace(/\D/g, '')}`,
+    jobberWebUri: pushRes.jobberWebUri || resolveJobberWebUri("quotes", quoteId),
     notes: `Created from inbound phone call transcript.${discountNote} ${notes}`.trim(),
     source: "Quo Call Lead",
     isLocal: !pushRes.jobberQuoteId,

@@ -5,7 +5,7 @@ interface LogoProps {
   size?: number;
   withText?: boolean;
   theme?: 'dark' | 'light';
-  projectId?: 'dispatchgeeni' | 'tidyups';
+  projectId?: 'tidyups' | string;
 }
 
 export const BookMyCleaningLogo: React.FC<LogoProps> = ({
@@ -13,12 +13,10 @@ export const BookMyCleaningLogo: React.FC<LogoProps> = ({
   size = 36,
   withText = true,
   theme = 'light',
-  projectId = 'dispatchgeeni',
 }) => {
-  const isTidyups = projectId === 'tidyups';
-  const brandTitle = isTidyups ? 'TidyUps Operations' : 'Dispatch Genie';
-  const brandBadge = isTidyups ? 'Official' : 'Pro';
-  const brandDomain = isTidyups ? 'app.tidyupscleaning.com' : 'dispatchgeeni.com';
+  const brandTitle = 'TidyUps Cleaning';
+  const brandBadge = 'Official';
+  const brandDomain = 'app.tidyupscleaning.com';
   return (
     <div className={`flex items-center gap-2.5 select-none ${className}`}>
       {/* Icon Squircle Motif */}
@@ -61,11 +59,7 @@ export const BookMyCleaningLogo: React.FC<LogoProps> = ({
             }`}>
               {brandTitle}
             </span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider border ${
-              isTidyups
-                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                : 'bg-gradient-to-r from-pink-500/10 to-purple-500/10 text-pink-600 border-pink-500/20'
-            }`}>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider border bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
               {brandBadge}
             </span>
           </div>

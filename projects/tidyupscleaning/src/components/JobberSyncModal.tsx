@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { JobberConfig, ServiceTicket } from '../types/dispatch';
 import { ticketToSheetRow, APP_LEAD_HEADERS, generateTsvRows, LEADS_SPREADSHEET_ID, APP_LEADS_TAB } from '../services/leadSheetSync';
+import { parseSpreadsheetBuffer } from '../data/serviceCatalogData';
 
 interface JobberSyncModalProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
   onClose,
   tickets,
   onDataUpdated,
-  projectId = 'dispatchgeeni',
+  projectId = 'tidyups',
 }) => {
   const [activeProjectTab, setActiveProjectTab] = useState<'dispatchgeeni' | 'tidyups'>(projectId);
 
@@ -50,13 +51,12 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     setActiveProjectTab(projectId);
   }, [projectId]);
 
-  const DOMAIN_REDIRECT_URI = activeProjectTab === 'tidyups'
-    ? 'https://app.tidyupscleaning.com/api/jobber/oauth/callback'
-    : 'https://dispatchgeeni.com/api/jobber/oauth/callback';
+  // Dedicated Registered Callback in Jobber Developer Center for app.tidyupscleaning.com
+  const CANONICAL_JOBBER_CALLBACK = 'https://app.tidyupscleaning.com/api/jobber/oauth/callback';
 
   const previewRedirectUri = typeof window !== 'undefined'
     ? `${window.location.origin.replace(/^http:\/\//i, 'https://')}/api/jobber/oauth/callback`
-    : DOMAIN_REDIRECT_URI;
+    : CANONICAL_JOBBER_CALLBACK;
 
   const [config, setConfig] = useState<JobberConfig>({
     isConnected: false,
@@ -69,7 +69,8 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
   const [clientIdInput, setClientIdInput] = useState('27966135-e33e-4c2e-8dc3-ad7ba06dabb8');
   const [clientSecretInput, setClientSecretInput] = useState('');
   const [accessTokenInput, setAccessTokenInput] = useState('');
-  const [redirectUri, setRedirectUri] = useState(DOMAIN_REDIRECT_URI);
+  // By default, use the single canonical callback registered in Jobber Dev (works for ALL domains)
+  const [redirectUri, setRedirectUri] = useState<string>(CANONICAL_JOBBER_CALLBACK);
   const [copiedRedirectUri, setCopiedRedirectUri] = useState(false);
   const [copiedAuthLink, setCopiedAuthLink] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
@@ -83,9 +84,10 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
   const [isVerifyingToken, setIsVerifyingToken] = useState(false);
   const [tokenVerificationMsg, setTokenVerificationMsg] = useState<{ isValid: boolean; text: string } | null>(null);
 
-  // CSV Import state
+  // CSV / Spreadsheet Import state
   const [csvImportType, setCsvImportType] = useState<'visits' | 'quotes' | 'invoices'>('visits');
   const [csvInputText, setCsvInputText] = useState('');
+  const [attachedFile, setAttachedFile] = useState<{ name: string; sizeKb: string; type: string } | null>(null);
   const [isImportingCsv, setIsImportingCsv] = useState(false);
   const [csvImportFeedback, setCsvImportFeedback] = useState<{ success: boolean; text: string } | null>(null);
 
@@ -98,11 +100,23 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     push: { pushedCount: 14, ready: true },
   });
 
-  // Calculate instant authorization URL (never requires async roundtrip before opening)
+  // Calculate instant authorization URL (Universal 3-Domain Relay with base64url state)
   const computedAuthUrl = React.useMemo(() => {
     const cId = (clientIdInput || config.clientId || '27966135-e33e-4c2e-8dc3-ad7ba06dabb8').trim();
-    const rUri = redirectUri || DOMAIN_REDIRECT_URI;
-    return `https://api.getjobber.com/api/oauth/authorize?response_type=code&client_id=${encodeURIComponent(cId)}&redirect_uri=${encodeURIComponent(rUri)}&state=tidyups_auth`;
+    const rUri = (redirectUri || CANONICAL_JOBBER_CALLBACK).trim();
+    const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://app.tidyupscleaning.com';
+    const statePayload = {
+      redirectUri: rUri,
+      sourceOrigin: currentOrigin,
+      returnUrl: typeof window !== 'undefined' ? window.location.href : currentOrigin,
+      nonce: Math.random().toString(36).substring(2, 10),
+      timestamp: Date.now(),
+    };
+    let stateParam = 'tidyups_auth';
+    try {
+      stateParam = btoa(JSON.stringify(statePayload));
+    } catch {}
+    return `https://api.getjobber.com/api/oauth/authorize?response_type=code&client_id=${encodeURIComponent(cId)}&redirect_uri=${encodeURIComponent(rUri)}&state=${encodeURIComponent(stateParam)}`;
   }, [clientIdInput, config.clientId, redirectUri]);
 
   const fetchConfig = () => {
@@ -459,18 +473,36 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        setCsvInputText(content);
-        setCsvImportFeedback({ success: true, text: `Loaded file "${file.name}" (${(file.size / 1024).toFixed(1)} KB). Ready to import.` });
+    const sizeKb = (file.size / 1024).toFixed(1);
+
+    try {
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const { rawText } = parseSpreadsheetBuffer(arrayBuffer);
+        setCsvInputText(rawText);
+        setAttachedFile({ name: file.name, sizeKb, type: 'Excel Spreadsheet (.xlsx / .xls)' });
+        setCsvImportFeedback({
+          success: true,
+          text: `Loaded Excel file "${file.name}" (${sizeKb} KB). Converted sheets to text and ready to import.`,
+        });
+      } else {
+        const text = await file.text();
+        setCsvInputText(text);
+        setAttachedFile({ name: file.name, sizeKb, type: 'CSV / Text File' });
+        setCsvImportFeedback({
+          success: true,
+          text: `Loaded file "${file.name}" (${sizeKb} KB). Ready to import.`,
+        });
       }
-    };
-    reader.readAsText(file);
+    } catch (err: any) {
+      setCsvImportFeedback({
+        success: false,
+        text: `Error reading file "${file.name}": ${err.message || 'Invalid spreadsheet file'}`,
+      });
+    }
   };
 
   return (
@@ -606,103 +638,34 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                   </p>
                 </div>
 
-                {/* Step 1: Redirect URI */}
-                <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2.5">
+                {/* Step 1: Dedicated app.tidyupscleaning.com Callback */}
+                <div className="p-3.5 bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-blue-50/70 border-2 border-emerald-300 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center font-bold">1</span>
-                      <span>Jobber Developer Center Redirect URI</span>
+                    <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] flex items-center justify-center font-bold">1</span>
+                      <span>Jobber Dev Callback URI (app.tidyupscleaning.com)</span>
                     </span>
                     <button
-                      onClick={() => handleCopyRedirectUri()}
-                      className="px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-700 border border-blue-300 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                      onClick={() => handleCopyRedirectUri(CANONICAL_JOBBER_CALLBACK)}
+                      className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
                     >
                       <Copy className="w-3 h-3" />
-                      <span>{copiedRedirectUri ? 'Copied!' : 'Copy Active URI'}</span>
+                      <span>{copiedRedirectUri ? 'Copied!' : 'Copy Callback URI'}</span>
                     </button>
                   </div>
 
-                  {/* Quick Selectors for Production Domains vs Preview */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveProjectTab('dispatchgeeni');
-                        setRedirectUri('https://dispatchgeeni.com/api/jobber/oauth/callback');
-                      }}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        redirectUri === 'https://dispatchgeeni.com/api/jobber/oauth/callback'
-                          ? 'bg-purple-700 text-white border-purple-800 shadow-2xs font-semibold'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold flex items-center gap-1">
-                          <Globe className="w-3 h-3" />
-                          <span>dispatchgeeni.com</span>
-                        </span>
-                        {redirectUri === 'https://dispatchgeeni.com/api/jobber/oauth/callback' && (
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">ACTIVE</span>
-                        )}
-                      </div>
-                      <div className="font-mono text-[10px] break-all mt-1 opacity-90">
-                        https://dispatchgeeni.com/api/jobber/oauth/callback
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveProjectTab('tidyups');
-                        setRedirectUri('https://app.tidyupscleaning.com/api/jobber/oauth/callback');
-                      }}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        redirectUri === 'https://app.tidyupscleaning.com/api/jobber/oauth/callback'
-                          ? 'bg-emerald-700 text-white border-emerald-800 shadow-2xs font-semibold'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold flex items-center gap-1">
-                          <Globe className="w-3 h-3" />
-                          <span>app.tidyupscleaning.com</span>
-                        </span>
-                        {redirectUri === 'https://app.tidyupscleaning.com/api/jobber/oauth/callback' && (
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">ACTIVE</span>
-                        )}
-                      </div>
-                      <div className="font-mono text-[10px] break-all mt-1 opacity-90">
-                        https://app.tidyupscleaning.com/api/jobber/oauth/callback
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRedirectUri(previewRedirectUri)}
-                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                        redirectUri === previewRedirectUri
-                          ? 'bg-blue-600 text-white border-blue-700 shadow-2xs font-semibold'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold flex items-center gap-1">
-                          <ExternalLink className="w-3 h-3" />
-                          <span>Preview Container</span>
-                        </span>
-                        {redirectUri === previewRedirectUri && (
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">ACTIVE</span>
-                        )}
-                      </div>
-                      <div className="font-mono text-[10px] break-all mt-1 opacity-90">
-                        {previewRedirectUri}
-                      </div>
-                    </button>
+                  <div className="p-2.5 bg-white/90 border border-emerald-200 rounded-lg text-[11px] text-slate-800 space-y-1">
+                    <div className="font-extrabold text-emerald-950 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Dedicated to app.tidyupscleaning.com:</span>
+                    </div>
+                    <p className="text-slate-600 leading-relaxed">
+                      This project is strictly connected to <strong className="text-emerald-700">app.tidyupscleaning.com</strong>. Set your Jobber Developer App Callback URL to:
+                    </p>
+                    <div className="font-mono text-xs font-bold text-emerald-900 bg-emerald-50 px-2.5 py-1.5 rounded border border-emerald-200 break-all">
+                      https://app.tidyupscleaning.com/api/jobber/oauth/callback
+                    </div>
                   </div>
-
-                  <p className="text-[11px] text-blue-800 leading-relaxed">
-                    In your <strong>Jobber Developer Center App Settings</strong>, paste the active URL into the <strong>OAuth Callback URLs / Redirect URIs</strong> list.
-                  </p>
                 </div>
 
                 {/* Step 2: Client ID & Secret Inputs */}
@@ -953,27 +916,60 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                   </p>
                 </div>
 
-                {/* File Upload Selector */}
-                <div className="flex items-center justify-between gap-3 p-3 border border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100/70 transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600">
-                      <Upload className="w-4 h-4" />
+                {/* File Upload Selector & Persistent Attached Badge */}
+                {attachedFile ? (
+                  <div className="flex items-center justify-between gap-3 p-3 border-2 border-emerald-300 rounded-xl bg-emerald-50 shadow-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-extrabold text-emerald-950 flex items-center gap-2">
+                          <span>{attachedFile.name}</span>
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-200 text-emerald-800">
+                            Loaded
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-emerald-700">
+                          {attachedFile.type} • {attachedFile.sizeKb} KB
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">Upload Jobber Export File</div>
-                      <div className="text-[10px] text-slate-500">Supports .csv and .txt exports directly from Jobber</div>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttachedFile(null);
+                        setCsvInputText('');
+                        setCsvImportFeedback(null);
+                      }}
+                      className="px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Clear File
+                    </button>
                   </div>
-                  <label className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 shadow-2xs cursor-pointer transition-colors">
-                    <span>Browse File</span>
-                    <input
-                      type="file"
-                      accept=".csv, text/csv, .txt, text/plain"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 p-3 border border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100/70 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-600">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">Upload Jobber Export / Spreadsheet File</div>
+                        <div className="text-[10px] text-slate-500">Supports Excel (.xlsx, .xls), CSV, and TSV files</div>
+                      </div>
+                    </div>
+                    <label className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow-2xs cursor-pointer transition-colors flex items-center gap-1.5">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Browse File</span>
+                      <input
+                        type="file"
+                        accept=".xlsx, .xls, .csv, .tsv, text/csv, text/tab-separated-values, text/plain"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
 
                 {/* Textarea for direct paste */}
                 <div>
@@ -1166,21 +1162,33 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
 
                 {/* 5. Jobber Outbound Push (Full Width) */}
                 <div className="md:col-span-2 bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-3.5 rounded-xl border border-slate-800 shadow-md">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-white/10 text-emerald-400 rounded-lg">
                         <Send className="w-4 h-4" />
                       </div>
-                      <span className="font-bold text-xs">jobberPush (Outbound Booking Creator)</span>
+                      <span className="font-bold text-xs">jobberPush (Automatic Outbound Quote &amp; Booking Creator)</span>
                     </div>
-                    <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-400/30">Auto-Push Ready</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-400/30">
+                        Auto-Push Active on Sync
+                      </span>
+                      <button
+                        onClick={() => handleSyncModule('/api/jobber/push-all', 'PUSH', 'Auto-pushed all pending quotes (with Service Name, QTY, Unit Price & Total) and bookings to Jobber!')}
+                        disabled={isSyncing !== null}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isSyncing === 'PUSH' ? 'animate-spin' : ''}`} />
+                        <span>Push Pending to Jobber Now</span>
+                      </button>
+                    </div>
                   </div>
                   <p className="text-[11px] text-slate-300 mb-3 leading-relaxed">
-                    Whenever an AI voice dictation booking or manual cleaning booking is confirmed in this dispatch board, <code>pushBookingToJobber</code> automatically calls Jobber's GraphQL mutation to mint a new Job and Scheduled Visit with idempotency tags.
+                    <strong>Automatic Two-Way Push:</strong> Whenever you create a Quote or Booking in the app — OR whenever you click <strong>"Run All 5 Jobber Syncs"</strong> above — <code>jobberPush</code> automatically pushes your quotes (with exact <code>Service Name</code>, <code>Quantity</code>, <code>Unit Price</code>, and <code>Total</code> line items) and scheduled visits directly to Jobber without any extra steps needed.
                   </p>
                   <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/10">
-                    <span>Mutation: <code>jobCreate(input: &#123; title, clientId, scheduledAt &#125;)</code></span>
-                    <span className="text-emerald-400 font-mono font-bold">14 Bookings Linked</span>
+                    <span>Mutations: <code>quoteCreate</code> &amp; <code>jobCreate</code> (with QTY × Unit Price = Total)</span>
+                    <span className="text-emerald-400 font-mono font-bold">{moduleStats.push.pushedCount} Records Auto-Pushed</span>
                   </div>
                 </div>
               </div>
@@ -1255,7 +1263,8 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                         <tr className="bg-slate-100 text-slate-600 text-left border-b border-slate-200">
                           <th className="p-2 font-semibold">Client Name</th>
                           <th className="p-2 font-semibold">Phone</th>
-                          <th className="p-2 font-semibold">Service</th>
+                          <th className="p-2 font-semibold">Service Requested</th>
+                          <th className="p-2 font-semibold">Bedrooms &amp; Bathrooms</th>
                           <th className="p-2 font-semibold">Address</th>
                           <th className="p-2 font-semibold">Date Requested</th>
                           <th className="p-2 font-semibold">Status</th>
@@ -1269,6 +1278,9 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                               <td className="p-2 font-medium text-slate-900">{row.first_name} {row.last_name}</td>
                               <td className="p-2 text-slate-600 font-mono">{row.phone_number}</td>
                               <td className="p-2 text-blue-700 font-semibold">{row.service}</td>
+                              <td className="p-2 text-purple-800 font-semibold whitespace-nowrap">
+                                {row.bedrooms} • {row.bathrooms}
+                              </td>
                               <td className="p-2 text-slate-600 truncate max-w-xs">{row.street_address}, {row.city}</td>
                               <td className="p-2 text-slate-600">{row.date_of_service_requested}</td>
                               <td className="p-2">

@@ -5,37 +5,16 @@ const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCT
 const BUNDLED_DATA_DIR = path.join(process.cwd(), "data");
 const DATA_DIR = IS_SERVERLESS ? "/tmp" : path.join(process.cwd(), "data");
 
-export type SupportedProjectId = "dispatchgeeni" | "tidyups";
+export type SupportedProjectId = "tidyups";
 
-export function resolveStoreFilePath(projectId?: string): string {
-  const norm = (projectId || "").toLowerCase();
-  if (norm.includes("tidyup")) {
-    return path.join(DATA_DIR, "tidyups_cleaning_store.json");
-  }
-  if (norm.includes("dispatch")) {
-    return path.join(DATA_DIR, "dispatch_geeni_store.json");
-  }
-  // Default to dispatch_geeni_store.json or legacy dispatch_store.json
-  const defaultFile = path.join(DATA_DIR, "dispatch_geeni_store.json");
-  if (fs.existsSync(defaultFile)) {
-    return defaultFile;
-  }
-  return path.join(DATA_DIR, "dispatch_store.json");
+const PRIMARY_STORE_FILENAME = "tidyups_cleaning_store.json";
+
+export function resolveStoreFilePath(_projectId?: string): string {
+  return path.join(DATA_DIR, PRIMARY_STORE_FILENAME);
 }
 
-export function resolveBundledStoreFilePath(projectId?: string): string {
-  const norm = (projectId || "").toLowerCase();
-  if (norm.includes("tidyup")) {
-    return path.join(BUNDLED_DATA_DIR, "tidyups_cleaning_store.json");
-  }
-  if (norm.includes("dispatch")) {
-    return path.join(BUNDLED_DATA_DIR, "dispatch_geeni_store.json");
-  }
-  const defaultFile = path.join(BUNDLED_DATA_DIR, "dispatch_geeni_store.json");
-  if (fs.existsSync(defaultFile)) {
-    return defaultFile;
-  }
-  return path.join(BUNDLED_DATA_DIR, "dispatch_store.json");
+export function resolveBundledStoreFilePath(_projectId?: string): string {
+  return path.join(BUNDLED_DATA_DIR, PRIMARY_STORE_FILENAME);
 }
 
 export interface AppPersistentStore {
@@ -65,6 +44,7 @@ export interface AppPersistentStore {
     lineMappings?: Record<string, string>;
   };
   blockedCallsHistory?: any[];
+  recentInboundCalls?: any[];
   jobberConfig?: {
     isConnected: boolean;
     accountName: string;
@@ -83,6 +63,7 @@ export interface AppPersistentStore {
     mapsApiKey?: string;
     geminiApiKey?: string;
   };
+  serviceCatalog?: any[];
 }
 
 // Ensure data directory exists
@@ -95,32 +76,35 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 /**
- * Loads stored data from disk for a specific project (or default)
+ * Loads stored data from disk exclusively for TidyUps Cleaning (app.tidyupscleaning.com)
  */
-export function loadStore(projectId?: string): AppPersistentStore | null {
-  const targetFile = resolveStoreFilePath(projectId);
-  const bundledFile = resolveBundledStoreFilePath(projectId);
-  const fallbackLegacyFile = path.join(DATA_DIR, "dispatch_store.json");
+export function loadStore(_projectId?: string): AppPersistentStore | null {
+  const targetFile = resolveStoreFilePath();
+  const bundledFile = resolveBundledStoreFilePath();
 
   try {
-    if (fs.existsSync(targetFile)) {
-      const raw = fs.readFileSync(targetFile, "utf-8");
-      return JSON.parse(raw);
-    }
-    // If project file doesn't exist yet, seed it from legacy dispatch_store.json or bundled file
-    if (fs.existsSync(fallbackLegacyFile)) {
-      const raw = fs.readFileSync(fallbackLegacyFile, "utf-8");
-      // Seed target file for future standalone mutations
-      try {
-        fs.writeFileSync(targetFile, raw, "utf-8");
-      } catch (seedErr) {
-        // ignore seed error
+    const candidateFiles = [targetFile, bundledFile];
+
+    let newestStore: AppPersistentStore | null = null;
+    let newestTime = 0;
+
+    for (const file of candidateFiles) {
+      if (fs.existsSync(file)) {
+        try {
+          const parsed = JSON.parse(fs.readFileSync(file, "utf-8")) as AppPersistentStore;
+          const ts = parsed?.lastSavedAt ? new Date(parsed.lastSavedAt).getTime() : 1;
+          if (!newestStore || ts > newestTime) {
+            newestStore = parsed;
+            newestTime = ts;
+          }
+        } catch {
+          // skip unreadable candidate
+        }
       }
-      return JSON.parse(raw);
     }
-    if (IS_SERVERLESS && fs.existsSync(bundledFile)) {
-      const raw = fs.readFileSync(bundledFile, "utf-8");
-      return JSON.parse(raw);
+
+    if (newestStore) {
+      return newestStore;
     }
   } catch (err) {
     console.warn(`Could not read store file (${targetFile}), creating initial store:`, err);
@@ -129,42 +113,43 @@ export function loadStore(projectId?: string): AppPersistentStore | null {
 }
 
 /**
- * Atomically writes data to disk for a specific project
+ * Atomically writes and persists store data exclusively for TidyUps Cleaning (app.tidyupscleaning.com)
  */
-export function saveStore(store: AppPersistentStore, projectId?: string): boolean {
-  const targetFile = resolveStoreFilePath(projectId);
+export function saveStore(store: AppPersistentStore, _projectId?: string): boolean {
+  const targetFile = resolveStoreFilePath();
 
   try {
-    let existing: Partial<AppPersistentStore> = {};
-    if (fs.existsSync(targetFile)) {
-      try {
-        existing = JSON.parse(fs.readFileSync(targetFile, "utf-8")) || {};
-      } catch {
-        // use empty if corrupt
-      }
-    } else {
-      const fallbackLegacyFile = path.join(DATA_DIR, "dispatch_store.json");
-      if (fs.existsSync(fallbackLegacyFile)) {
-        try {
-          existing = JSON.parse(fs.readFileSync(fallbackLegacyFile, "utf-8")) || {};
-        } catch {
-          // ignore
-        }
-      }
-    }
+    const existing = loadStore() || ({} as Partial<AppPersistentStore>);
 
     const merged: AppPersistentStore = {
       ...existing,
       ...store,
-      // Ensure nested API configurations are never erased if not explicitly provided
+      // Ensure nested API, phone configurations, and custom serviceCatalog are never erased if not explicitly provided
+      spamShieldConfig: store.spamShieldConfig || existing.spamShieldConfig,
       jobberConfig: store.jobberConfig || existing.jobberConfig,
       quoConfig: store.quoConfig || existing.quoConfig,
       apiKeys: store.apiKeys || existing.apiKeys,
+      serviceCatalog:
+        Array.isArray(store.serviceCatalog) && store.serviceCatalog.length > 0
+          ? store.serviceCatalog
+          : existing.serviceCatalog,
       lastSavedAt: new Date().toISOString(),
     };
 
     const json = JSON.stringify(merged, null, 2);
+
     fs.writeFileSync(targetFile, json, "utf-8");
+
+    // Also mirror to standalone sub-project folder if present
+    const subFile = path.join(process.cwd(), "projects", "tidyupscleaning", "data", PRIMARY_STORE_FILENAME);
+    if (fs.existsSync(path.dirname(subFile))) {
+      try {
+        fs.writeFileSync(subFile, json, "utf-8");
+      } catch {
+        // ignore
+      }
+    }
+
     return true;
   } catch (err) {
     console.error(`Failed to write store (${targetFile}):`, err);
