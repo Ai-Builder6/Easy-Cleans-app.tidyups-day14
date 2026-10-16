@@ -60,6 +60,7 @@ import {
   ticketToSheetRow,
   generateTsvRows,
 } from "./src/services/leadSheetSync";
+import { generateStyledLeadsWorkbookBuffer } from "./src/services/styledLeadsWorkbookBuilder";
 import { loadStore, saveStore, AppPersistentStore } from "./src/services/storeService";
 import { db } from "./src/db";
 import * as dbSchema from "./src/db/schema";
@@ -5216,127 +5217,35 @@ app.post("/api/leads/clear-sheet", (req, res) => {
   });
 });
 
-// GET /api/leads/export.xlsx: Download Multi-Tab Clean Google Sheets Workbook (.xlsx)
-app.get("/api/leads/export.xlsx", (req, res) => {
-  const projectId = getProjectId(req);
-  const store = loadStore(projectId);
-  const leads: any[] = Array.isArray(store?.adLeads) ? store.adLeads : [];
-  const quotes: any[] = Array.isArray(store?.quotes) ? store.quotes : [];
+// GET /api/leads/export.xlsx: Download Multi-Tab Clean Google Sheets Workbook (.xlsx) with Frozen Headers, Source Colors & Table Footers
+app.get("/api/leads/export.xlsx", async (req, res) => {
+  try {
+    const projectId = getProjectId(req);
+    const store = loadStore(projectId);
+    const leads: any[] = Array.isArray(store?.adLeads) ? store.adLeads : [];
+    const quotes: any[] = Array.isArray(store?.quotes) ? store.quotes : [];
 
-  const buildRowsForList = (list: any[]) => {
-    const headers = [
-      "Date",
-      "Sheet Tab",
-      "Source",
-      "Client Name",
-      "Phone",
-      "Email",
-      "Street Address",
-      "City",
-      "Postal Code",
-      "Service Requested",
-      "Bedrooms",
-      "Bathrooms",
-      "Date Requested",
-      "Quoted Total ($)",
-      "Jobber Quote #",
-      "Jobber Quote Link",
-      "Jobber Client Link",
-      "Verdict",
-      "Status",
-      "Notes",
-    ];
-    const rows = list.map((l: any) => {
-      const matchedQ = quotes.find((q: any) => q.id === l.quoteId || (l.quoteNumber && q.quoteNumber === l.quoteNumber));
-      const quoteUrl =
-        matchedQ?.jobberWebUri ||
-        (l.quoteId && String(l.quoteId).startsWith("Z2lkOi8v")
-          ? resolveJobberWebUri("quotes", l.quoteId)
-          : "https://secure.getjobber.com/quotes");
-      const clientUrl =
-        matchedQ?.jobberClientWebUri ||
-        (l.jobberClientId && String(l.jobberClientId).startsWith("Z2lkOi8v")
-          ? resolveJobberWebUri("clients", l.jobberClientId)
-          : "https://secure.getjobber.com/clients");
-      return [
-        (l.dateReceived || new Date().toISOString()).slice(0, 10),
-        l.sourceTab || "Voice & Quick Quotes",
-        l.source || "Voice / Quick Quote",
-        l.customerName || "",
-        l.phone || "",
-        l.email || "",
-        l.address || "",
-        l.city || "Edmonton",
-        l.postalCode || "",
-        l.serviceRequested || "",
-        l.bedrooms || "3 Bedrooms",
-        l.bathrooms || "2 Bathrooms",
-        l.dateOfServiceRequested || "",
-        l.quotedAmount !== undefined ? Number(l.quotedAmount).toFixed(2) : "",
-        l.quoteNumber || "",
-        quoteUrl,
-        clientUrl,
-        l.verdict || "Good lead",
-        l.status || "New",
-        l.notes || "",
-      ];
+    const buffer = await generateStyledLeadsWorkbookBuffer({
+      leads,
+      quotes,
+      appLeadHeaders: APP_LEAD_HEADERS,
+      resolveJobberWebUri,
     });
-    return [headers, ...rows];
-  };
 
-  const wb = XLSX.utils.book_new();
-  const allSheet = XLSX.utils.aoa_to_sheet(buildRowsForList(leads));
-  XLSX.utils.book_append_sheet(wb, allSheet, "All Clean Leads");
-
-  for (const tabName of CLEAN_SHEET_TABS) {
-    const tabLeads = leads.filter((l: any) => l.sourceTab === tabName);
-    const ws = XLSX.utils.aoa_to_sheet(buildRowsForList(tabLeads));
-    XLSX.utils.book_append_sheet(wb, ws, tabName);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="TidyUps_Clean_Leads_Google_Sheet_${dateStr}.xlsx"`
+    );
+    res.send(buffer);
+  } catch (err: any) {
+    console.error("Failed to generate styled leads workbook:", err);
+    res.status(500).json({ error: err?.message || "Failed to generate styled workbook" });
   }
-
-  // Also append "Facebook Leads" and the exact 20-column "ScrubbyBuilder Leads" schema tab for direct FB Lead Ads & Google Ads Lead Form connections
-  const fbLeads = leads.filter((l: any) => l.sourceTab === "FB Leads" || l.sourceTab === "Facebook Leads");
-  const fbSheet = XLSX.utils.aoa_to_sheet(buildRowsForList(fbLeads));
-  XLSX.utils.book_append_sheet(wb, fbSheet, "Facebook Leads");
-
-  const twentyColRows = [
-    [...APP_LEAD_HEADERS],
-    ...leads.map((l: any) => {
-      const nameParts = String(l.customerName || "").trim().split(/\s+/);
-      const firstName = nameParts[0] || "";
-      const lastName = nameParts.slice(1).join(" ") || "";
-      return [
-        l.id || "",
-        l.dateReceived || new Date().toISOString(),
-        l.source || "facebook_lead_ads",
-        l.sourceTab || "FB Leads",
-        firstName,
-        lastName,
-        l.phone || "",
-        l.email || "",
-        l.address || "",
-        l.city || "Edmonton",
-        "AB",
-        l.postalCode || "",
-        l.serviceRequested || "Residential Standard Cleaning",
-        l.bedrooms || "3 Bedrooms",
-        l.bathrooms || "2 Bathrooms",
-        l.dateOfServiceRequested || "",
-        l.campaignName || "FB / Google Ads",
-        l.notes || "",
-        `https://app.tidyupscleaning.com/?lead=${encodeURIComponent(l.id || "")}`,
-        l.isJobberSynced ? "booked" : "new",
-      ];
-    }),
-  ];
-  const twentyColSheet = XLSX.utils.aoa_to_sheet(twentyColRows);
-  XLSX.utils.book_append_sheet(wb, twentyColSheet, APP_LEADS_TAB);
-
-  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-  const dateStr = new Date().toISOString().slice(0, 10);
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-  res.setHeader("Content-Disposition", `attachment; filename="TidyUps_Clean_Leads_Google_Sheet_${dateStr}.xlsx"`);
-  res.send(buffer);
 });
 
 // GET /api/leads/export.csv: Download Clean Google Sheet (.csv)

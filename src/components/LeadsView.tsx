@@ -480,6 +480,91 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
     }
   };
 
+  // 1-Click: Populate sample Facebook, Google, and Pasted leads so all 4 channel colors are visible in the table and Google Sheet
+  const handleAddSampleMultiChannelLeads = async () => {
+    setIsSyncing(true);
+    setNotice(null);
+    try {
+      const sampleRows = [
+        {
+          source_tab: 'FB Leads',
+          source: 'Facebook Lead Ads',
+          first_name: 'Sarah',
+          last_name: 'Jenkins (Facebook Ad)',
+          phone_number: '780-555-0148',
+          email: 'sarah.jenkins@example.com',
+          street_address: '10420 98 Ave NW',
+          city: 'Edmonton',
+          post_code: 'T5K 0A1',
+          service: '3Bed 2Bath Deep Cleaning',
+          bedrooms: '3 Bedrooms',
+          bathrooms: '2 Bathrooms',
+          quotedAmount: 265.0,
+          campaign_name: 'FB Lead Ads — Fall Deep Clean Promo',
+          message: 'Facebook Lead Form — Requested Friday morning deep clean + inside oven.',
+        },
+        {
+          source_tab: 'Google Leads',
+          source: 'Google Ads / LSA',
+          first_name: 'David',
+          last_name: 'Chen (Google Search Ad)',
+          phone_number: '780-555-0194',
+          email: 'david.chen@example.com',
+          street_address: '8820 Jasper Ave NW',
+          city: 'Edmonton',
+          post_code: 'T5H 4E8',
+          service: 'Move-Out Full House Cleaning',
+          bedrooms: '4 Bedrooms',
+          bathrooms: '2.5 Bathrooms',
+          quotedAmount: 345.0,
+          campaign_name: 'Google Local Services — Move-Out Clean',
+          message: 'Google Ads Lead Extension — Move-out inspection on Saturday.',
+        },
+        {
+          source_tab: 'Pasted Leads',
+          source: 'Pasted / Manual Table',
+          first_name: 'Amanda',
+          last_name: 'Kowalski (Pasted Table)',
+          phone_number: '780-555-0271',
+          email: 'amanda.k@example.com',
+          street_address: '5210 106 St NW',
+          city: 'Edmonton',
+          post_code: 'T6H 2S9',
+          service: 'Bi-Weekly Standard Residential Cleaning',
+          bedrooms: '3 Bedrooms',
+          bathrooms: '2 Bathrooms',
+          quotedAmount: 198.5,
+          campaign_name: 'Spreadsheet Paste Import',
+          message: 'Imported via Paste Table — Recurring bi-weekly inquiry.',
+        },
+      ];
+      const added: AdLeadItem[] = [];
+      for (const payload of sampleRows) {
+        const r = await fetch('/api/leads/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const d = await r.json();
+        if (d.success && d.lead) {
+          added.push(d.lead);
+        }
+      }
+      if (added.length > 0) {
+        const nextList = [...added, ...leadsList];
+        setLeadsList(nextList);
+        if (onLeadsUpdated) onLeadsUpdated(nextList);
+        setNotice(
+          '✓ Added sample 🔵 Facebook, 🟢 Google, and 🟠 Pasted leads alongside your 🟣 Voice Quote! Click "✨ Sync & Style Google Sheet" to push all colors & frozen headers to Google Drive.'
+        );
+      }
+    } catch (err: any) {
+      setNotice(`Could not add sample leads: ${err?.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Add Pasted Rows (and optionally run Step 1: Create Client in Jobber -> Step 2: Create Request or Quote in Jobber)
   const handleImportPastedRows = async (syncToJobber: boolean, createRequestOnly: boolean = false) => {
     if (parsedPreviewRows.length === 0) return;
@@ -743,11 +828,15 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
             type="button"
             onClick={() => setConfirmDriveSyncModal(true)}
             disabled={isSyncingDriveSheet}
-            className="px-3.5 py-2 bg-teal-900/70 hover:bg-teal-800/80 text-teal-200 border border-teal-500/40 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Sync all current leads directly into your live Google Sheet in Google Drive"
+            className="px-3.5 py-2 bg-gradient-to-r from-teal-700 to-emerald-700 hover:from-teal-600 hover:to-emerald-600 text-white border border-teal-400/40 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+            title="Sync all current leads and apply Frozen Headers, Executive Title Banner, Channel Colors (Blue FB, Green Google, Purple Voice, Amber Pasted) & Summary Footer to your live Google Sheet in Drive"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncingDriveSheet ? 'animate-spin' : ''}`} />
-            <span>{isSyncingDriveSheet ? 'Syncing Drive Sheet...' : 'Sync to Drive Sheet'}</span>
+            <span>
+              {isSyncingDriveSheet
+                ? 'Formatting & Syncing Sheet...'
+                : '✨ Sync & Style Google Sheet (Freeze Headers + Colors)'}
+            </span>
           </button>
 
           <button
@@ -755,10 +844,10 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
             onClick={handleDownloadXlsx}
             disabled={isDownloadingFile !== null}
             className="px-3.5 py-2 bg-[#1b2234] hover:bg-[#232c42] text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Download Multi-Tab Clean Google Sheet (.xlsx) in-app without cookie prompts"
+            title="Download Styled Multi-Tab Clean Google Sheet (.xlsx) with Frozen Headers & Source Colors"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>{isDownloadingFile === 'XLSX' ? 'Downloading...' : 'Download .XLSX'}</span>
+            <span>{isDownloadingFile === 'XLSX' ? 'Downloading...' : 'Download Styled .XLSX'}</span>
           </button>
 
           <button
@@ -795,21 +884,27 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
       {/* Explicit Confirmation Modal Before Updating Live Google Sheet in Drive (per Workspace skill rules) */}
       {confirmDriveSyncModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#151926] border border-slate-700 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+          <div className="bg-[#151926] border border-slate-700 rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
             <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
-                <AlertTriangle className="w-5 h-5" />
+              <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+                <FileSpreadsheet className="w-5 h-5" />
               </div>
-              <div>
+              <div className="space-y-2">
                 <h3 className="text-sm font-extrabold text-white">
-                  Update Live Google Sheet in Google Drive?
+                  Sync &amp; Apply Visual Table Formatting to Live Google Sheet?
                 </h3>
-                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                <p className="text-xs text-slate-300 leading-relaxed">
                   This will update your connected Google Sheet in Google Drive with{' '}
-                  <strong className="text-emerald-300 font-mono">{leadsList.length}</strong> lead row(s) across the{' '}
-                  <strong>All Clean Leads</strong>, <strong>Facebook Leads</strong>, <strong>Google Leads</strong>,{' '}
-                  <strong>Voice &amp; Quick Quotes</strong>, and <strong>ScrubbyBuilder Leads</strong> tabs.
+                  <strong className="text-emerald-300 font-mono">{leadsList.length}</strong> active lead row(s) and apply full visual spreadsheet styling across all tabs:
                 </p>
+                <ul className="text-[11px] text-slate-300 space-y-1 bg-[#0d111c] p-3 rounded-xl border border-slate-800">
+                  <li>📌 <strong>Frozen Top 3 Header Rows:</strong> Executive Title Banner + 5-Color Channel KPI Bar + AutoFilter Column Headers stay pinned when scrolling</li>
+                  <li>🔵 <strong>Facebook Leads:</strong> Royal Facebook Blue (<code>#1877F2</code>) badges &amp; soft Sky-Blue table rows</li>
+                  <li>🟢 <strong>Google Leads:</strong> Google Emerald Green (<code>#0F9D58</code>) badges &amp; soft Mint-Green table rows</li>
+                  <li>🟣 <strong>Voice &amp; Quick Quotes:</strong> Royal Purple (<code>#7C3AED</code>) badges &amp; soft Lavender table rows</li>
+                  <li>🟠 <strong>Pasted Leads:</strong> Warm Amber (<code>#D97706</code>) badges &amp; soft Gold table rows</li>
+                  <li>📊 <strong>Table Summary Footer:</strong> Live <code>=SUM(...)</code> Quoted Total + Channel Color Legend Table at the bottom</li>
+                </ul>
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
@@ -825,7 +920,7 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                 onClick={handleConfirmedSyncToDriveSheet}
                 className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold cursor-pointer"
               >
-                Confirm &amp; Update Google Sheet
+                Confirm &amp; Style Google Sheet
               </button>
             </div>
           </div>
@@ -1387,21 +1482,45 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
       )}
 
       {/* ─────────────────────────────────────────────────────────────────────────────
-          CLEAN GOOGLE SHEET LIVE SPREADSHEET TABLE
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          CLEAN GOOGLE SHEET LIVE SPREADSHEET TABLE (Frozen Headers + Source Colors + Summary Footer)
          ───────────────────────────────────────────────────────────────────────────── */}
       <div className="bg-[#121623] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-        <div className="px-5 py-3.5 bg-[#161b2b] border-b border-slate-800 flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
+        {/* Executive Title Header Banner */}
+        <div className="px-5 py-3.5 bg-gradient-to-r from-[#0f172a] via-[#131c33] to-[#0f292a] border-b border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs sm:text-sm font-extrabold text-white">
-              Clean Google Sheet Rows ({filteredLeads.length})
+            <span className="text-xs sm:text-sm font-extrabold text-white tracking-wide">
+              ✨ TIDYUPS MASTER LEADS &amp; QUOTES TABLE ({filteredLeads.length} Row{filteredLeads.length === 1 ? '' : 's'})
+            </span>
+            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-extrabold">
+              📌 Frozen Headers Active
             </span>
             <span className="text-[11px] text-slate-400">
-              • Showing {activeTab === 'ALL' ? 'All Tabs' : activeTab}
+              • Showing {activeTab === 'ALL' ? 'All Channels (Color-Coded)' : activeTab}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleAddSampleMultiChannelLeads}
+              disabled={isSyncing}
+              className="px-3 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-400/40 text-indigo-200 text-[11px] font-extrabold cursor-pointer transition-all"
+              title="Add sample Facebook (Blue), Google (Green), and Pasted (Amber) rows so you can see all 4 source colors in this table and your Google Sheet"
+            >
+              + Add Sample FB / Google / Pasted Rows
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setConfirmDriveSyncModal(true)}
+              disabled={isSyncingDriveSheet}
+              className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-extrabold cursor-pointer transition-all"
+            >
+              ✨ Push Frozen Headers &amp; Colors to Google Sheet
+            </button>
+
             {leadsList.length === 0 && (
               <button
                 type="button"
@@ -1414,6 +1533,40 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
           </div>
         </div>
 
+        {/* 5-Color Channel Legend & Live KPI Bar (Matches Row 2 of Google Sheet) */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 border-b border-slate-800 text-[11px] font-extrabold">
+          <div className="px-3.5 py-2 bg-[#1e293b] text-white flex items-center justify-between border-r border-slate-700/60">
+            <span>📊 TOTAL LEADS: {leadsList.length}</span>
+            <span className="text-emerald-300 font-mono">
+              ${leadsList.reduce((acc, l) => acc + (Number(l.quotedAmount) || 0), 0).toFixed(2)}
+            </span>
+          </div>
+          <div className="px-3.5 py-2 bg-[#1877F2] text-white flex items-center justify-between border-r border-blue-400/30">
+            <span>🔵 FACEBOOK LEADS</span>
+            <span className="px-1.5 py-0.5 rounded bg-black/25 font-mono">
+              {tabCounts['Facebook Leads']}
+            </span>
+          </div>
+          <div className="px-3.5 py-2 bg-[#0F9D58] text-white flex items-center justify-between border-r border-emerald-400/30">
+            <span>🟢 GOOGLE LEADS</span>
+            <span className="px-1.5 py-0.5 rounded bg-black/25 font-mono">
+              {tabCounts['Google Leads']}
+            </span>
+          </div>
+          <div className="px-3.5 py-2 bg-[#7C3AED] text-white flex items-center justify-between border-r border-purple-400/30">
+            <span>🟣 VOICE &amp; QUICK QUOTES</span>
+            <span className="px-1.5 py-0.5 rounded bg-black/25 font-mono">
+              {tabCounts['Voice & Quick Quotes']}
+            </span>
+          </div>
+          <div className="px-3.5 py-2 bg-[#D97706] text-white flex items-center justify-between col-span-2 sm:col-span-1">
+            <span>🟠 PASTED LEADS</span>
+            <span className="px-1.5 py-0.5 rounded bg-black/25 font-mono">
+              {tabCounts['Pasted Leads']}
+            </span>
+          </div>
+        </div>
+
         {filteredLeads.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <FileSpreadsheet className="w-10 h-10 text-emerald-400/60 mx-auto" />
@@ -1421,35 +1574,87 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
               Your Clean Google Sheet ({activeTab === 'ALL' ? 'All Tabs' : activeTab}) is Ready &amp; Blank
             </div>
             <p className="text-xs text-slate-400 max-w-lg mx-auto">
-              Use the Quick Single-Row Entry or Paste Table above to add Facebook Leads, Google Leads, or Pasted Leads — or create a Voice Quote in the Voice Dictation tab and it will sync here automatically.
+              Use the Quick Single-Row Entry or Paste Table above to add Facebook Leads, Google Leads, or Pasted Leads — or click <strong>"+ Add Sample FB / Google / Pasted Rows"</strong> above to preview all 4 channel colors right away.
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[640px] relative">
             <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-[#0e121d] border-b border-slate-800 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                  <th className="py-3 px-3">Date / Tab</th>
-                  <th className="py-3 px-3">Client Name &amp; Phone</th>
-                  <th className="py-3 px-3">Service Property Address</th>
-                  <th className="py-3 px-3">Bed / Bath &amp; Service</th>
-                  <th className="py-3 px-3">Quoted ($)</th>
-                  <th className="py-3 px-3">Jobber Status (1. Client → 2. Quote)</th>
-                  <th className="py-3 px-3">Verdict</th>
-                  <th className="py-3 px-3 text-right">Jobber &amp; Quote Actions</th>
+              {/* FROZEN / STICKY TABLE HEADER */}
+              <thead className="sticky top-0 z-20 bg-[#0b0f1a] shadow-lg border-b-2 border-emerald-500/50">
+                <tr className="text-[11px] font-extrabold uppercase tracking-wider text-slate-200">
+                  <th className="py-3.5 px-3 bg-[#0b0f1a] border-r border-slate-800/80">
+                    Date &amp; Channel Color
+                  </th>
+                  <th className="py-3.5 px-3 bg-[#0b0f1a] border-r border-slate-800/80">
+                    Client Name &amp; Contact
+                  </th>
+                  <th className="py-3.5 px-3 bg-[#0b0f1a] border-r border-slate-800/80">
+                    Service Property Address
+                  </th>
+                  <th className="py-3.5 px-3 bg-[#0b0f1a] border-r border-slate-800/80">
+                    Bed / Bath &amp; Service
+                  </th>
+                  <th className="py-3.5 px-3 bg-[#0b0f1a] border-r border-slate-800/80">
+                    Quoted Total ($)
+                  </th>
+                  <th className="py-3.5 px-3 bg-[#0b0f1a] border-r border-slate-800/80">
+                    Jobber Status (1. Client → 2. Quote)
+                  </th>
+                  <th className="py-3.5 px-3 bg-[#0b0f1a] border-r border-slate-800/80">
+                    Verdict
+                  </th>
+                  <th className="py-3.5 px-3 bg-[#0b0f1a] text-right">
+                    Jobber &amp; Quote Actions
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/70">
+              <tbody className="divide-y divide-slate-800/80">
                 {filteredLeads.map((lead) => {
-                  const rowTab =
-                    (lead as any).sourceTab ||
-                    (String(lead.source).includes('Facebook')
-                      ? 'Facebook Leads'
-                      : String(lead.source).includes('Google')
-                      ? 'Google Leads'
-                      : String(lead.source).includes('Paste')
-                      ? 'Pasted Leads'
-                      : 'Voice & Quick Quotes');
+                  const rawTab = String((lead as any).sourceTab || '');
+                  const rawSource = String(lead.source || '');
+                  const combined = `${rawTab} ${rawSource}`.toLowerCase();
+
+                  const isFacebook =
+                    combined.includes('fb') ||
+                    combined.includes('facebook') ||
+                    combined.includes('meta');
+                  const isGoogle =
+                    combined.includes('google') || combined.includes('lsa');
+                  const isPasted =
+                    combined.includes('paste') || combined.includes('manual');
+
+                  const rowTab = isFacebook
+                    ? 'Facebook Leads'
+                    : isGoogle
+                    ? 'Google Leads'
+                    : isPasted
+                    ? 'Pasted Leads'
+                    : 'Voice & Quick Quotes';
+
+                  const rowColorClasses = isFacebook
+                    ? 'border-l-4 border-l-[#1877F2] bg-blue-950/30 hover:bg-blue-900/40'
+                    : isGoogle
+                    ? 'border-l-4 border-l-[#0F9D58] bg-emerald-950/30 hover:bg-emerald-900/40'
+                    : isPasted
+                    ? 'border-l-4 border-l-[#D97706] bg-amber-950/30 hover:bg-amber-900/40'
+                    : 'border-l-4 border-l-[#7C3AED] bg-purple-950/30 hover:bg-purple-900/40';
+
+                  const badgeColorClasses = isFacebook
+                    ? 'bg-[#1877F2] text-white shadow-xs'
+                    : isGoogle
+                    ? 'bg-[#0F9D58] text-white shadow-xs'
+                    : isPasted
+                    ? 'bg-[#D97706] text-white shadow-xs'
+                    : 'bg-[#7C3AED] text-white shadow-xs';
+
+                  const channelIcon = isFacebook
+                    ? '🔵 '
+                    : isGoogle
+                    ? '🟢 '
+                    : isPasted
+                    ? '🟠 '
+                    : '🟣 ';
 
                   const matchedQuote = quotes.find(
                     (q) =>
@@ -1478,30 +1683,26 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                   return (
                     <tr
                       key={lead.id}
-                      className="hover:bg-[#171d2e]/80 transition-colors"
+                      className={`transition-colors ${rowColorClasses}`}
                     >
                       {/* Date & Sheet Tab */}
-                      <td className="py-3.5 px-3 align-top whitespace-nowrap">
-                        <div className="font-mono text-[11px] text-slate-300 font-bold">
+                      <td className="py-3.5 px-3 align-top whitespace-nowrap border-r border-slate-800/50">
+                        <div className="font-mono text-[11px] text-slate-200 font-bold">
                           {(lead.dateReceived || '').slice(0, 10) || '2026-10-16'}
                         </div>
                         <span
-                          className={`inline-block mt-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
-                            rowTab === 'Facebook Leads'
-                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                              : rowTab === 'Google Leads'
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                              : rowTab === 'Pasted Leads'
-                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                              : 'bg-pink-500/20 text-pink-300 border border-pink-500/30'
-                          }`}
+                          className={`inline-block mt-1 px-2.5 py-0.5 rounded-md text-[10px] font-extrabold ${badgeColorClasses}`}
                         >
+                          {channelIcon}
                           {rowTab}
                         </span>
+                        <div className="text-[10px] text-slate-400 mt-1 font-medium">
+                          {lead.source || rowTab}
+                        </div>
                       </td>
 
                       {/* Client Name & Phone */}
-                      <td className="py-3.5 px-3 align-top">
+                      <td className="py-3.5 px-3 align-top border-r border-slate-800/50">
                         <div className="font-extrabold text-white text-sm">
                           {lead.customerName}
                         </div>
@@ -1510,7 +1711,7 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                           <span>{lead.phone || 'No phone'}</span>
                         </div>
                         {lead.email && (
-                          <div className="flex items-center gap-1 text-slate-400 text-[11px] mt-0.5">
+                          <div className="flex items-center gap-1 text-slate-300 text-[11px] mt-0.5">
                             <Mail className="w-3 h-3 shrink-0" />
                             <span>{lead.email}</span>
                           </div>
@@ -1518,8 +1719,8 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                       </td>
 
                       {/* Property Address */}
-                      <td className="py-3.5 px-3 align-top max-w-[220px]">
-                        <div className="flex items-start gap-1.5 text-slate-200 font-semibold">
+                      <td className="py-3.5 px-3 align-top max-w-[220px] border-r border-slate-800/50">
+                        <div className="flex items-start gap-1.5 text-slate-100 font-semibold">
                           <MapPin className="w-3.5 h-3.5 text-pink-400 shrink-0 mt-0.5" />
                           <span>
                             {lead.address || 'Edmonton, AB'}
@@ -1529,37 +1730,37 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                       </td>
 
                       {/* Bed / Bath & Service */}
-                      <td className="py-3.5 px-3 align-top max-w-[260px]">
+                      <td className="py-3.5 px-3 align-top max-w-[260px] border-r border-slate-800/50">
                         <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                          <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-200 text-[10px] font-bold flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded bg-indigo-500/25 text-indigo-200 text-[10px] font-bold flex items-center gap-1">
                             <BedDouble className="w-3 h-3" />
                             {lead.bedrooms || '3 Bedrooms'}
                           </span>
-                          <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-200 text-[10px] font-bold flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-200 text-[10px] font-bold flex items-center gap-1">
                             <Bath className="w-3 h-3" />
                             {lead.bathrooms || '2 Bathrooms'}
                           </span>
                         </div>
-                        <div className="font-bold text-slate-100">
+                        <div className="font-bold text-white">
                           {lead.serviceRequested || 'Residential Standard Cleaning'}
                         </div>
                         {lead.notes && (
-                          <div className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">
+                          <div className="text-[11px] text-slate-300/90 line-clamp-2 mt-0.5">
                             {lead.notes}
                           </div>
                         )}
                       </td>
 
                       {/* Quoted Total */}
-                      <td className="py-3.5 px-3 align-top whitespace-nowrap">
-                        <div className="font-mono font-black text-sm text-emerald-400">
+                      <td className="py-3.5 px-3 align-top whitespace-nowrap border-r border-slate-800/50 bg-emerald-950/20">
+                        <div className="font-mono font-black text-sm text-emerald-300">
                           ${Number(lead.quotedAmount ?? 221.07).toFixed(2)}
                         </div>
-                        <div className="text-[10px] text-slate-400">CAD + GST</div>
+                        <div className="text-[10px] text-emerald-400/80 font-semibold">CAD + GST</div>
                       </td>
 
                       {/* Jobber Sync Status */}
-                      <td className="py-3.5 px-3 align-top">
+                      <td className="py-3.5 px-3 align-top border-r border-slate-800/50">
                         <div className="space-y-1">
                           {realJobberQuoteUrl ? (
                             <a
@@ -1574,8 +1775,8 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                               <ExternalLink className="w-3 h-3" />
                             </a>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[11px] font-bold">
-                              Not Yet Pushed to Jobber
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800/90 text-slate-300 text-[11px] font-bold">
+                              Ready for Jobber Push
                             </span>
                           )}
 
@@ -1596,7 +1797,7 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                       </td>
 
                       {/* Verdict */}
-                      <td className="py-3.5 px-3 align-top">
+                      <td className="py-3.5 px-3 align-top border-r border-slate-800/50">
                         <select
                           value={lead.verdict || 'Good lead'}
                           onChange={(e) =>
@@ -1604,10 +1805,10 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                           }
                           className={`px-2 py-1 rounded-lg text-[11px] font-extrabold border ${
                             (lead.verdict || 'Good lead') === 'Good lead'
-                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'
                               : lead.verdict === 'Spam'
-                              ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                              : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                              ? 'bg-rose-500/20 border-rose-500/50 text-rose-200'
+                              : 'bg-amber-500/20 border-amber-500/50 text-amber-200'
                           }`}
                         >
                           <option value="Good lead">Good lead</option>
@@ -1682,6 +1883,40 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                   );
                 })}
               </tbody>
+
+              {/* STICKY TABLE TOTALS & CHANNEL SUMMARY FOOTER */}
+              <tfoot className="sticky bottom-0 z-10 bg-[#0b0f1a] border-t-2 border-emerald-500/50 text-xs font-extrabold text-white shadow-inner">
+                <tr>
+                  <td colSpan={2} className="py-3 px-3 border-r border-slate-800">
+                    📊 TABLE SUMMARY &amp; TOTALS ({filteredLeads.length} Displayed)
+                  </td>
+                  <td colSpan={2} className="py-3 px-3 border-r border-slate-800">
+                    <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                      <span className="px-2 py-0.5 rounded bg-[#1877F2] text-white">
+                        🔵 FB: {tabCounts['Facebook Leads']}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-[#0F9D58] text-white">
+                        🟢 Google: {tabCounts['Google Leads']}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-[#7C3AED] text-white">
+                        🟣 Voice: {tabCounts['Voice & Quick Quotes']}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-[#D97706] text-white">
+                        🟠 Pasted: {tabCounts['Pasted Leads']}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 font-mono text-sm text-emerald-300 border-r border-slate-800 bg-emerald-950/40">
+                    $
+                    {filteredLeads
+                      .reduce((sum, l) => sum + (Number(l.quotedAmount ?? 221.07) || 0), 0)
+                      .toFixed(2)}
+                  </td>
+                  <td colSpan={3} className="py-3 px-3 text-[11px] text-slate-300">
+                    ✅ Jobber Order: Step 1. Create Client &amp; Property → Step 2. Create Request / Quote
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
