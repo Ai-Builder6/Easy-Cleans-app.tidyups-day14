@@ -29,7 +29,9 @@ export interface JobberConfig {
   clientId?: string;
   clientSecret?: string;
   hasSecret?: boolean;
+  clientSecretMasked?: string;
   redirectUri?: string;
+  canonicalRedirectUri?: string;
   accessToken?: string;
   isConnected: boolean;
   lastSyncedAt?: string;

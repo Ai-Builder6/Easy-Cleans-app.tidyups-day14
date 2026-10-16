@@ -2363,6 +2363,7 @@ export function App() {
             quotes={quotesList}
             onQuotesUpdated={(updated) => setQuotesList(updated)}
             onClientsUpdated={(updated) => setClientsList(updated)}
+            onOpenJobberModal={() => setIsJobberModalOpen(true)}
             projectId={activeProjectId}
           />
         ) : activeTopView === 'QUICK_QUOTE' ? (

@@ -25,6 +25,7 @@ import {
   BedDouble,
   Bath,
   Send,
+  Key,
 } from 'lucide-react';
 import { AdLeadItem, LeadStatus, LeadVerdict } from '../types/lead';
 import { JobberQuote, extractJobberNumericId } from '../services/jobberSyncModules';
@@ -49,6 +50,7 @@ interface LeadsViewProps {
   quotes?: JobberQuote[];
   onQuotesUpdated?: (quotes: JobberQuote[]) => void;
   onClientsUpdated?: (clients: any[]) => void;
+  onOpenJobberModal?: () => void;
   projectId?: 'dispatchgeeni' | 'tidyups';
 }
 
@@ -201,6 +203,7 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
   quotes = [],
   onQuotesUpdated,
   onClientsUpdated,
+  onOpenJobberModal,
   projectId = 'tidyups',
 }) => {
   const [leadsList, setLeadsList] = useState<AdLeadItem[]>(initialLeads || []);
@@ -556,6 +559,18 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
 
         {/* Top Right Export & Reset Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          {onOpenJobberModal && (
+            <button
+              type="button"
+              onClick={onOpenJobberModal}
+              className="px-3.5 py-2 bg-[#1b2234] hover:bg-[#232c42] text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              title="Open Jobber Developer App & OAuth Credentials Hub"
+            >
+              <Key className="w-3.5 h-3.5 text-amber-400" />
+              <span>Jobber Credentials &amp; Secret</span>
+            </button>
+          )}
+
           <a
             href={`/api/leads/export.xlsx?project=${projectId}`}
             download

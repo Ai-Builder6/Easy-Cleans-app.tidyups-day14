@@ -1391,6 +1391,7 @@ app.get("/api/jobber/config", (req, res) => {
     accountName: jobberConfig.accountName,
     clientId: jobberConfig.clientId,
     hasSecret: Boolean(jobberConfig.clientSecret),
+    clientSecretMasked: jobberConfig.clientSecret ? `${jobberConfig.clientSecret.slice(0, 8)}...${jobberConfig.clientSecret.slice(-4)}` : "",
     accessToken: jobberConfig.accessToken ? `${jobberConfig.accessToken.slice(0, 8)}...${jobberConfig.accessToken.slice(-4)}` : "",
     lastSyncedAt: jobberConfig.lastSyncedAt,
     environment: jobberConfig.environment,
@@ -1433,6 +1434,7 @@ app.post("/api/jobber/config", (req, res) => {
       accountName: jobberConfig.accountName,
       clientId: jobberConfig.clientId,
       hasSecret: Boolean(jobberConfig.clientSecret),
+      clientSecretMasked: jobberConfig.clientSecret ? `${jobberConfig.clientSecret.slice(0, 8)}...${jobberConfig.clientSecret.slice(-4)}` : "",
       accessToken: jobberConfig.accessToken ? `${jobberConfig.accessToken.slice(0, 8)}...` : "",
       lastSyncedAt: jobberConfig.lastSyncedAt,
       redirectUri,
@@ -1499,8 +1501,8 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
   const errorDescription = req.query.error_description as string;
   const stateParam = req.query.state as string;
 
-  // Use the exact redirect_uri and sourceOrigin that was encoded into state
-  let redirectUri = `${getAppBaseUrl(req)}/api/jobber/oauth/callback`;
+  // Use the exact redirect_uri and sourceOrigin that was encoded into state, defaulting to canonical app.tidyupscleaning.com callback
+  let redirectUri = (jobberConfig as any).canonicalRedirectUri || "https://app.tidyupscleaning.com/api/jobber/oauth/callback";
   let sourceOrigin = "";
   let returnUrl = "/";
 
@@ -1578,16 +1580,93 @@ app.get(["/api/jobber/oauth/callback", "/api/jobber/oauth/callback/"], async (re
     }
 
     if (!tokenRes.ok || !tokenData.access_token) {
+      const isMismatchError =
+        tokenRes.status === 401 ||
+        String(tokenData?.raw || tokenData?.error_description || "").includes("do not match");
+
       return res.status(400).send(`
         <!DOCTYPE html>
         <html>
-          <head><title>Jobber Token Exchange Failed</title><style>body{font-family:sans-serif;padding:30px;line-height:1.5;}</style></head>
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Jobber Client Secret Update Required</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0b0f19; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+              .card { background: #151c2c; border: 1px solid #334155; border-radius: 24px; padding: 36px; max-width: 580px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+              .badge { display: inline-block; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 9999px; padding: 4px 12px; font-size: 11px; font-weight: 800; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+              h2 { color: #ffffff; margin: 0 0 10px 0; font-size: 22px; font-weight: 800; }
+              p { color: #94a3b8; font-size: 13px; line-height: 1.6; margin: 0 0 16px 0; }
+              .box { background: #0d121f; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; font-family: monospace; font-size: 12px; color: #cbd5e1; margin-bottom: 20px; }
+              .box code { color: #38bdf8; font-weight: bold; }
+              .input-group { margin-bottom: 20px; }
+              label { display: block; font-size: 12px; font-weight: 700; color: #e2e8f0; margin-bottom: 6px; }
+              input[type="text"], input[type="password"] { width: 100%; box-sizing: border-box; padding: 12px 14px; background: #0d121f; border: 1px solid #475569; border-radius: 12px; color: #ffffff; font-family: monospace; font-size: 13px; outline: none; transition: border-color 0.2s; }
+              input:focus { border-color: #10b981; }
+              .btn { display: inline-flex; align-items: center; justify-content: center; width: 100%; box-sizing: border-box; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 14px; border-radius: 12px; font-weight: 800; font-size: 14px; border: none; cursor: pointer; text-decoration: none; transition: all 0.2s; }
+              .btn:hover { background: linear-gradient(135deg, #34d399, #10b981); transform: translateY(-1px); }
+              .btn-secondary { background: #1e293b; color: #94a3b8; margin-top: 10px; font-size: 12px; padding: 10px; }
+              .btn-secondary:hover { background: #334155; color: white; transform: none; }
+              .link { color: #38bdf8; text-decoration: underline; font-weight: bold; }
+            </style>
+          </head>
           <body>
-            <h2 style="color:#b91c1c;">Jobber Token Exchange Failed</h2>
-            <p>Jobber responded with status ${tokenRes.status}:</p>
-            <pre style="background:#f1f5f9;padding:12px;border-radius:8px;">${JSON.stringify(tokenData, null, 2)}</pre>
-            <p>Ensure that the Redirect URI in your Jobber Developer Center matches: <code>${redirectUri}</code></p>
-            <a href="${targetReturnUrl}">← Return to ${sourceLabel}</a>
+            <div class="card">
+              <div class="badge">${isMismatchError ? "Client Secret Mismatch" : "Jobber Token Exchange"}</div>
+              <h2>${isMismatchError ? "New Client Secret Required for App" : "Jobber Token Exchange Notice"}</h2>
+              <p>
+                Your Jobber Developer App is set to Client ID <code>${jobberConfig.clientId}</code>. 
+                Jobber rejected token exchange because the stored Client Secret was from an older application.
+              </p>
+              <div class="box">
+                <strong>Jobber Status ${tokenRes.status}:</strong><br>
+                <code>${tokenData.raw || tokenData.error_description || "The provided client id and secret do not match an existing application"}</code><br><br>
+                <strong>Current App Client ID:</strong> <code>${jobberConfig.clientId}</code><br>
+                <strong>Redirect URI:</strong> <code>${redirectUri}</code>
+              </div>
+              <form id="secretForm" onsubmit="handleSaveSecret(event)">
+                <div class="input-group">
+                  <label>1. Copy your Client Secret from <a class="link" href="https://developer.getjobber.com" target="_blank" rel="noopener">Jobber Developer Center ↗</a></label>
+                  <p style="font-size: 11px; margin-bottom: 8px; color: #94a3b8;">
+                    Log into <a class="link" href="https://developer.getjobber.com" target="_blank">developer.getjobber.com</a> &rarr; open your app with Client ID <code>${jobberConfig.clientId.slice(0, 8)}...</code> &rarr; copy the <strong>Client Secret</strong>.
+                  </p>
+                  <input type="text" id="newSecret" placeholder="Paste your Jobber Client Secret here..." required autocomplete="off" />
+                </div>
+                <button type="submit" id="saveBtn" class="btn">✓ Save Secret &amp; Connect to Jobber in 1 Click →</button>
+              </form>
+              <a href="${targetReturnUrl}" class="btn btn-secondary">← Return to ${sourceLabel}</a>
+            </div>
+            <script>
+              async function handleSaveSecret(e) {
+                e.preventDefault();
+                const secret = document.getElementById('newSecret').value.trim();
+                if (!secret) return;
+                const btn = document.getElementById('saveBtn');
+                btn.innerText = 'Saving Secret...';
+                btn.disabled = true;
+                try {
+                  const res = await fetch('/api/jobber/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clientSecret: secret, clientId: '${jobberConfig.clientId}' })
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    btn.innerText = 'Redirecting to Jobber...';
+                    const authUrl = "https://api.getjobber.com/api/oauth/authorize?response_type=code&client_id=" + encodeURIComponent('${jobberConfig.clientId}') + "&redirect_uri=" + encodeURIComponent('${redirectUri}') + "&state=" + encodeURIComponent('${stateParam || "tidyups_auth"}');
+                    window.location.href = authUrl;
+                  } else {
+                    alert(data.error || 'Failed to save secret');
+                    btn.innerText = '✓ Save Secret & Connect to Jobber in 1 Click →';
+                    btn.disabled = false;
+                  }
+                } catch (err) {
+                  alert('Network error: ' + err.message);
+                  btn.innerText = '✓ Save Secret & Connect to Jobber in 1 Click →';
+                  btn.disabled = false;
+                }
+              }
+            </script>
           </body>
         </html>
       `);

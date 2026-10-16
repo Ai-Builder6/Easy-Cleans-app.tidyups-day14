@@ -23,7 +23,11 @@ import {
   Globe,
   Unlink,
   FileSpreadsheet,
-  Upload
+  Upload,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  ClipboardPaste
 } from 'lucide-react';
 import { JobberConfig, ServiceTicket } from '../types/dispatch';
 import { ticketToSheetRow, APP_LEAD_HEADERS, generateTsvRows, LEADS_SPREADSHEET_ID, APP_LEADS_TAB } from '../services/leadSheetSync';
@@ -68,6 +72,7 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
 
   const [clientIdInput, setClientIdInput] = useState('27966135-e33e-4c2e-8dc3-ad7ba06dabb8');
   const [clientSecretInput, setClientSecretInput] = useState('');
+  const [showSecret, setShowSecret] = useState(false);
   const [accessTokenInput, setAccessTokenInput] = useState('');
   // By default, use the single canonical callback registered in Jobber Dev (works for ALL domains)
   const [redirectUri, setRedirectUri] = useState<string>(CANONICAL_JOBBER_CALLBACK);
@@ -204,13 +209,34 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Open popup synchronously without async await delays that trigger browser popup blockers
-  const handleOpenPopup = () => {
+  // Open direct in new tab (waits for secret to save to server first)
+  const handleDirectAuthClick = async () => {
     if (!clientIdInput.trim() && !config.clientId) {
       setSyncNotice('Please provide your Jobber Client ID first.');
       return;
     }
-    if (!clientSecretInput.trim() && !config.hasSecret) {
+    if (clientSecretInput.trim()) {
+      setSyncNotice('Saving updated Client Secret to server...');
+      await handleSaveCredentials();
+    } else if (!config.hasSecret) {
+      setSyncNotice('Please paste your Jobber Client Secret from developer.getjobber.com first.');
+      return;
+    }
+
+    setIsAuthorizing(true);
+    setSyncNotice('Jobber authorization opened in a new tab! Please click "Allow Access" in Jobber to approve.');
+    window.open(computedAuthUrl, '_blank');
+  };
+
+  // Open popup synchronously without async await delays that trigger browser popup blockers
+  const handleOpenPopup = async () => {
+    if (!clientIdInput.trim() && !config.clientId) {
+      setSyncNotice('Please provide your Jobber Client ID first.');
+      return;
+    }
+    if (clientSecretInput.trim()) {
+      await handleSaveCredentials();
+    } else if (!config.hasSecret) {
       setSyncNotice('Please paste your Jobber Client Secret so the app can complete token exchange.');
       return;
     }
@@ -683,6 +709,17 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                     )}
                   </div>
 
+                  {/* Warning banner about matching Client Secret */}
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl space-y-1 text-xs text-amber-900">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Jobber App Secret Check (Client ID: 27966135...)</span>
+                    </div>
+                    <p className="text-[11px] text-amber-800">
+                      When you created or updated your app in <a href="https://developer.getjobber.com" target="_blank" rel="noopener noreferrer" className="underline font-bold text-amber-950">developer.getjobber.com</a>, Jobber generated a unique <strong>Client Secret</strong> for this application. If you see status 401 ("client id and secret do not match"), paste that new secret below and click <strong>Save Credentials</strong> before opening Jobber.
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -698,16 +735,47 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Client Secret
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-semibold text-slate-700">
+                          Client Secret
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const text = await navigator.clipboard.readText();
+                                if (text) setClientSecretInput(text.trim());
+                              } catch {}
+                            }}
+                            className="text-[10px] text-emerald-700 hover:text-emerald-900 font-bold flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <ClipboardPaste className="w-3 h-3" />
+                            <span>Paste</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowSecret((v) => !v)}
+                            className="text-[10px] text-slate-500 hover:text-slate-700 font-bold flex items-center gap-0.5 cursor-pointer"
+                          >
+                            {showSecret ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            <span>{showSecret ? 'Hide' : 'Show'}</span>
+                          </button>
+                        </div>
+                      </div>
                       <input
-                        type="password"
+                        type={showSecret ? "text" : "password"}
                         value={clientSecretInput}
                         onChange={(e) => setClientSecretInput(e.target.value)}
-                        placeholder={config.hasSecret ? "•••••••••••••••• (Secret Stored On Server)" : "Paste your Jobber Client Secret"}
+                        placeholder={config.hasSecret ? (config.clientSecretMasked || "•••••••••••••••• (Secret Stored On Server)") : "Paste your Jobber Client Secret"}
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500"
                       />
+                      {config.clientSecretMasked && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Active Secret on Server: <code className="font-mono text-emerald-900 bg-emerald-100/80 px-1 py-0.5 rounded">{config.clientSecretMasked}</code></span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -715,11 +783,11 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
                     <button
                       type="button"
                       onClick={handleSaveCredentials}
-                      className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
                     >
                       Save Credentials
                     </button>
-                    <span className="text-[11px] text-slate-500">Credentials remain securely encrypted on your server instance.</span>
+                    <span className="text-[11px] text-slate-500">Saves Client ID &amp; Secret securely on your server instance.</span>
                   </div>
                 </div>
 
@@ -738,21 +806,15 @@ export const JobberSyncModal: React.FC<JobberSyncModalProps> = ({
 
                     {/* Action buttons: Direct tab (bypass popup blocker) + synchronous popup */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                      <a
+                      <button
+                        type="button"
                         id="jobber-direct-auth-button"
-                        href={computedAuthUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => {
-                          handleSaveCredentialsQuietly();
-                          setIsAuthorizing(true);
-                          setSyncNotice('Jobber authorization opened in a new tab! Please click "Allow Access" in Jobber to approve.');
-                        }}
+                        onClick={handleDirectAuthClick}
                         className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer hover:shadow-emerald-200 hover:scale-[1.01] active:scale-[0.99]"
                       >
                         <ExternalLink className="w-4 h-4 shrink-0" />
                         <span>Open Jobber in New Tab (Direct) →</span>
-                      </a>
+                      </button>
 
                       <button
                         type="button"
