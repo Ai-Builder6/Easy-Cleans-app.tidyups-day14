@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
-  Download,
   CloudUpload,
   CheckCircle2,
   FileArchive,
-  FileText,
   Copy,
   Check,
   ExternalLink,
@@ -17,22 +15,21 @@ import {
   Sparkles,
   LogOut,
   FolderOpen,
+  Layers,
 } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { initAuth, googleSignIn, getAccessToken, logout } from '../lib/firebase';
+import {
+  TIDYUPS_DRIVE_FOLDER_NAME,
+  DriveFolderInfo,
+  DriveBackupFileItem,
+  listTidyUpsFolderFiles,
+  uploadWholeProjectZipToDriveFolder,
+} from '../services/googleDriveBackupService';
 
 interface ProjectBackupDriveModalProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-interface DriveBackupFile {
-  id: string;
-  name: string;
-  mimeType: string;
-  createdTime?: string;
-  size?: string;
-  webViewLink?: string;
 }
 
 export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = ({
@@ -47,12 +44,22 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
   const [user, setUser] = useState<User | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
-  // Backup & Drive state
-  const [isDownloadingZip, setIsDownloadingZip] = useState<boolean>(false);
+  // Server ZIP readiness & Google Drive folder state
+  const [zipReadyOnServer, setZipReadyOnServer] = useState<boolean>(false);
+  const [zipSizeBytes, setZipSizeBytes] = useState<number>(0);
+  const [zipCreatedAt, setZipCreatedAt] = useState<string | null>(null);
+  const [driveFolder, setDriveFolder] = useState<DriveFolderInfo | null>(null);
+
+  // Upload & Drive files state
   const [isUploadingDrive, setIsUploadingDrive] = useState<boolean>(false);
   const [isLoadingFiles, setIsLoadingFiles] = useState<boolean>(false);
-  const [driveFiles, setDriveFiles] = useState<DriveBackupFile[]>([]);
-  const [statusBanner, setStatusBanner] = useState<{ type: 'success' | 'error'; message: string; link?: string } | null>(null);
+  const [driveFiles, setDriveFiles] = useState<DriveBackupFileItem[]>([]);
+  const [statusBanner, setStatusBanner] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    link?: string;
+    folderLink?: string;
+  } | null>(null);
 
   // Mandatory Explicit User Confirmation Dialog State for Destructive/Mutating Drive Operations
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -83,19 +90,26 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
     return () => unsub();
   }, []);
 
-  // Load README & AI_BUILD_WORKFLOW metadata when opened
-  useEffect(() => {
-    if (!isOpen) return;
+  // Load README, AI_BUILD_WORKFLOW & server ZIP readiness when opened
+  const refreshMetadata = useCallback(() => {
     fetch('/api/project/export-metadata')
       .then((r) => r.json())
       .then((data) => {
         if (data?.readme) setReadmeContent(data.readme);
         if (data?.aiWorkflow) setAiWorkflowContent(data.aiWorkflow);
+        setZipReadyOnServer(Boolean(data?.zipReadyOnServer));
+        setZipSizeBytes(Number(data?.zipSizeBytes || 0));
+        setZipCreatedAt(data?.zipCreatedAt || null);
       })
       .catch(() => {});
-  }, [isOpen]);
+  }, []);
 
-  // Fetch existingTidyUps backup files from Google Drive
+  useEffect(() => {
+    if (!isOpen) return;
+    refreshMetadata();
+  }, [isOpen, refreshMetadata]);
+
+  // Fetch existing backup files from the dedicated "TidyUps Cleaning App Backup Zips" folder in Google Drive
   const fetchDriveBackupFiles = useCallback(async (accessToken?: string | null) => {
     const activeToken = accessToken || (await getAccessToken());
     if (!activeToken) {
@@ -105,23 +119,15 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
 
     setIsLoadingFiles(true);
     try {
-      const q = encodeURIComponent("name contains 'tidyups' or name contains 'AI_BUILD_WORKFLOW' and trashed = false");
-      const res = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,createdTime,size,webViewLink)&orderBy=createdTime desc&pageSize=15`,
-        {
-          headers: { Authorization: `Bearer ${activeToken}` },
-        }
-      );
-      if (res.status === 401 || res.status === 403) {
+      const { folder, files } = await listTidyUpsFolderFiles(activeToken);
+      setDriveFolder(folder);
+      setDriveFiles(files);
+    } catch (err: any) {
+      if (err?.message === 'AUTH_EXPIRED') {
         setNeedsAuth(true);
-        return;
+      } else {
+        console.warn('Google Drive folder list note:', err);
       }
-      const data = await res.json();
-      if (Array.isArray(data.files)) {
-        setDriveFiles(data.files);
-      }
-    } catch (err) {
-      console.warn('Google Drive list files note:', err);
     } finally {
       setIsLoadingFiles(false);
     }
@@ -145,21 +151,14 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
         setNeedsAuth(false);
         setStatusBanner({
           type: 'success',
-          message: `Signed in as ${result.user.email || result.user.displayName}. Ready to back up project ZIP to Google Drive!`,
+          message: `Signed in as ${result.user.email || result.user.displayName}. Folder "${TIDYUPS_DRIVE_FOLDER_NAME}" is ready in Google Drive!`,
         });
         fetchDriveBackupFiles(result.accessToken);
       }
     } catch (err: any) {
-      const codeOrMsg = `${err?.code || ''} ${err?.message || ''}`;
-      const isDomainOrRefererError =
-        codeOrMsg.includes('unauthorized-domain') ||
-        codeOrMsg.includes('requests-from-referer') ||
-        codeOrMsg.includes('are-blocked');
       setStatusBanner({
-        type: 'success',
-        message: isDomainOrRefererError
-          ? 'Direct local ZIP download is ready below for app.tidyupscleaning.com!'
-          : (err?.message || 'Google Sign-In was cancelled or blocked by popup settings.'),
+        type: 'error',
+        message: err?.message || 'Google Sign-In was cancelled or blocked by popup settings.',
       });
     } finally {
       setIsLoggingIn(false);
@@ -172,120 +171,50 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
     setUser(null);
     setNeedsAuth(true);
     setDriveFiles([]);
+    setDriveFolder(null);
   };
 
-  // 1. Download Complete Project .ZIP to Local Computer (Dedicated to app.tidyupscleaning.com)
-  const handleDownloadProjectZip = async (_domainKey: 'tidyups' = 'tidyups') => {
-    setIsDownloadingZip(true);
-    setStatusBanner(null);
-    try {
-      const res = await fetch(`/api/project/export-zip?domain=tidyups`);
-      if (!res.ok) throw new Error('Failed to generate project ZIP archive.');
-      const blob = await res.blob();
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const filename = `app.tidyupscleaning.com-complete-project-${dateStr}.zip`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setStatusBanner({
-        type: 'success',
-        message: `Downloaded ${filename} (${(blob.size / 1024).toFixed(0)} KB) — pre-configured for app.tidyupscleaning.com!`,
-      });
-    } catch (err: any) {
-      setStatusBanner({
-        type: 'error',
-        message: err.message || 'Could not download ZIP archive.',
-      });
-    } finally {
-      setIsDownloadingZip(false);
-    }
-  };
-
-  // 2. Upload Complete Project .ZIP + AI_BUILD_WORKFLOW.md to Google Drive
-  const executeUploadToGoogleDrive = async () => {
-    const activeToken = token || (await getAccessToken());
-    if (!activeToken) {
-      setNeedsAuth(true);
-      return;
-    }
-
+  // 1-Click: Create Whole Project & Workflows ZIP (or reuse if already created) and upload directly into
+  // the "TidyUps Cleaning App Backup Zips" folder in Google Drive (NO local computer download!)
+  const handleOneClickUploadToDriveFolder = async (forceRebuild = false) => {
     setIsUploadingDrive(true);
     setStatusBanner(null);
     try {
-      // Fetch freshly generated project .ZIP from server
-      const zipRes = await fetch('/api/project/export-zip?domain=tidyups');
-      if (!zipRes.ok) throw new Error('Could not generate project ZIP from server.');
-      const zipBlob = await zipRes.blob();
+      const result = await uploadWholeProjectZipToDriveFolder({
+        forceRebuild,
+        accessToken: token,
+        aiWorkflowContent,
+      });
 
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const timeStr = new Date().toTimeString().slice(0, 5).replace(':', '-');
-      const zipFilename = `tidyups-cleaning-complete-backup-${dateStr}-${timeStr}.zip`;
-
-      // Multipart upload to Google Drive API v3
-      const metadata = {
-        name: zipFilename,
-        mimeType: 'application/zip',
-        description:
-          'Complete TidyUps Cleaning (app.tidyupscleaning.com) Full-Stack Source Code, Voice Dictation Intake, Quick Quote, Quick Map, Jobber Sync, README.md & AI_BUILD_WORKFLOW.md',
-      };
-
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', zipBlob);
-
-      const uploadRes = await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,size',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${activeToken}`,
-          },
-          body: form,
-        }
-      );
-
-      if (uploadRes.status === 401 || uploadRes.status === 403) {
-        setNeedsAuth(true);
-        throw new Error('Google Drive session expired. Please click "Sign in with Google" to re-authenticate.');
+      const currentToken = await getAccessToken();
+      if (currentToken) {
+        setToken(currentToken);
+        setNeedsAuth(false);
       }
-
-      const uploadedData = await uploadRes.json();
-      if (!uploadRes.ok) {
-        throw new Error(uploadedData?.error?.message || 'Failed to upload ZIP to Google Drive.');
-      }
-
-      // Also upload standalone AI_BUILD_WORKFLOW.md so it can be opened directly in Google Drive
-      if (aiWorkflowContent) {
-        const wfMeta = {
-          name: `AI_BUILD_WORKFLOW-${dateStr}.md`,
-          mimeType: 'text/markdown',
-          description: 'Master AI Build & Reconstruction Workflow for TidyUps Cleaning (app.tidyupscleaning.com)',
-        };
-        const wfForm = new FormData();
-        wfForm.append('metadata', new Blob([JSON.stringify(wfMeta)], { type: 'application/json' }));
-        wfForm.append('file', new Blob([aiWorkflowContent], { type: 'text/markdown' }));
-        await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${activeToken}` },
-          body: wfForm,
-        }).catch(() => {});
-      }
+      setDriveFolder(result.folder);
+      refreshMetadata();
 
       setStatusBanner({
         type: 'success',
-        message: `✓ Uploaded ${uploadedData.name} + AI_BUILD_WORKFLOW.md to your Google Drive!`,
-        link: uploadedData.webViewLink || 'https://drive.google.com',
+        message: `✓ ${
+          result.reusedServerZip
+            ? 'Used already-created Whole Project & Workflows ZIP and uploaded'
+            : 'Created Whole Project & Workflows ZIP and uploaded'
+        } "${result.file.name}" directly into folder "${result.folder.name}" in Google Drive (no computer download)!`,
+        link: result.file.webViewLink || result.folder.webViewLink,
+        folderLink: result.folder.webViewLink,
       });
-      fetchDriveBackupFiles(activeToken);
+
+      if (currentToken) {
+        fetchDriveBackupFiles(currentToken);
+      }
     } catch (err: any) {
+      if (err?.message === 'AUTH_EXPIRED') {
+        setNeedsAuth(true);
+      }
       setStatusBanner({
         type: 'error',
-        message: err.message || 'Failed to upload backup to Google Drive.',
+        message: err?.message || 'Failed to upload Whole Project ZIP to Google Drive folder.',
       });
     } finally {
       setIsUploadingDrive(false);
@@ -293,10 +222,10 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
   };
 
   // Delete a backup file from Google Drive (Requires explicit user confirmation modal per SKILL.md)
-  const handleRequestDeleteDriveFile = (file: DriveBackupFile) => {
+  const handleRequestDeleteDriveFile = (file: DriveBackupFileItem) => {
     setConfirmDialog({
-      title: `Delete "${file.name}" from Google Drive?`,
-      message: `Are you sure you want to permanently delete "${file.name}" from your Google Drive? This action cannot be undone.`,
+      title: `Delete "${file.name}" from "${TIDYUPS_DRIVE_FOLDER_NAME}"?`,
+      message: `Are you sure you want to permanently delete "${file.name}" from your "${TIDYUPS_DRIVE_FOLDER_NAME}" folder in Google Drive? This action cannot be undone.`,
       confirmLabel: 'Delete from Google Drive',
       onConfirm: async () => {
         const activeToken = token || (await getAccessToken());
@@ -312,7 +241,7 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
           setDriveFiles((prev) => prev.filter((f) => f.id !== file.id));
           setStatusBanner({
             type: 'success',
-            message: `Deleted "${file.name}" from Google Drive.`,
+            message: `Deleted "${file.name}" from "${TIDYUPS_DRIVE_FOLDER_NAME}" in Google Drive.`,
           });
         }
       },
@@ -331,15 +260,19 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
         {/* Top Modal Header */}
         <div className="p-4 sm:p-6 border-b border-slate-800 bg-[#151926] flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-pink-600 via-fuchsia-600 to-purple-600 text-white flex items-center justify-center shadow-lg">
-              <FileArchive className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-600 text-white flex items-center justify-center shadow-lg">
+              <CloudUpload className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
-                3 Standalone Domain ZIP Downloads &amp; Google Drive Backup
+                Whole Project &amp; Workflows ZIP — 1-Click Google Drive Backup
               </h2>
               <p className="text-xs text-slate-400">
-                This live instance is dedicated to <span className="text-emerald-400 font-mono font-bold">app.tidyupscleaning.com</span>. Download all 3 separate domain copies below.
+                Creates (or reuses) the complete project &amp; workflows archive and uploads directly into{' '}
+                <span className="text-emerald-400 font-mono font-bold">
+                  📁 {TIDYUPS_DRIVE_FOLDER_NAME}
+                </span>{' '}
+                on Google Drive — never downloads to your computer.
               </p>
             </div>
           </div>
@@ -359,12 +292,12 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
             onClick={() => setActiveTab('BACKUP_DRIVE')}
             className={`px-4 py-2.5 rounded-t-xl text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'BACKUP_DRIVE'
-                ? 'border-pink-500 text-white bg-[#11141f]'
+                ? 'border-emerald-500 text-white bg-[#11141f]'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <CloudUpload className="w-4 h-4 text-pink-400" />
-            <span>1. Download 3 Domain .ZIPs &amp; Google Drive</span>
+            <CloudUpload className="w-4 h-4 text-emerald-400" />
+            <span>1. 1-Click Whole Project ZIP → Google Drive Folder</span>
           </button>
 
           <button
@@ -377,7 +310,7 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
             }`}
           >
             <Sparkles className="w-4 h-4 text-purple-400" />
-            <span>2. README &amp; AI Complete Build Workflow</span>
+            <span>2. Included Workflows &amp; AI Rebuild Guide</span>
           </button>
 
           <button
@@ -385,11 +318,11 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
             onClick={() => setActiveTab('GITHUB_PUBLISH')}
             className={`px-4 py-2.5 rounded-t-xl text-xs font-extrabold flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'GITHUB_PUBLISH'
-                ? 'border-emerald-500 text-white bg-[#11141f]'
+                ? 'border-pink-500 text-white bg-[#11141f]'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Globe className="w-4 h-4 text-emerald-400" />
+            <Globe className="w-4 h-4 text-pink-400" />
             <span>3. GitHub Push &amp; When to Publish Live</span>
           </button>
         </div>
@@ -398,7 +331,7 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {statusBanner && (
             <div
-              className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold flex items-center justify-between gap-3 ${
+              className={`p-4 rounded-2xl border text-xs sm:text-sm font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                 statusBanner.type === 'success'
                   ? 'bg-emerald-950/80 border-emerald-700 text-emerald-200'
                   : 'bg-rose-950/80 border-rose-700 text-rose-200'
@@ -408,127 +341,156 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
                 <CheckCircle2 className="w-5 h-5 shrink-0" />
                 <span>{statusBanner.message}</span>
               </div>
-              {statusBanner.link && (
-                <a
-                  href={statusBanner.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center gap-1.5 shrink-0"
-                >
-                  <span>Open in Google Drive</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                {statusBanner.folderLink && (
+                  <a
+                    href={statusBanner.folderLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center gap-1.5 shrink-0"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                    <span>Open Drive Folder</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
             </div>
           )}
 
           {activeTab === 'BACKUP_DRIVE' && (
             <div className="space-y-6">
-              {/* Dedicated Standalone Domain ZIP Download Card for app.tidyupscleaning.com */}
-              <div className="bg-[#171b29] border border-emerald-500/30 rounded-3xl p-5 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-                  <div>
-                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider block">
-                      Dedicated Domain Package • Single Connected Domain
-                    </span>
-                    <h3 className="text-base font-black text-white">
-                      app.tidyupscleaning.com — Complete Standalone Project .ZIP
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isDownloadingZip}
-                    onClick={() => handleDownloadProjectZip('tidyups')}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center gap-2 shadow-lg cursor-pointer shrink-0 disabled:opacity-50"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>Download app.tidyupscleaning.com ZIP</span>
-                  </button>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-[#11141f] border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase">
-                        Primary Active Domain
+              {/* Primary 1-Click Whole Project & Workflows ZIP -> Google Drive Folder Card */}
+              <div className="bg-gradient-to-br from-[#132622] via-[#171b29] to-[#171b29] border border-emerald-500/40 rounded-3xl p-5 sm:p-6 space-y-5 shadow-xl">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
+                        Whole Project + Workflows • Cloud-Only (No Computer Download)
                       </span>
-                      <span className="font-mono font-black text-sm text-white">app.tidyupscleaning.com</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">
-                      This project is strictly dedicated and aligned to <code className="text-emerald-300">app.tidyupscleaning.com</code> with all other domain references removed.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Two Main Action Cards: Local ZIP Download + Google Drive Upload */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Card A: Instant Local Project ZIP Download */}
-                <div className="bg-[#171b29] border border-slate-800 rounded-3xl p-5 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-1 rounded-full bg-pink-500/15 text-pink-300 border border-pink-500/30 text-[10px] font-black uppercase tracking-wider">
-                        Complete Source Code + AI Workflow
+                      <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-[10px] font-mono font-bold">
+                        📁 Folder: {TIDYUPS_DRIVE_FOLDER_NAME}
                       </span>
-                      <FileArchive className="w-5 h-5 text-pink-400" />
                     </div>
-                    <h3 className="text-base font-black text-white">
-                      Download app.tidyupscleaning.com (.ZIP)
+                    <h3 className="text-lg sm:text-xl font-black text-white">
+                      1-Click Create &amp; Upload Whole Project ZIP to Google Drive
                     </h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Packages the entire project (<code className="text-pink-300">src/</code>, <code className="text-pink-300">server.ts</code>, <code className="text-pink-300">package.json</code>, <code className="text-pink-300">README.md</code>, and <code className="text-pink-300">AI_BUILD_WORKFLOW.md</code>) into a clean, ready-to-run ZIP file.
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Packages the entire project — <code className="text-emerald-300">src/</code>,{' '}
+                      <code className="text-emerald-300">server.ts</code>,{' '}
+                      <code className="text-emerald-300">.github/workflows/</code>,{' '}
+                      <code className="text-emerald-300">workflows/COMPLETE_APP_WORKFLOWS.md</code>,{' '}
+                      <code className="text-emerald-300">AI_BUILD_WORKFLOW.md</code>,{' '}
+                      <code className="text-emerald-300">README.md</code>, and live store — and uploads it directly into{' '}
+                      <strong className="text-emerald-300">{TIDYUPS_DRIVE_FOLDER_NAME}</strong> in your Google Drive.
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={isDownloadingZip}
-                    onClick={() => handleDownloadProjectZip('tidyups')}
-                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-pink-600 via-fuchsia-600 to-purple-600 hover:opacity-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl cursor-pointer disabled:opacity-50"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>
-                      {isDownloadingZip
-                        ? 'Packaging Complete Project ZIP...'
-                        : 'Download app.tidyupscleaning.com .ZIP'}
-                    </span>
-                  </button>
+                  {driveFolder?.webViewLink && (
+                    <a
+                      href={driveFolder.webViewLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5 shrink-0 self-start md:self-auto"
+                    >
+                      <FolderOpen className="w-4 h-4 text-emerald-400" />
+                      <span>Open Backup Folder in Drive</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
                 </div>
 
-                {/* Card B: Send Backup ZIP to Google Drive */}
-                <div className="bg-[#171b29] border border-emerald-500/30 rounded-3xl p-5 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider">
-                        Google Drive Cloud Backup
+                {/* Server Archive Status + Included Workflows Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-[#11141f] border border-slate-800 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Whole Project ZIP Status on Server
                       </span>
-                      <CloudUpload className="w-5 h-5 text-emerald-400" />
+                      <span className="text-xs font-extrabold text-white flex items-center gap-1.5 mt-0.5">
+                        <FileArchive className="w-4 h-4 text-emerald-400 shrink-0" />
+                        {zipReadyOnServer
+                          ? `Already Created (${(zipSizeBytes / 1024).toFixed(0)} KB) — Ready for Instant Drive Upload`
+                          : 'Will Create Whole Project + Workflows ZIP on Click'}
+                      </span>
+                      {zipCreatedAt && (
+                        <span className="text-[10px] text-slate-500 block mt-0.5">
+                          Last packaged: {new Date(zipCreatedAt).toLocaleString()}
+                        </span>
+                      )}
                     </div>
-                    <h3 className="text-base font-black text-white">
-                      Send Backup .ZIP to Google Drive
-                    </h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Uploads the full project <code className="text-emerald-300">.zip</code> archive and <code className="text-emerald-300">AI_BUILD_WORKFLOW.md</code> directly into your Google Drive account (<code className="text-slate-300">cleaningserviceyeg@gmail.com</code>).
-                    </p>
                   </div>
 
+                  <div className="p-3.5 rounded-2xl bg-[#11141f] border border-slate-800 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Google Drive Destination Folder
+                      </span>
+                      <span className="text-xs font-extrabold text-emerald-300 flex items-center gap-1.5 mt-0.5 font-mono">
+                        <FolderOpen className="w-4 h-4 text-emerald-400 shrink-0" />
+                        {TIDYUPS_DRIVE_FOLDER_NAME}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                        Auto-created if missing • All app exports go into this folder
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 1-Click Action Area */}
+                <div className="pt-1 space-y-3">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      disabled={isUploadingDrive || isLoggingIn}
+                      onClick={() => handleOneClickUploadToDriveFolder(false)}
+                      className="flex-1 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-xl cursor-pointer disabled:opacity-50 transition-all active:scale-99"
+                    >
+                      <CloudUpload className="w-5 h-5 shrink-0" />
+                      <span>
+                        {isUploadingDrive
+                          ? `Uploading Whole Project & Workflows ZIP to "${TIDYUPS_DRIVE_FOLDER_NAME}"...`
+                          : zipReadyOnServer
+                          ? `1-Click Upload Whole Project & Workflows ZIP to "${TIDYUPS_DRIVE_FOLDER_NAME}"`
+                          : `1-Click Create & Upload Whole Project + Workflows ZIP to "${TIDYUPS_DRIVE_FOLDER_NAME}"`}
+                      </span>
+                    </button>
+
+                    {zipReadyOnServer && (
+                      <button
+                        type="button"
+                        disabled={isUploadingDrive || isLoggingIn}
+                        onClick={() => handleOneClickUploadToDriveFolder(true)}
+                        className="py-3.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0"
+                        title="Rebuild a fresh Whole Project + Workflows ZIP from current files and upload to Google Drive folder"
+                      >
+                        <RefreshCw className={`w-4 h-4 text-emerald-400 ${isUploadingDrive ? 'animate-spin' : ''}`} />
+                        <span>Rebuild Fresh &amp; Upload to Drive</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Google Account Connection Status */}
                   {needsAuth || !token ? (
-                    <div className="space-y-2">
-                      {/* Official "Sign in with Google" Material Button per workspace-integration skill */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                      <span className="text-xs text-slate-400">
+                        Clicking the 1-Click button above will automatically connect Google Drive and upload to{' '}
+                        <strong className="text-slate-200">{TIDYUPS_DRIVE_FOLDER_NAME}</strong>, or sign in below:
+                      </span>
                       <button
                         type="button"
                         disabled={isLoggingIn}
                         onClick={handleGoogleLogin}
-                        className="gsi-material-button w-full py-2.5 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-extrabold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-lg transition-all cursor-pointer"
+                        className="gsi-material-button py-2 px-3.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
                       >
                         <div className="gsi-material-button-state" />
-                        <div className="gsi-material-button-content-wrapper flex items-center justify-center gap-2.5">
-                          <div className="gsi-material-button-icon w-5 h-5">
+                        <div className="gsi-material-button-content-wrapper flex items-center justify-center gap-2">
+                          <div className="gsi-material-button-icon w-4 h-4">
                             <svg
                               version="1.1"
                               xmlns="http://www.w3.org/2000/svg"
                               viewBox="0 0 48 48"
-                              style={{ display: 'block', width: '20px', height: '20px' }}
+                              style={{ display: 'block', width: '16px', height: '16px' }}
                             >
                               <path
                                 fill="#EA4335"
@@ -550,106 +512,121 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
                             </svg>
                           </div>
                           <span className="gsi-material-button-contents">
-                            {isLoggingIn ? 'Connecting Google Drive...' : 'Sign in with Google to Connect Drive'}
+                            {isLoggingIn ? 'Connecting...' : 'Sign in with Google'}
                           </span>
                         </div>
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800/80 px-1">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                        Connected to Google Drive ({user?.email || 'Active Session'}) • Folder:{' '}
+                        <strong className="text-emerald-300 font-mono">{TIDYUPS_DRIVE_FOLDER_NAME}</strong>
+                      </span>
                       <button
                         type="button"
-                        disabled={isUploadingDrive}
-                        onClick={executeUploadToGoogleDrive}
-                        className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl cursor-pointer disabled:opacity-50"
+                        onClick={handleGoogleLogout}
+                        className="text-rose-400 hover:underline flex items-center gap-1 cursor-pointer"
                       >
-                        <CloudUpload className="w-4 h-4" />
-                        <span>
-                          {isUploadingDrive
-                            ? 'Uploading Project ZIP to Google Drive...'
-                            : 'Send Backup .ZIP to Google Drive Now'}
-                        </span>
+                        <LogOut className="w-3.5 h-3.5" /> Sign Out
                       </button>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
-                        <span>Connected: {user?.email || 'Google Drive Active'}</span>
-                        <button
-                          type="button"
-                          onClick={handleGoogleLogout}
-                          className="text-rose-400 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <LogOut className="w-3 h-3" /> Sign Out
-                        </button>
-                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Recent Google Drive Backups List */}
-              {!needsAuth && token && (
-                <div className="bg-[#171b29] border border-slate-800 rounded-3xl p-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FolderOpen className="w-4 h-4 text-emerald-400" />
+              {/* Files Inside "TidyUps Cleaning App Backup Zips" Folder in Google Drive */}
+              <div className="bg-[#171b29] border border-slate-800 rounded-3xl p-5 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <div>
                       <h4 className="text-sm font-black text-white">
-                        Your TidyUps Project Backups in Google Drive
+                        Files Inside Google Drive Folder: <span className="text-emerald-300 font-mono">{TIDYUPS_DRIVE_FOLDER_NAME}</span>
                       </h4>
+                      <p className="text-[11px] text-slate-400">
+                        All Whole Project ZIPs, Workflows, and CSV exports from this app are saved in this folder.
+                      </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => fetchDriveBackupFiles(token)}
-                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 flex items-center gap-1 cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isLoadingFiles ? 'animate-spin' : ''}`} />
-                      <span>Refresh</span>
-                    </button>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {driveFolder?.webViewLink && (
+                      <a
+                        href={driveFolder.webViewLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5"
+                      >
+                        <span>Open Folder</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    {!needsAuth && token && (
+                      <button
+                        type="button"
+                        onClick={() => fetchDriveBackupFiles(token)}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingFiles ? 'animate-spin' : ''}`} />
+                        <span>Refresh</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-                  {driveFiles.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-3">
-                      No backup archives listed yet — click <strong>&ldquo;Send Backup .ZIP to Google Drive Now&rdquo;</strong> above to upload your first full snapshot.
-                    </p>
-                  ) : (
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                      {driveFiles.map((f) => (
-                        <div
-                          key={f.id}
-                          className="p-3 rounded-2xl bg-[#10131d] border border-slate-800 flex items-center justify-between gap-3 text-xs"
-                        >
-                          <div className="min-w-0">
-                            <div className="font-bold text-white truncate">{f.name}</div>
-                            <div className="text-[11px] text-slate-400">
-                              {f.createdTime ? new Date(f.createdTime).toLocaleString() : 'Saved in Drive'}
-                              {f.size ? ` • ${(Number(f.size) / 1024).toFixed(0)} KB` : ''}
-                            </div>
+                {needsAuth || !token ? (
+                  <p className="text-xs text-slate-400 py-3">
+                    Click the <strong>1-Click Upload Whole Project &amp; Workflows ZIP</strong> button above to automatically create the{' '}
+                    <code className="text-emerald-300">{TIDYUPS_DRIVE_FOLDER_NAME}</code> folder and upload your project archive.
+                  </p>
+                ) : driveFiles.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-3">
+                    Folder <strong className="text-emerald-300">{TIDYUPS_DRIVE_FOLDER_NAME}</strong> is ready in your Google Drive. Click the 1-Click button above to upload your Whole Project &amp; Workflows ZIP into it now.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {driveFiles.map((f) => (
+                      <div
+                        key={f.id}
+                        className="p-3 rounded-2xl bg-[#10131d] border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-bold text-white truncate flex items-center gap-2">
+                            <Layers className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="truncate">{f.name}</span>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {f.webViewLink && (
-                              <a
-                                href={f.webViewLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 font-bold flex items-center gap-1 hover:bg-emerald-600/30"
-                              >
-                                <span>Open</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleRequestDeleteDriveFile(f)}
-                              className="p-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/50 cursor-pointer"
-                              title="Delete backup from Google Drive"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            {f.createdTime ? new Date(f.createdTime).toLocaleString() : 'Saved in Drive Folder'}
+                            {f.size ? ` • ${(Number(f.size) / 1024).toFixed(0)} KB` : ''}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {f.webViewLink && (
+                            <a
+                              href={f.webViewLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 font-bold flex items-center gap-1 hover:bg-emerald-600/30"
+                            >
+                              <span>Open in Drive</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRequestDeleteDriveFile(f)}
+                            className="p-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/50 cursor-pointer"
+                            title="Delete file from Google Drive folder"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -658,10 +635,10 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#171b29] p-4 rounded-2xl border border-purple-500/30">
                 <div>
                   <h3 className="text-sm font-black text-white">
-                    Master AI Rebuild Prompt &amp; Complete Project Workflow (<code className="text-purple-300">AI_BUILD_WORKFLOW.md</code>)
+                    Complete Project Workflows (<code className="text-purple-300">AI_BUILD_WORKFLOW.md</code> &amp; <code className="text-purple-300">workflows/COMPLETE_APP_WORKFLOWS.md</code>)
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Included automatically inside your ZIP download &amp; Google Drive backup. Copy and paste this into any AI assistant when opening the project to build or extend it immediately.
+                    Packaged inside every Whole Project ZIP uploaded to <code className="text-emerald-300">{TIDYUPS_DRIVE_FOLDER_NAME}</code>.
                   </p>
                 </div>
                 <button
@@ -674,12 +651,12 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
                   className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   {copiedWorkflow ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  <span>{copiedWorkflow ? 'Copied AI Workflow!' : 'Copy AI Build Workflow'}</span>
+                  <span>{copiedWorkflow ? 'Copied All Workflows!' : 'Copy Complete Workflows'}</span>
                 </button>
               </div>
 
               <pre className="p-4 rounded-2xl bg-[#0b0d14] border border-slate-800 text-xs text-slate-200 font-mono whitespace-pre-wrap overflow-x-auto max-h-[380px] leading-relaxed">
-                {aiWorkflowContent || 'Loading AI_BUILD_WORKFLOW.md...'}
+                {aiWorkflowContent || 'Loading complete project workflows...'}
               </pre>
             </div>
           )}
@@ -694,14 +671,14 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
                 </div>
                 <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
                   <p>
-                    <strong className="text-white">1. To push today&apos;s new Voice Dictation &amp; Intake Header, Bedrooms/Bathrooms Quoting Form, Quick Map &amp; Google Drive Backup live to <code className="text-emerald-300">app.tidyupscleaning.com</code>:</strong>
+                    <strong className="text-white">1. To push code or UI updates live to <code className="text-emerald-300">app.tidyupscleaning.com</code>:</strong>
                     <br />
-                    Click the <strong>&ldquo;Publish&rdquo;</strong> (or <strong>&ldquo;Deploy&rdquo;</strong>) button in the top-right corner of Google AI Studio right now. That builds the production container and updates <code className="text-emerald-300">app.tidyupscleaning.com</code> within ~60 seconds.
+                    Click the <strong>&ldquo;Publish&rdquo;</strong> (or <strong>&ldquo;Deploy&rdquo;</strong>) button in the top-right corner of Google AI Studio. That builds the production container and updates <code className="text-emerald-300">app.tidyupscleaning.com</code> within ~60 seconds.
                   </p>
                   <p>
                     <strong className="text-white">2. Do you need to re-publish every time someone calls or books a cleaning?</strong>
                     <br />
-                    <strong className="text-emerald-400">No!</strong> All daily voice dictations, quick quotes, customer bookings, and Jobber syncs save automatically to your live Cloud Firestore database (<code className="text-pink-300">ai-studio-cleaningserviced-8a2493ab-cb9d-4c28-a60b-c28e7d08d30e</code>). You <strong>only</strong> need to click Publish when we change the app&apos;s code, buttons, or page design.
+                    <strong className="text-emerald-400">No!</strong> All daily voice dictations, quick quotes, customer bookings, and Jobber syncs save automatically to your live database.
                   </p>
                 </div>
               </div>
@@ -711,12 +688,12 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-white font-black text-sm">
                     <GitBranch className="w-5 h-5 text-pink-400" />
-                    <span>Push Complete Project to GitHub</span>
+                    <span>Push Complete Project &amp; Workflows to GitHub</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
-                      const cmds = `git init\ngit add .\ngit commit -m "TidyUps Cleaning: Voice Dictation Intake, Quick Quote, Quick Map & Google Drive Backup"\ngit branch -M main\ngit remote add origin https://github.com/YOUR_USERNAME/tidyups-cleaning.git\ngit push -u origin main`;
+                      const cmds = `git init\ngit add .\ngit commit -m "TidyUps Cleaning: Whole Project & Workflows Backup"\ngit branch -M main\ngit remote add origin https://github.com/YOUR_USERNAME/tidyups-cleaning.git\ngit push -u origin main`;
                       navigator.clipboard.writeText(cmds);
                       setCopiedGitCmd(true);
                       setTimeout(() => setCopiedGitCmd(false), 2500);
@@ -727,13 +704,10 @@ export const ProjectBackupDriveModal: React.FC<ProjectBackupDriveModalProps> = (
                     <span>{copiedGitCmd ? 'Copied Git Commands!' : 'Copy Git Push Commands'}</span>
                   </button>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  All project files (including <code className="text-pink-300">README.md</code> and <code className="text-pink-300">AI_BUILD_WORKFLOW.md</code>) are committed to the local Git repository on branch <code className="text-emerald-300">main</code>. You can click the <strong>GitHub icon</strong> in the top-right bar of AI Studio to sync directly to your GitHub account, or unzip the downloaded project and run:
-                </p>
                 <pre className="p-3.5 rounded-2xl bg-[#0b0d14] border border-slate-800 text-xs font-mono text-emerald-300 overflow-x-auto">
 {`git init
 git add .
-git commit -m "TidyUps Cleaning: Voice Dictation Intake, Quick Quote, Quick Map & Google Drive Backup"
+git commit -m "TidyUps Cleaning: Whole Project & Workflows Backup"
 git branch -M main
 git remote add origin https://github.com/YOUR_USERNAME/tidyups-cleaning.git
 git push -u origin main`}

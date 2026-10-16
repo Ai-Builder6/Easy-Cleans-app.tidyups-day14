@@ -135,18 +135,26 @@ export const StaffRosterModal: React.FC<StaffRosterModalProps> = ({
     }
   };
 
-  // Handle Export CSV
-  const handleExportCsv = () => {
-    const csvContent = generateStaffCsv(staffList);
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'jobber_staff_roster.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Downloaded Jobber staff spreadsheet CSV', 'info');
+  // Handle Export CSV -> Uploads directly into "TidyUps Cleaning App Backup Zips" folder in Google Drive
+  const handleExportCsv = async () => {
+    try {
+      const csvContent = generateStaffCsv(staffList);
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const { uploadAppFileToTidyUpsDriveFolder, TIDYUPS_DRIVE_FOLDER_NAME } = await import(
+        '../services/googleDriveBackupService'
+      );
+      showToast(`Uploading staff roster CSV to Google Drive folder "${TIDYUPS_DRIVE_FOLDER_NAME}"...`, 'info');
+      const { file, folder } = await uploadAppFileToTidyUpsDriveFolder({
+        filename: `TidyUps_Staff_Roster_${dateStr}.csv`,
+        blob,
+        mimeType: 'text/csv',
+        description: 'TidyUps Cleaning Staff Roster CSV Export',
+      });
+      showToast(`Uploaded "${file.name}" into Google Drive folder "${folder.name}"!`, 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Could not upload CSV to Google Drive folder', 'info');
+    }
   };
 
   // Handle Archive / Deactivate Toggle

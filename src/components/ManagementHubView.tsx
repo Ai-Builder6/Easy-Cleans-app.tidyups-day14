@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   SlidersHorizontal, 
   FileCheck, 
@@ -29,8 +29,13 @@ import {
   CloudUpload,
   Tag,
   FileSpreadsheet,
+  FolderOpen,
 } from 'lucide-react';
 import { Technician } from '../types/dispatch';
+import {
+  TIDYUPS_DRIVE_FOLDER_NAME,
+  uploadWholeProjectZipToDriveFolder,
+} from '../services/googleDriveBackupService';
 
 interface ManagementHubViewProps {
   onNavigateToVoiceIntake?: () => void;
@@ -83,6 +88,32 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
   isSyncingFirestore = false,
   onOpenProjectBackup,
 }) => {
+  const [isUploadingProjectDrive, setIsUploadingProjectDrive] = useState(false);
+  const [driveBackupNotice, setDriveBackupNotice] = useState<{
+    text: string;
+    folderUrl?: string;
+    isError?: boolean;
+  } | null>(null);
+
+  const handleOneClickDriveUpload = async () => {
+    setIsUploadingProjectDrive(true);
+    setDriveBackupNotice(null);
+    try {
+      const res = await uploadWholeProjectZipToDriveFolder({ forceRebuild: false });
+      setDriveBackupNotice({
+        text: `✓ Uploaded "${res.file.name}" into Drive folder "${res.folder.name}"!`,
+        folderUrl: res.folder.webViewLink,
+      });
+    } catch (err: any) {
+      setDriveBackupNotice({
+        text: err?.message || 'Could not upload to Google Drive folder.',
+        isError: true,
+      });
+    } finally {
+      setIsUploadingProjectDrive(false);
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto bg-slate-900 text-slate-100 min-h-screen p-4 sm:p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -100,15 +131,19 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {onOpenProjectBackup && (
-            <button
-              onClick={onOpenProjectBackup}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
-            >
-              <CloudUpload className="w-3.5 h-3.5 text-white" />
-              <span>Download ZIP &amp; Google Drive Backup</span>
-            </button>
-          )}
+          <button
+            onClick={handleOneClickDriveUpload}
+            disabled={isUploadingProjectDrive}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+            title={`1-Click: Create or reuse Whole Project & Workflows ZIP and upload straight to "${TIDYUPS_DRIVE_FOLDER_NAME}" in Google Drive`}
+          >
+            <CloudUpload className="w-3.5 h-3.5 text-white" />
+            <span>
+              {isUploadingProjectDrive
+                ? `Uploading to "${TIDYUPS_DRIVE_FOLDER_NAME}"...`
+                : '1-Click Upload Whole Project ZIP to Drive'}
+            </span>
+          </button>
           <button
             onClick={onOpenJobberSync}
             className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
@@ -162,41 +197,67 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
           </div>
         </div>
 
-        {/* 0B. Project ZIP Download, Google Drive Backup, AI Build Workflow & GitHub / Publish Guide */}
+        {/* 0B. Whole Project & Workflows ZIP — 1-Click Upload to Google Drive Folder */}
         <div className="bg-gradient-to-br from-[#112420] via-[#151923] to-[#151923] border border-emerald-500/40 hover:border-emerald-400 rounded-3xl p-5 sm:p-6 flex flex-col justify-between space-y-4 shadow-xl transition-all group">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/25 to-teal-500/25 text-emerald-400 border border-emerald-500/40 flex items-center justify-center">
-                <FileArchive className="w-6 h-6" />
+                <CloudUpload className="w-6 h-6" />
               </div>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
-                📦 ZIP + Google Drive + GitHub
+                📁 {TIDYUPS_DRIVE_FOLDER_NAME}
               </span>
             </div>
             <div>
-              <h3 className="font-black text-lg text-white">Project Backup, Google Drive &amp; AI Workflow</h3>
+              <h3 className="font-black text-lg text-white">Whole Project &amp; Workflows → Google Drive</h3>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Download the complete project <code className="text-emerald-300 font-mono">.zip</code>, send backup directly to your Google Drive, copy the AI Reconstruction Workflow, and view GitHub &amp; Domain Publish instructions.
+                With 1 click, creates (or reuses) the complete project &amp; workflows <code className="text-emerald-300 font-mono">.zip</code> and uploads it directly into your <strong className="text-emerald-300">{TIDYUPS_DRIVE_FOLDER_NAME}</strong> folder in Google Drive — without downloading to your computer.
               </p>
+              {driveBackupNotice && (
+                <div
+                  className={`mt-2 p-2.5 rounded-xl text-[11px] font-bold flex items-center justify-between gap-2 ${
+                    driveBackupNotice.isError
+                      ? 'bg-rose-950/80 text-rose-200 border border-rose-700'
+                      : 'bg-emerald-950/80 text-emerald-200 border border-emerald-700'
+                  }`}
+                >
+                  <span>{driveBackupNotice.text}</span>
+                  {driveBackupNotice.folderUrl && (
+                    <a
+                      href={driveBackupNotice.folderUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-black flex items-center gap-1 shrink-0"
+                    >
+                      <span>Open Folder</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2">
             <button
-              onClick={onOpenProjectBackup}
-              className="flex-1 py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+              onClick={handleOneClickDriveUpload}
+              disabled={isUploadingProjectDrive}
+              className="flex-1 py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
             >
               <CloudUpload className="w-3.5 h-3.5" />
-              <span>ZIP, Drive Backup &amp; AI Guide</span>
+              <span>
+                {isUploadingProjectDrive ? 'Uploading to Google Drive...' : '1-Click Upload to Drive Folder'}
+              </span>
             </button>
-            <a
-              href="/api/project/export-zip"
-              download="tidyups-cleaning-complete-project.zip"
-              className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>Direct .ZIP</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </a>
+            {onOpenProjectBackup && (
+              <button
+                onClick={onOpenProjectBackup}
+                className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span>Drive Folder &amp; Workflows</span>
+              </button>
+            )}
           </div>
         </div>
 

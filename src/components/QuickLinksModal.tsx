@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Zap, 
   X, 
@@ -16,7 +16,8 @@ import {
   ChevronRight,
   ShieldCheck,
   CheckCircle2,
-  Download,
+  CloudUpload,
+  FolderOpen,
   GitBranch,
   FileSpreadsheet,
   Compass,
@@ -25,6 +26,10 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { JOBBER_TEAM_MEMBERS } from '../data/jobberCalendarData';
+import {
+  TIDYUPS_DRIVE_FOLDER_NAME,
+  uploadWholeProjectZipToDriveFolder,
+} from '../services/googleDriveBackupService';
 
 interface QuickLinksModalProps {
   isOpen: boolean;
@@ -55,7 +60,36 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
   unscheduledJobsCount = 6,
   scheduledJobsCount = 181,
 }) => {
+  const [isUploadingDrive, setIsUploadingDrive] = useState(false);
+  const [driveStatus, setDriveStatus] = useState<{
+    message: string;
+    folderLink?: string;
+    isError?: boolean;
+  } | null>(null);
+
   if (!isOpen) return null;
+
+  const handleUploadWholeProjectToDrive = async (customFilename?: string) => {
+    setIsUploadingDrive(true);
+    setDriveStatus(null);
+    try {
+      const res = await uploadWholeProjectZipToDriveFolder({
+        customFilename,
+        forceRebuild: false,
+      });
+      setDriveStatus({
+        message: `✓ Uploaded "${res.file.name}" into Drive folder "${res.folder.name}" (no computer download)!`,
+        folderLink: res.folder.webViewLink,
+      });
+    } catch (err: any) {
+      setDriveStatus({
+        message: err?.message || 'Could not upload to Google Drive folder.',
+        isError: true,
+      });
+    } finally {
+      setIsUploadingDrive(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
@@ -446,7 +480,7 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
             </a>
           </div>
 
-          {/* Dual Independent Projects & Standalone Archive Downloads */}
+          {/* Whole Project & Workflows ZIP — 1-Click Upload to Google Drive Folder */}
           <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-col gap-3 text-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
@@ -455,55 +489,89 @@ export const QuickLinksModal: React.FC<QuickLinksModalProps> = ({
                 </div>
                 <div>
                   <p className="font-extrabold text-indigo-950 flex items-center gap-2 flex-wrap">
-                    <span>Dedicated Standalone Project Archive (app.tidyupscleaning.com)</span>
+                    <span>Whole Project &amp; Workflows ZIP → Google Drive</span>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-200 text-emerald-950 font-bold border border-emerald-300">
-                      Single Domain Connected
+                      📁 {TIDYUPS_DRIVE_FOLDER_NAME}
                     </span>
                   </p>
                   <p className="text-[11px] text-indigo-700 mt-0.5 leading-relaxed">
-                    This project is strictly dedicated to TidyUps Cleaning Operations (app.tidyupscleaning.com) with its own persistent store and Jobber OAuth configuration.
+                    With 1 click, creates (or reuses) the whole project &amp; workflows archive and uploads it straight into your <strong>{TIDYUPS_DRIVE_FOLDER_NAME}</strong> folder in Google Drive — never downloads to your computer.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Dedicated Project: app.tidyupscleaning.com */}
+            {driveStatus && (
+              <div
+                className={`p-2.5 rounded-xl border text-[11px] font-bold flex items-center justify-between gap-2 ${
+                  driveStatus.isError
+                    ? 'bg-rose-50 border-rose-200 text-rose-800'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                }`}
+              >
+                <span>{driveStatus.message}</span>
+                {driveStatus.folderLink && (
+                  <a
+                    href={driveStatus.folderLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold flex items-center gap-1 shrink-0"
+                  >
+                    <FolderOpen className="w-3 h-3" />
+                    <span>Open Folder</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Dedicated Whole Project & Workflows -> Google Drive Folder */}
             <div className="p-3 bg-white/90 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="text-sm">✨</span>
-                  <span className="font-extrabold text-emerald-950 text-xs">TidyUps Cleaning Operations</span>
+                  <span className="font-extrabold text-emerald-950 text-xs">Whole Project &amp; Workflows Archive</span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-100 text-emerald-800 font-bold">
                     app.tidyupscleaning.com
                   </span>
                 </div>
                 <span className="text-[10px] text-slate-500 mt-0.5 font-mono">
-                  Store: data/tidyups_cleaning_store.json • Jobber: https://app.tidyupscleaning.com/api/jobber/oauth/callback
+                  Google Drive Folder: {TIDYUPS_DRIVE_FOLDER_NAME} • Includes Workflows, Store &amp; Source
                 </span>
               </div>
-              <a
-                href="/tidyups-cleaning-v1.zip"
-                download="tidyups-cleaning-v1.zip"
-                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer shrink-0 active:scale-95 text-xs self-start sm:self-auto"
-                title="Download tidyups-cleaning-v1.zip standalone project archive"
+              <button
+                type="button"
+                disabled={isUploadingDrive}
+                onClick={() => handleUploadWholeProjectToDrive()}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer shrink-0 active:scale-95 text-xs self-start sm:self-auto disabled:opacity-50"
+                title={`1-Click: Create or reuse Whole Project & Workflows ZIP and upload straight into "${TIDYUPS_DRIVE_FOLDER_NAME}" in Google Drive`}
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>tidyups-cleaning-v1.zip</span>
-              </a>
+                <CloudUpload className="w-3.5 h-3.5" />
+                <span>
+                  {isUploadingDrive ? 'Uploading to Google Drive...' : '1-Click Upload Whole Project ZIP to Drive'}
+                </span>
+              </button>
             </div>
 
-            {/* Daily Version Checkpoints Action Buttons */}
+            {/* Daily Version Checkpoints Action Buttons -> Also Upload to Google Drive Folder */}
             <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-indigo-200/60">
-              <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider">Next Checkpoints:</span>
-              <a
-                href="/api/download-zip?name=tidyups-cleaning-v2"
-                download="tidyups-cleaning-v2.zip"
-                className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer text-[11px] active:scale-95"
-                title="Generate tidyups-cleaning-v2 archive"
+              <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                Save Version Checkpoint to Drive Folder:
+              </span>
+              <button
+                type="button"
+                disabled={isUploadingDrive}
+                onClick={() =>
+                  handleUploadWholeProjectToDrive(
+                    `TidyUps-Cleaning-Whole-Project-Checkpoint-${new Date().toISOString().slice(0, 10)}.zip`
+                  )
+                }
+                className="px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer text-[11px] active:scale-95 disabled:opacity-50"
+                title={`Upload checkpoint archive into "${TIDYUPS_DRIVE_FOLDER_NAME}" in Google Drive`}
               >
-                <Download className="w-3 h-3 text-emerald-600" />
-                <span>tidyups-cleaning-v2</span>
-              </a>
+                <CloudUpload className="w-3 h-3 text-emerald-600" />
+                <span>Save Checkpoint to Drive Folder</span>
+              </button>
             </div>
           </div>
         </div>

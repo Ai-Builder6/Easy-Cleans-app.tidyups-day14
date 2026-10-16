@@ -603,17 +603,27 @@ export const ServiceCatalogModal: React.FC<ServiceCatalogModalProps> = ({
     const dateStr = new Date().toISOString().slice(0, 10);
     const filename = `Tidyups_Updated_Price_List_Google_Sheets_${dateStr}.csv`;
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setFeedbackNotice(
-      `✓ Downloaded Google Sheets CSV "${filename}" with ${currentItems.length} live updated items!`
-    );
+    try {
+      const { uploadAppFileToTidyUpsDriveFolder, TIDYUPS_DRIVE_FOLDER_NAME } = await import(
+        '../services/googleDriveBackupService'
+      );
+      setFeedbackNotice(
+        `Uploading "${filename}" into Google Drive folder "${TIDYUPS_DRIVE_FOLDER_NAME}"...`
+      );
+      const { file, folder } = await uploadAppFileToTidyUpsDriveFolder({
+        filename,
+        blob,
+        mimeType: 'text/csv',
+        description: `TidyUps Service Catalog & Price List (${currentItems.length} items)`,
+      });
+      setFeedbackNotice(
+        `✓ Uploaded "${file.name}" (${currentItems.length} items) directly into Google Drive folder "${folder.name}"!`
+      );
+    } catch (err: any) {
+      setFeedbackNotice(
+        err?.message || 'Could not upload Price List CSV to Google Drive folder.'
+      );
+    }
   };
 
   if (!isOpen) return null;

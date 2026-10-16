@@ -5424,7 +5424,7 @@ app.post("/api/public/book", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Complete Project ZIP Archive Generator & AI Build Workflow Export
+// Complete Project & Workflows ZIP Archive Generator (For Google Drive Folder Backup)
 // ─────────────────────────────────────────────────────────────────────────────
 const EXCLUDED_ZIP_DIRS = new Set([
   "node_modules",
@@ -5433,7 +5433,14 @@ const EXCLUDED_ZIP_DIRS = new Set([
   ".aistudio",
   ".cache",
   ".next",
+  "backups",
 ]);
+
+const CACHED_PROJECT_ZIP_DIR = path.join(process.cwd(), "data", "backups");
+const CACHED_PROJECT_ZIP_PATH = path.join(
+  CACHED_PROJECT_ZIP_DIR,
+  "TidyUps-Cleaning-Whole-Project-And-Workflows.zip"
+);
 
 function addDirectoryToZip(zip: JSZip, dirPath: string, relativeRoot = ""): number {
   let count = 0;
@@ -5461,6 +5468,100 @@ function addDirectoryToZip(zip: JSZip, dirPath: string, relativeRoot = ""): numb
   return count;
 }
 
+async function getOrCreateWholeProjectZip(forceRebuild = false): Promise<{
+  buffer: Buffer;
+  reused: boolean;
+  createdAt: string;
+  filename: string;
+}> {
+  const dateStamp = new Date().toISOString().slice(0, 10);
+  const filename = `TidyUps-Cleaning-Whole-Project-And-Workflows-${dateStamp}.zip`;
+
+  if (!forceRebuild && fs.existsSync(CACHED_PROJECT_ZIP_PATH)) {
+    try {
+      const stat = fs.statSync(CACHED_PROJECT_ZIP_PATH);
+      if (stat.size > 1024) {
+        const existingBuffer = fs.readFileSync(CACHED_PROJECT_ZIP_PATH);
+        return {
+          buffer: existingBuffer,
+          reused: true,
+          createdAt: stat.mtime.toISOString(),
+          filename,
+        };
+      }
+    } catch (readErr) {
+      console.warn("Cached project ZIP read note:", readErr);
+    }
+  }
+
+  const zip = new JSZip();
+  const rootDir = process.cwd();
+  const fileCount = addDirectoryToZip(zip, rootDir, "");
+
+  try {
+    zip.file(
+      "WORKFLOWS_MANIFEST.json",
+      JSON.stringify(
+        {
+          projectName: "TidyUps Cleaning Service Inc — Whole Project & Workflows Archive",
+          domain: "app.tidyupscleaning.com",
+          googleDriveBackupFolder: "TidyUps Cleaning App Backup Zips",
+          includedWorkflows: [
+            "AI_BUILD_WORKFLOW.md",
+            "workflows/COMPLETE_APP_WORKFLOWS.md",
+            ".github/workflows/deploy-and-backup.yml",
+            "cloudbuild.yaml",
+            "Dockerfile",
+          ],
+          totalFilesPackaged: fileCount,
+          exportedAt: new Date().toISOString(),
+        },
+        null,
+        2
+      )
+    );
+    zip.file(
+      "DOMAIN_CONFIG.json",
+      JSON.stringify(
+        {
+          domain: "app.tidyupscleaning.com",
+          brandId: "tidyups",
+          projectId: "tidyups",
+          title: "TidyUps Cleaning — Whole Project & Workflows Archive (app.tidyupscleaning.com)",
+          googleDriveFolder: "TidyUps Cleaning App Backup Zips",
+          exportedAt: new Date().toISOString(),
+        },
+        null,
+        2
+      )
+    );
+  } catch (customErr) {
+    console.warn("Project ZIP manifest note:", customErr);
+  }
+
+  const zipBuffer = await zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  });
+
+  try {
+    if (!fs.existsSync(CACHED_PROJECT_ZIP_DIR)) {
+      fs.mkdirSync(CACHED_PROJECT_ZIP_DIR, { recursive: true });
+    }
+    fs.writeFileSync(CACHED_PROJECT_ZIP_PATH, zipBuffer);
+  } catch (saveErr) {
+    console.warn("Could not cache project ZIP to disk:", saveErr);
+  }
+
+  return {
+    buffer: zipBuffer,
+    reused: false,
+    createdAt: new Date().toISOString(),
+    filename,
+  };
+}
+
 app.get("/api/project/export-metadata", (_req, res) => {
   try {
     const rootDir = process.cwd();
@@ -5470,20 +5571,40 @@ app.get("/api/project/export-metadata", (_req, res) => {
     const workflowText = fs.existsSync(path.join(rootDir, "AI_BUILD_WORKFLOW.md"))
       ? fs.readFileSync(path.join(rootDir, "AI_BUILD_WORKFLOW.md"), "utf-8")
       : "";
+    const appWorkflowsText = fs.existsSync(path.join(rootDir, "workflows", "COMPLETE_APP_WORKFLOWS.md"))
+      ? fs.readFileSync(path.join(rootDir, "workflows", "COMPLETE_APP_WORKFLOWS.md"), "utf-8")
+      : "";
+
+    let zipReadyOnServer = false;
+    let zipSizeBytes = 0;
+    let zipCreatedAt: string | null = null;
+    if (fs.existsSync(CACHED_PROJECT_ZIP_PATH)) {
+      const stat = fs.statSync(CACHED_PROJECT_ZIP_PATH);
+      if (stat.size > 1024) {
+        zipReadyOnServer = true;
+        zipSizeBytes = stat.size;
+        zipCreatedAt = stat.mtime.toISOString();
+      }
+    }
+
     res.json({
       success: true,
-      projectName: "tidyups-cleaning-complete-project",
+      projectName: "TidyUps-Cleaning-Whole-Project-And-Workflows",
       primaryDomain: "app.tidyupscleaning.com",
+      driveFolderName: "TidyUps Cleaning App Backup Zips",
+      zipReadyOnServer,
+      zipSizeBytes,
+      zipCreatedAt,
       domains: [
         {
           id: "tidyups",
           domain: "app.tidyupscleaning.com",
           brandName: "TidyUps Cleaning Service Inc",
-          zipFilename: `app.tidyupscleaning.com-complete-project.zip`,
+          zipFilename: `TidyUps-Cleaning-Whole-Project-And-Workflows.zip`,
         },
       ],
       readme: readmeText,
-      aiWorkflow: workflowText,
+      aiWorkflow: workflowText + (appWorkflowsText ? `\n\n---\n\n${appWorkflowsText}` : ""),
       timestamp: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -5491,50 +5612,23 @@ app.get("/api/project/export-metadata", (_req, res) => {
   }
 });
 
-app.get("/api/project/export-zip", async (_req, res) => {
+app.get("/api/project/export-zip", async (req, res) => {
   try {
-    const domainMeta = {
-      id: "tidyups",
-      domain: "app.tidyupscleaning.com",
-      brandTitle: "TidyUps Cleaning — Voice Dictation, Quick Quote & Live Dispatch (app.tidyupscleaning.com)",
-      projectSlug: "app.tidyupscleaning.com-complete-project",
-      projectId: "tidyups",
-    };
+    const forceRebuild = req.query.force === "true";
+    const isDriveMode = req.query.mode === "drive";
+    const { buffer, reused, createdAt, filename } = await getOrCreateWholeProjectZip(forceRebuild);
 
-    const zip = new JSZip();
-    const rootDir = process.cwd();
-    addDirectoryToZip(zip, rootDir, "");
-
-    try {
-      zip.file(
-        "DOMAIN_CONFIG.json",
-        JSON.stringify(
-          {
-            domain: domainMeta.domain,
-            brandId: domainMeta.id,
-            projectId: domainMeta.projectId,
-            title: domainMeta.brandTitle,
-            exportedAt: new Date().toISOString(),
-          },
-          null,
-          2
-        )
-      );
-    } catch (customErr) {
-      console.warn("Domain ZIP customization note:", customErr);
-    }
-
-    const zipBuffer = await zip.generateAsync({
-      type: "nodebuffer",
-      compression: "DEFLATE",
-      compressionOptions: { level: 6 },
-    });
-    const dateStamp = new Date().toISOString().slice(0, 10);
-    const filename = `${domainMeta.projectSlug}-${dateStamp}.zip`;
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Length", String(zipBuffer.length));
-    res.send(zipBuffer);
+    res.setHeader("X-Zip-Cache-Status", reused ? "REUSED_EXISTING" : "CREATED_NEW");
+    res.setHeader("X-Zip-Created-At", createdAt);
+    res.setHeader("X-Zip-Filename", filename);
+    if (isDriveMode) {
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    } else {
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    }
+    res.setHeader("Content-Length", String(buffer.length));
+    res.send(buffer);
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to generate project zip" });
   }
