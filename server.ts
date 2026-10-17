@@ -3421,7 +3421,19 @@ app.post("/api/database/quotes", async (req, res) => {
           ];
         })();
 
-  // STRICT ORDER: Step 1 Create Client in Jobber -> Step 2 Create Service Property & Request -> Step 3 Create Draft Quote in Jobber
+  // Check if a quote for this client was already created in the last 10 minutes to prevent duplicate creations
+  const normClientName = clientName.trim().toLowerCase();
+  const normClientPhone = (clientPhone || "").replace(/\D/g, "").slice(-10);
+  const existingRecentQuote = (currentStore.quotes || []).find((q: any) => {
+    const qName = (q.clientName || "").trim().toLowerCase();
+    const qPhone = (q.clientPhone || "").replace(/\D/g, "").slice(-10);
+    const sameClient = (normClientName && qName === normClientName) || (normClientPhone.length >= 7 && qPhone === normClientPhone);
+    if (!sameClient) return false;
+    const ageMs = Date.now() - new Date(q.createdAt || 0).getTime();
+    return ageMs >= 0 && ageMs < 10 * 60 * 1000;
+  });
+
+  // STRICT ORDER: Step 1 Create Client in Jobber -> Step 2 Create Service Property & Single Quote (or Request if createRequestOnly) in Jobber
   const pushRes = await pushQuoteToJobber(
     {
       clientName,
@@ -3435,6 +3447,10 @@ app.post("/api/database/quotes", async (req, res) => {
       depositRequired: Number(depositRequired) || 0,
       notes,
       createRequestOnly: Boolean(createRequestOnly),
+      existingJobberQuoteId:
+        existingRecentQuote?.id && String(existingRecentQuote.id).startsWith("Z2lkOi8vSm9iYmVyL1F1b3Rl")
+          ? existingRecentQuote.id
+          : existingRecentQuote?.jobberQuoteId,
       lineItems: defaultLineItems,
     },
     jobberConfig.accessToken,
@@ -3445,12 +3461,13 @@ app.post("/api/database/quotes", async (req, res) => {
   googleSheetsSyncState.syncedRowsCount += 1;
   googleSheetsSyncState.lastSyncedAt = new Date().toISOString();
 
-  const quoteId = pushRes.jobberQuoteId || `quote_local_${Date.now()}`;
-  const quoteNumber = pushRes.quoteNumber || `QT-${Math.floor(4295 + Math.random() * 60)}`;
+  const quoteId = pushRes.jobberQuoteId || existingRecentQuote?.id || `quote_local_${Date.now()}`;
+  const quoteNumber = pushRes.quoteNumber || existingRecentQuote?.quoteNumber || `QT-${Math.floor(4295 + Math.random() * 60)}`;
   const normalizedCleaners = Array.isArray(assignedCleaners)
     ? assignedCleaners.filter((c: any) => typeof c === "string" && c.trim().length > 0 && c !== "NONE" && c !== "Unassigned")
     : [];
 
+  const todayPrefix = new Date().toISOString().slice(0, 10);
   const newQuote: any = {
     id: quoteId,
     quoteNumber,
@@ -3461,11 +3478,11 @@ app.post("/api/database/quotes", async (req, res) => {
     service: resolvedService,
     bedrooms: resolvedBedrooms,
     bathrooms: resolvedBathrooms,
-    quoteStatus: quoteStatus || "DRAFT",
+    quoteStatus: quoteStatus || existingRecentQuote?.quoteStatus || "DRAFT",
     total: Number(total) || 280,
     discountAmount: Number(discountAmount) || 0,
     depositRequired: Number(depositRequired) || 0,
-    createdAt: new Date().toISOString(),
+    createdAt: existingRecentQuote?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     syncedAt: new Date().toISOString(),
     scheduledDate: scheduledDate || undefined,
@@ -3492,7 +3509,13 @@ app.post("/api/database/quotes", async (req, res) => {
   if (!createRequestOnly) {
     currentStore.quotes = [
       newQuote,
-      ...(currentStore.quotes || []).filter((q: any) => q.id !== newQuote.id && q.quoteNumber !== newQuote.quoteNumber),
+      ...(currentStore.quotes || []).filter((q: any) => {
+        if (q.id === newQuote.id || q.quoteNumber === newQuote.quoteNumber) return false;
+        const qName = (q.clientName || "").trim().toLowerCase();
+        const qDay = String(q.createdAt || "").slice(0, 10);
+        if (normClientName && qName === normClientName && qDay === todayPrefix) return false;
+        return true;
+      }),
     ];
   }
   const syncedClient = upsertJobberClientAndLeadFromQuote(
@@ -3616,6 +3639,9 @@ app.post("/api/quotes/:id/sync-jobber-google", async (req, res) => {
       total: Number(targetQuote.total) || 280,
       depositRequired: Number(targetQuote.depositRequired) || 0,
       notes: targetQuote.notes,
+      existingJobberQuoteId: String(targetQuote.id || "").startsWith("Z2lkOi8vSm9iYmVyL1F1b3Rl")
+        ? targetQuote.id
+        : targetQuote.jobberQuoteId,
       lineItems: targetQuote.lineItems,
     },
     jobberConfig.accessToken,
@@ -6119,7 +6145,7 @@ app.post("/api/google-sheets/sync-quote", (req, res) => {
     const tsvRow = `${headers.join("\t")}\n${values.map((v) => String(v || "").replace(/[\t\r\n]+/g, " ")).join("\t")}`;
 
     const currentStore = loadStore(projectId);
-    if (currentStore) {
+    if (currentStore && !body.skipStoreUpsert) {
       const fakeQuoteForUpsert = {
         id: `gsync-${Date.now()}`,
         quoteNumber: `GS-${Math.floor(1000 + Math.random() * 9000)}`,

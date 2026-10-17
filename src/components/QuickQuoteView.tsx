@@ -290,6 +290,7 @@ export const QuickQuoteView: React.FC<QuickQuoteViewProps> = ({
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const isSubmittingRef = useRef<boolean>(false);
   const [copiedBreakdown, setCopiedBreakdown] = useState<boolean>(false);
   const [feedbackNotice, setFeedbackNotice] = useState<string | null>(null);
   const [createdQuoteModalItem, setCreatedQuoteModalItem] = useState<JobberQuote | null>(null);
@@ -674,12 +675,13 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
   };
 
   // Sync Client, Exact Layout, Custom Discount & Deposit Amount to Google
-  const syncClientAndQuoteToGoogle = async () => {
+  const syncClientAndQuoteToGoogle = async (skipStoreUpsert = false) => {
     try {
       const gRes = await fetch(`/api/google-sheets/sync-quote?project=${projectId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-project-id': projectId },
         body: JSON.stringify({
+          skipStoreUpsert,
           customerName: customerName.trim() || 'Phone Lead',
           customerPhone: customerPhone.trim() || '(780) 555-0199',
           customerEmail: customerEmail.trim(),
@@ -712,11 +714,13 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
       if (gData?.success) {
         setGoogleSyncedRow(gData.row);
         setGoogleSyncedTsv(gData.tsv || '');
-        if (gData.clients && onClientsUpdated) {
-          onClientsUpdated(gData.clients);
-        }
-        if (gData.leads && onLeadsUpdated) {
-          onLeadsUpdated(gData.leads);
+        if (!skipStoreUpsert) {
+          if (gData.clients && onClientsUpdated) {
+            onClientsUpdated(gData.clients);
+          }
+          if (gData.leads && onLeadsUpdated) {
+            onLeadsUpdated(gData.leads);
+          }
         }
       }
       return gData;
@@ -728,12 +732,16 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
 
   // 1-Click Send to Booking System, Jobber Client+Quote & Dispatch Job (Saves Bedrooms, Bathrooms, Custom Discount & Deposit + Clean Google Sheet Sync)
   const handleSendToBookingAndDispatch = async () => {
+    if (isSubmittingRef.current) return;
     setIsSubmitting(true);
     setFeedbackNotice(null);
     try {
-      // 1. Create Client + Property + Quote in Jobber & Sync to Clean Google Sheet
-      await handleSaveJobberQuote(false);
+      // 1. Create Client + Property + Quote in Jobber & Sync to Clean Google Sheet (only if not already created)
+      if (!createdQuoteModalItem) {
+        await handleSaveJobberQuote(false);
+      }
 
+      isSubmittingRef.current = true;
       // 2. Send to Booking System (/api/public/book) with bedrooms, bathrooms, discount & deposit
       const bookRes = await fetch('/api/public/book', {
         method: 'POST',
@@ -782,16 +790,19 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
     } catch (err: any) {
       setFeedbackNotice(`Error: ${err.message}`);
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   // Create official Jobber Client FIRST (Step 1), then Jobber Request or Quote (Step 2) & Sync to Clean Google Sheet
   const handleSaveJobberQuote = async (createRequestOnly: boolean = false) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setFeedbackNotice(null);
     try {
-      const gData = await syncClientAndQuoteToGoogle();
+      const gData = await syncClientAndQuoteToGoogle(true);
 
       const primaryLineItemName = matchedCatalogItem
         ? matchedCatalogItem.jobberItemName
@@ -891,7 +902,7 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
         } else if (data.quote) {
           setFeedbackNotice(
             data.message ||
-              `✓ Step 1: Created Client "${customerName || 'Client'}" in Jobber → Step 2: Created Jobber Quote ${data.quote.quoteNumber} ($${calculations.total.toFixed(2)}, Deposit $${depositAmount}) & Synced to Clean Google Sheet!`
+              `✓ Step 1: Created Client "${customerName || 'Client'}" in Jobber → Step 2: Created Single Jobber Quote ${data.quote.quoteNumber} ($${calculations.total.toFixed(2)}, Deposit $${depositAmount}) & Synced to Clean Google Sheet!`
           );
           if (onQuoteCreated) onQuoteCreated(data.quote);
           setCreatedQuoteModalItem(data.quote);
@@ -902,6 +913,7 @@ ${depositAmount > 0 ? `• Deposit Required: $${Number(depositAmount).toFixed(2)
     } catch (err: any) {
       setFeedbackNotice(`Error: ${err.message}`);
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

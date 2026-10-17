@@ -2679,7 +2679,22 @@ export function App() {
               setScheduledJobsList((prev) => [newVisit, ...prev]);
             }}
             onQuoteCreated={(newQuote) => {
-              setQuotesList((prev) => [newQuote, ...prev]);
+              setQuotesList((prev) => {
+                const newDay = String(newQuote.createdAt || '').slice(0, 10);
+                const newClient = String(newQuote.clientName || '').trim().toLowerCase();
+                const filtered = prev.filter((q) => {
+                  if (q.id === newQuote.id || (q.quoteNumber && q.quoteNumber === newQuote.quoteNumber)) return false;
+                  if (
+                    newClient &&
+                    String(q.clientName || '').trim().toLowerCase() === newClient &&
+                    String(q.createdAt || '').slice(0, 10) === newDay
+                  ) {
+                    return false;
+                  }
+                  return true;
+                });
+                return [newQuote, ...filtered];
+              });
             }}
             onBookingSubmitted={(ticket) => {
               setTickets((prev) => [ticket, ...prev]);

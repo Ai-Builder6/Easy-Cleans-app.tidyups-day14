@@ -95,12 +95,49 @@ export const IntakesView: React.FC<IntakesViewProps> = ({
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [feedbackBanner, setFeedbackBanner] = useState<string | null>(null);
 
-  // Build unified intake records from Tickets, Quotes, and Leads
+  // Build unified intake records from Quotes, Tickets, and Leads (deduplicated so each intake only appears once)
   const intakeRecords = useMemo<IntakeRecord[]>(() => {
     const list: IntakeRecord[] = [];
+    const seenKeys = new Set<string>();
 
-    // 1. From Service Tickets (Customer Portal + Voice Dictation tickets)
+    const makeKey = (name?: string, phone?: string) => {
+      const n = (name || '').trim().toLowerCase();
+      const p = (phone || '').replace(/\D/g, '').slice(-10);
+      return n || p || `anon-${Math.random()}`;
+    };
+
+    // 1. From Quotes (Quick Quote & Voice Intake quotes — prioritized first)
+    quotes.forEach((q) => {
+      const key = makeKey(q.clientName, q.clientPhone);
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+
+      const parsed = extractBedBathFromText(`${q.service || ''} ${q.notes || ''}`);
+      list.push({
+        id: `intake-quote-${q.id}`,
+        customerName: q.clientName || 'Phone Lead',
+        phone: q.clientPhone || '(780) 555-0199',
+        email: q.clientEmail,
+        address: q.serviceAddress || 'Edmonton, AB',
+        city: 'Edmonton',
+        serviceType: q.service || 'Residential Standard Cleaning',
+        bedrooms: q.bedrooms || parsed.bedrooms,
+        bathrooms: q.bathrooms || parsed.bathrooms,
+        specificInfo: q.notes || 'Quick quote generated from phone intake.',
+        quotedPrice: q.total,
+        createdAt: (q as any).createdDate || q.createdAt || 'Today',
+        source: 'Quick Quote',
+        status: 'JOBBER_SYNCED',
+        jobberRef: q.quoteNumber,
+      });
+    });
+
+    // 2. From Service Tickets (Customer Portal + Voice Dictation tickets) if not already in Quotes
     tickets.forEach((t) => {
+      const key = makeKey(t.customerName, (t as any).phone || t.customerPhone);
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+
       const parsed = extractBedBathFromText(`${t.equipmentModel || ''} ${t.issueDescription || ''} ${t.accessNotes || ''}`);
       list.push({
         id: `intake-ticket-${t.id}`,
@@ -119,53 +156,30 @@ export const IntakesView: React.FC<IntakesViewProps> = ({
       });
     });
 
-    // 2. From Quotes (Quick Quote & Voice Intake quotes)
-    quotes.forEach((q) => {
-      const parsed = extractBedBathFromText(`${q.service || ''} ${q.notes || ''}`);
-      list.push({
-        id: `intake-quote-${q.id}`,
-        customerName: q.clientName || 'Phone Lead',
-        phone: q.clientPhone || '(780) 555-0199',
-        email: q.clientEmail,
-        address: q.serviceAddress || 'Edmonton, AB',
-        city: 'Edmonton',
-        serviceType: q.service || 'Residential Standard Cleaning',
-        bedrooms: parsed.bedrooms,
-        bathrooms: parsed.bathrooms,
-        specificInfo: q.notes || 'Quick quote generated from phone intake.',
-        quotedPrice: q.total,
-        createdAt: (q as any).createdDate || q.createdAt || 'Today',
-        source: 'Quick Quote',
-        status: 'JOBBER_SYNCED',
-        jobberRef: q.quoteNumber,
-      });
-    });
-
     // 3. From Ad/Phone Leads if not already represented
     leads.slice(0, 15).forEach((l) => {
-      const alreadyExists = list.some(
-        (r) => r.customerName.toLowerCase() === (l.customerName || '').toLowerCase()
-      );
-      if (!alreadyExists) {
-        const parsed = extractBedBathFromText(`${l.serviceRequested || ''} ${l.notes || ''}`);
-        list.push({
-          id: `intake-lead-${l.id}`,
-          customerName: l.customerName,
-          phone: l.phone,
-          email: l.email,
-          address: l.address || 'Edmonton, AB',
-          city: 'Edmonton',
-          serviceType: l.serviceRequested || 'Residential Standard Cleaning',
-          bedrooms: parsed.bedrooms,
-          bathrooms: parsed.bathrooms,
-          specificInfo: l.notes || 'Caller requested quick quote and availability.',
-          quotedPrice: l.quotedAmount,
-          createdAt: (l as any).timestamp || (l as any).createdAt || 'Recent',
-          source: 'Voice Dictation',
-          status: l.isJobberSynced ? 'JOBBER_SYNCED' : 'NEW_INTAKE',
-          jobberRef: l.quoteNumber || 'INTAKE',
-        });
-      }
+      const key = makeKey(l.customerName, l.phone);
+      if (seenKeys.has(key)) return;
+      seenKeys.add(key);
+
+      const parsed = extractBedBathFromText(`${l.serviceRequested || ''} ${l.notes || ''}`);
+      list.push({
+        id: `intake-lead-${l.id}`,
+        customerName: l.customerName,
+        phone: l.phone,
+        email: l.email,
+        address: l.address || 'Edmonton, AB',
+        city: 'Edmonton',
+        serviceType: l.serviceRequested || 'Residential Standard Cleaning',
+        bedrooms: l.bedrooms || parsed.bedrooms,
+        bathrooms: l.bathrooms || parsed.bathrooms,
+        specificInfo: l.notes || 'Caller requested quick quote and availability.',
+        quotedPrice: l.quotedAmount,
+        createdAt: (l as any).timestamp || (l as any).createdAt || 'Recent',
+        source: 'Voice Dictation',
+        status: l.isJobberSynced ? 'JOBBER_SYNCED' : 'NEW_INTAKE',
+        jobberRef: l.quoteNumber || 'INTAKE',
+      });
     });
 
     return list;

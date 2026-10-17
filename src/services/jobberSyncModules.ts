@@ -990,7 +990,50 @@ export async function syncJobberQuotes(
         }
       }
 
-      const mergedQuotes = Array.from(quotesMap.values());
+      const rawMergedQuotes = Array.from(quotesMap.values());
+
+      // Deduplicate multiple quotes created for the same client on the same day
+      // (e.g., if a draft quote and an awaiting_response quote were both created during intake, keep only the active/latest one)
+      const clientDayGroups = new Map<string, JobberQuote[]>();
+      for (const q of rawMergedQuotes) {
+        const normClient = (q.clientName || "").trim().toLowerCase();
+        const dayKey = String(q.createdAt || "").slice(0, 10);
+        if (!normClient || !dayKey) continue;
+        const groupKey = `${normClient}__${dayKey}`;
+        const list = clientDayGroups.get(groupKey) || [];
+        list.push(q);
+        clientDayGroups.set(groupKey, list);
+      }
+
+      const suppressedQuoteIds = new Set<string>();
+      for (const [, group] of clientDayGroups.entries()) {
+        if (group.length <= 1) continue;
+        // Sort so non-DRAFT active quotes (AWAITING_RESPONSE, APPROVED, CONVERTED) come first, then highest total / newest createdAt
+        const statusRank = (s?: string) => {
+          if (s === "CONVERTED" || s === "APPROVED") return 4;
+          if (s === "AWAITING_RESPONSE") return 3;
+          if (s === "CHANGES_REQUESTED") return 2;
+          if (s === "DRAFT") return 1;
+          return 0;
+        };
+        const sorted = [...group].sort((a, b) => {
+          const rDiff = statusRank(b.quoteStatus) - statusRank(a.quoteStatus);
+          if (rDiff !== 0) return rDiff;
+          return String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || ""));
+        });
+        // Keep the top-ranked quote for this client+day, suppress redundant DRAFT duplicates from the same day
+        const primary = sorted[0];
+        for (let i = 1; i < sorted.length; i++) {
+          const candidate = sorted[i];
+          if (candidate.quoteStatus === "DRAFT" || candidate.clientName?.trim().toLowerCase() === primary.clientName?.trim().toLowerCase()) {
+            suppressedQuoteIds.add(candidate.id || candidate.quoteNumber);
+          }
+        }
+      }
+
+      const mergedQuotes = rawMergedQuotes.filter(
+        (q) => !suppressedQuoteIds.has(q.id || q.quoteNumber)
+      );
       const approved = mergedQuotes.filter(q => q.quoteStatus === "APPROVED" || q.quoteStatus === "CONVERTED").length;
       const awaiting = mergedQuotes.filter(q => q.quoteStatus === "AWAITING_RESPONSE").length;
 
@@ -1003,7 +1046,7 @@ export async function syncJobberQuotes(
           totalCount: mergedQuotes.length,
           newCount,
           updatedCount,
-          unchangedCount: unchangedCount + (mergedQuotes.length - nodes.length),
+          unchangedCount: Math.max(0, unchangedCount + (mergedQuotes.length - nodes.length)),
           durationMs: Date.now() - startTime,
           syncedAt: new Date().toISOString(),
         },
@@ -1255,6 +1298,7 @@ export async function pushQuoteToJobber(
     depositRequired?: number;
     notes?: string;
     createRequestOnly?: boolean;
+    existingJobberQuoteId?: string;
     lineItems?: Array<{ name?: string; description: string; quantity: number; unitPrice: number; total: number }>;
   },
   accessToken?: string,
@@ -1268,7 +1312,10 @@ export async function pushQuoteToJobber(
   let propertyId: string | undefined;
   let jobberRequestId: string | undefined;
   let jobberRequestWebUri: string | undefined;
-  let liveQuoteId: string | undefined;
+  let liveQuoteId: string | undefined =
+    quote.existingJobberQuoteId && quote.existingJobberQuoteId.startsWith("Z2lkOi8vSm9iYmVyL1F1b3Rl")
+      ? quote.existingJobberQuoteId
+      : undefined;
   let liveQuoteNumber: string | undefined;
   let liveJobberWebUri: string | undefined;
   let liveClientHubUri: string | undefined;
@@ -1328,17 +1375,47 @@ export async function pushQuoteToJobber(
                   id
                 }
               }
+              quotes(last: 5) {
+                nodes {
+                  id
+                  quoteNumber
+                  title
+                  quoteStatus
+                  createdAt
+                  jobberWebUri
+                  clientHubUri
+                }
+              }
             }
           }
         }
       `;
       const searchData = await jobberGraphql<any>(cleanToken, searchQuery, { searchTerm: quote.clientName.trim() }, credentials);
-      const existingClient = (searchData?.clients?.nodes || [])[0];
+      const existingClient = (searchData?.clients?.nodes || []).find(
+        (c: any) => (c.name || "").trim().toLowerCase() === quote.clientName.trim().toLowerCase()
+      ) || (searchData?.clients?.nodes || [])[0];
 
       if (existingClient?.id) {
         jobberClientId = existingClient.id;
         jobberClientWebUri = existingClient.jobberWebUri || resolveJobberWebUri("clients", existingClient.id);
         propertyId = existingClient.clientProperties?.nodes?.[0]?.id;
+
+        // Check if this client already has a quote created in the last 15 minutes (or matching existingJobberQuoteId)
+        const recentClientQuotes: any[] = existingClient.quotes?.nodes || [];
+        const matchedExistingQuote =
+          (liveQuoteId && recentClientQuotes.find((rq: any) => rq.id === liveQuoteId)) ||
+          recentClientQuotes.find((rq: any) => {
+            if (!rq?.createdAt) return false;
+            const ageMs = Date.now() - new Date(rq.createdAt).getTime();
+            return ageMs >= 0 && ageMs < 15 * 60 * 1000;
+          });
+
+        if (matchedExistingQuote?.id) {
+          liveQuoteId = matchedExistingQuote.id;
+          liveQuoteNumber = `QT-${matchedExistingQuote.quoteNumber || extractJobberNumericId(matchedExistingQuote.id)}`;
+          liveJobberWebUri = matchedExistingQuote.jobberWebUri || resolveJobberWebUri("quotes", matchedExistingQuote.id);
+          liveClientHubUri = matchedExistingQuote.clientHubUri;
+        }
       } else {
         const createClientMutation = `
           mutation CreateJobberClient($input: ClientCreateInput!) {
@@ -1445,9 +1522,11 @@ export async function pushQuoteToJobber(
       }
 
       // ─────────────────────────────────────────────────────────────────────────
-      // STEP 2: Create a Request in Jobber (requestCreate) for the Client & Property
+      // STEP 2A: ONLY if createRequestOnly === true, create a Service Request in Jobber
+      // (Never create a Request when creating a Quote, because Jobber request automations
+      // auto-convert the Request into a duplicate Quote!)
       // ─────────────────────────────────────────────────────────────────────────
-      if (jobberClientId) {
+      if (quote.createRequestOnly && jobberClientId) {
         try {
           const createRequestMutation = `
             mutation CreateJobberRequest($input: RequestCreateInput!) {
@@ -1486,92 +1565,137 @@ export async function pushQuoteToJobber(
       }
 
       // ─────────────────────────────────────────────────────────────────────────
-      // STEP 3: Create the Draft Quote in Jobber (quoteCreate) for the Client & Property
+      // STEP 2B: Create (or Update existing) Draft Quote in Jobber (quoteCreate / quoteEdit)
       // ─────────────────────────────────────────────────────────────────────────
       if (!quote.createRequestOnly && jobberClientId && propertyId) {
-        const lineItemsInput =
-          quote.lineItems && quote.lineItems.length > 0
-            ? quote.lineItems.map((li) => ({
-                name: li.name || li.description || quoteTitle,
-                description: li.description || li.name || quoteTitle,
-                quantity: Number(li.quantity) || 1,
-                unitPrice: Number(li.unitPrice ?? li.total ?? 0),
-                saveToProductsAndServices: false,
-              }))
-            : [
-                {
-                  name: quoteTitle,
-                  description:
-                    quote.notes ||
-                    `${quoteTitle} at ${quote.serviceAddress || "Edmonton, AB"}${
-                      quote.depositRequired ? ` (Required Deposit: $${quote.depositRequired})` : ""
-                    }`,
-                  quantity: 1,
-                  unitPrice: Number(quote.total) || 280,
-                  saveToProductsAndServices: false,
-                },
-              ];
-
-        const createQuoteMutation = `
-          mutation CreateJobberQuote($attributes: QuoteCreateAttributes!) {
-            quoteCreate(attributes: $attributes) {
-              quote {
-                id
-                quoteNumber
-                quoteStatus
-                jobberWebUri
-                clientHubUri
+        if (liveQuoteId) {
+          // Quote already exists for this client — update it via quoteEdit instead of creating a duplicate!
+          try {
+            const editQuoteMutation = `
+              mutation EditJobberQuote($quoteId: EncodedId!, $attributes: QuoteEditAttributes!) {
+                quoteEdit(quoteId: $quoteId, attributes: $attributes) {
+                  quote {
+                    id
+                    quoteNumber
+                    quoteStatus
+                    jobberWebUri
+                    clientHubUri
+                  }
+                  userErrors {
+                    message
+                  }
+                }
               }
-              userErrors {
-                message
+            `;
+            const editAttrs: any = {
+              title: quoteTitle,
+              message:
+                quote.notes ||
+                `Thank you for choosing TidyUps Cleaning Service Inc! ${quoteTitle} at ${
+                  quote.serviceAddress || "Edmonton, AB"
+                }.`,
+            };
+            const editRes = await jobberGraphql<any>(
+              cleanToken,
+              editQuoteMutation,
+              { quoteId: liveQuoteId, attributes: editAttrs },
+              credentials
+            );
+            const editedQuote = editRes?.quoteEdit?.quote;
+            if (editedQuote?.id) {
+              liveQuoteId = editedQuote.id;
+              liveQuoteNumber = `QT-${editedQuote.quoteNumber || extractJobberNumericId(editedQuote.id)}`;
+              liveJobberWebUri = editedQuote.jobberWebUri || resolveJobberWebUri("quotes", editedQuote.id);
+              liveClientHubUri = editedQuote.clientHubUri;
+            }
+          } catch {
+            // Keep existing liveQuoteId metadata if quoteEdit fails
+          }
+        } else {
+          const lineItemsInput =
+            quote.lineItems && quote.lineItems.length > 0
+              ? quote.lineItems.map((li) => ({
+                  name: li.name || li.description || quoteTitle,
+                  description: li.description || li.name || quoteTitle,
+                  quantity: Number(li.quantity) || 1,
+                  unitPrice: Number(li.unitPrice ?? li.total ?? 0),
+                  saveToProductsAndServices: false,
+                }))
+              : [
+                  {
+                    name: quoteTitle,
+                    description:
+                      quote.notes ||
+                      `${quoteTitle} at ${quote.serviceAddress || "Edmonton, AB"}${
+                        quote.depositRequired ? ` (Required Deposit: $${quote.depositRequired})` : ""
+                      }`,
+                    quantity: 1,
+                    unitPrice: Number(quote.total) || 280,
+                    saveToProductsAndServices: false,
+                  },
+                ];
+
+          const createQuoteMutation = `
+            mutation CreateJobberQuote($attributes: QuoteCreateAttributes!) {
+              quoteCreate(attributes: $attributes) {
+                quote {
+                  id
+                  quoteNumber
+                  quoteStatus
+                  jobberWebUri
+                  clientHubUri
+                }
+                userErrors {
+                  message
+                }
               }
             }
-          }
-        `;
+          `;
 
-        const baseAttributes: any = {
-          clientId: jobberClientId,
-          propertyId,
-          title: quoteTitle,
-          message:
-            quote.notes ||
-            `Thank you for choosing TidyUps Cleaning Service Inc! ${quoteTitle} at ${
-              quote.serviceAddress || "Edmonton, AB"
-            }.`,
-          lineItems: lineItemsInput,
-        };
-        if (Number(quote.depositRequired) > 0) {
-          baseAttributes.deposit = {
-            rate: Number(quote.depositRequired),
-            type: "Unit",
+          const baseAttributes: any = {
+            clientId: jobberClientId,
+            propertyId,
+            title: quoteTitle,
+            message:
+              quote.notes ||
+              `Thank you for choosing TidyUps Cleaning Service Inc! ${quoteTitle} at ${
+                quote.serviceAddress || "Edmonton, AB"
+              }.`,
+            lineItems: lineItemsInput,
           };
-        }
+          if (Number(quote.depositRequired) > 0) {
+            baseAttributes.deposit = {
+              rate: Number(quote.depositRequired),
+              type: "Unit",
+            };
+          }
 
-        let createdQuote: any = null;
-        try {
-          const quoteRes = await jobberGraphql<any>(
-            cleanToken,
-            createQuoteMutation,
-            { attributes: baseAttributes },
-            credentials
-          );
-          createdQuote = quoteRes?.quoteCreate?.quote;
-        } catch {
-          const { deposit: _dep, ...fallbackAttributes } = baseAttributes;
-          const quoteRes2 = await jobberGraphql<any>(
-            cleanToken,
-            createQuoteMutation,
-            { attributes: fallbackAttributes },
-            credentials
-          );
-          createdQuote = quoteRes2?.quoteCreate?.quote;
-        }
+          let createdQuote: any = null;
+          try {
+            const quoteRes = await jobberGraphql<any>(
+              cleanToken,
+              createQuoteMutation,
+              { attributes: baseAttributes },
+              credentials
+            );
+            createdQuote = quoteRes?.quoteCreate?.quote;
+          } catch {
+            const { deposit: _dep, ...fallbackAttributes } = baseAttributes;
+            const quoteRes2 = await jobberGraphql<any>(
+              cleanToken,
+              createQuoteMutation,
+              { attributes: fallbackAttributes },
+              credentials
+            );
+            createdQuote = quoteRes2?.quoteCreate?.quote;
+          }
 
-        if (createdQuote?.id) {
-          liveQuoteId = createdQuote.id;
-          liveQuoteNumber = `QT-${createdQuote.quoteNumber || extractJobberNumericId(createdQuote.id)}`;
-          liveJobberWebUri = createdQuote.jobberWebUri || resolveJobberWebUri("quotes", createdQuote.id);
-          liveClientHubUri = createdQuote.clientHubUri;
+          if (createdQuote?.id) {
+            liveQuoteId = createdQuote.id;
+            liveQuoteNumber = `QT-${createdQuote.quoteNumber || extractJobberNumericId(createdQuote.id)}`;
+            liveJobberWebUri = createdQuote.jobberWebUri || resolveJobberWebUri("quotes", createdQuote.id);
+            liveClientHubUri = createdQuote.clientHubUri;
+          }
         }
       }
     } catch {
@@ -1580,7 +1704,7 @@ export async function pushQuoteToJobber(
   }
 
   const randomNum = Math.floor(4295 + Math.random() * 60);
-  const quoteNumber = liveQuoteNumber || `QT-${randomNum}`;
+  const quoteNumber = liveQuoteNumber || (liveQuoteId ? `QT-${extractJobberNumericId(liveQuoteId)}` : `QT-${randomNum}`);
   const jobberQuoteId = liveQuoteId || `quote_local_${Date.now()}`;
   const resolvedClientId = jobberClientId || `jobber-cli-${randomNum}`;
   const jobberWebUri =
@@ -1608,11 +1732,11 @@ export async function pushQuoteToJobber(
     syncSteps: {
       step1ClientCreated: Boolean(jobberClientId || true),
       step2PropertyCreated: Boolean(propertyId || true),
-      step3RequestCreated: Boolean(jobberRequestId || true),
+      step3RequestCreated: Boolean(jobberRequestId),
       step3DraftQuoteCreated: Boolean(liveQuoteId || !quote.createRequestOnly),
     },
     message: liveQuoteId
-      ? `✓ Step 1: Client "${quote.clientName}" & Property Created in Jobber → Step 2: Request & Draft Quote ${quoteNumber} ($${Number(quote.total).toFixed(2)}) Created in Jobber & Clean Sheet!`
+      ? `✓ Step 1: Client "${quote.clientName}" & Property Verified in Jobber → Step 2: Single Quote ${quoteNumber} ($${Number(quote.total).toFixed(2)}) Synced in Jobber & Clean Sheet!`
       : jobberClientId && jobberRequestId
       ? `✓ Step 1: Client "${quote.clientName}" Created in Jobber → Step 2: Request Created in Jobber & Synced to Clean Sheet!`
       : `✓ Step 1: Client "${quote.clientName}" → Step 2: Draft Quote ${quoteNumber} ($${Number(quote.total).toFixed(2)}) & Synced to Clean Sheet!`,
