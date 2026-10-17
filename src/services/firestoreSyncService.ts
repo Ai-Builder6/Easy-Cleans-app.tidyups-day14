@@ -358,6 +358,224 @@ export async function fetchServiceCatalogFromFirestore(): Promise<any[]> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BLOCKED NUMBERS & SCREENED CALL LIST SYNC (SPAM SHIELD + QUO CALLS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface BlockedNumberRuleRecord {
+  id: string;
+  pattern: string;
+  ruleType: 'number' | 'prefix' | 'areacode' | 'country';
+  reason?: string;
+  callerName?: string;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt: string;
+}
+
+export async function saveBlockedNumberRuleToFirestore(
+  pattern: string,
+  ruleType: 'number' | 'prefix' | 'areacode' | 'country' = 'number',
+  reason?: string,
+  callerName?: string
+): Promise<void> {
+  if (!pattern || !pattern.trim()) return;
+  const docId = sanitizeDocId(`blk_${ruleType}_${pattern.trim()}`, 'blk');
+  const now = new Date().toISOString();
+  const payload: Record<string, unknown> = {
+    id: docId,
+    pattern: String(pattern.trim()).substring(0, 60),
+    ruleType,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+  if (reason) payload.reason = String(reason).substring(0, 300);
+  if (callerName) payload.callerName = String(callerName).substring(0, 150);
+
+  try {
+    const docRef = doc(db, 'blockedNumbers', docId);
+    await setDoc(docRef, payload, { merge: true });
+  } catch (error) {
+    console.warn(`Firestore save error on blockedNumbers/${docId}:`, error);
+  }
+}
+
+export async function deleteBlockedNumberRuleFromFirestore(
+  pattern: string,
+  ruleType: 'number' | 'prefix' | 'areacode' | 'country' = 'number'
+): Promise<void> {
+  if (!pattern || !pattern.trim()) return;
+  const docId = sanitizeDocId(`blk_${ruleType}_${pattern.trim()}`, 'blk');
+  try {
+    const docRef = doc(db, 'blockedNumbers', docId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.warn(`Firestore delete error on blockedNumbers/${docId}:`, error);
+  }
+}
+
+export async function syncSpamShieldConfigToFirestore(config: {
+  blockedNumbers?: string[];
+  blockedPrefixes?: string[];
+  blockedCountryCodes?: string[];
+}): Promise<number> {
+  let count = 0;
+  for (const num of config.blockedNumbers || []) {
+    try {
+      await saveBlockedNumberRuleToFirestore(num, 'number', 'Saved in Twilio & Quo Spam Shield');
+      count++;
+    } catch {
+      // continue
+    }
+  }
+  for (const prefix of config.blockedPrefixes || []) {
+    try {
+      await saveBlockedNumberRuleToFirestore(prefix, 'prefix', 'Rotating prefix / area code block rule');
+      count++;
+    } catch {
+      // continue
+    }
+  }
+  for (const cc of config.blockedCountryCodes || []) {
+    try {
+      await saveBlockedNumberRuleToFirestore(cc, 'country', 'Blocked international country code');
+      count++;
+    } catch {
+      // continue
+    }
+  }
+  return count;
+}
+
+export async function fetchBlockedNumberRulesFromFirestore(): Promise<BlockedNumberRuleRecord[]> {
+  try {
+    const snap = await getDocs(collection(db, 'blockedNumbers'));
+    const list: BlockedNumberRuleRecord[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as any;
+      if (data && data.pattern && data.isActive !== false) {
+        list.push({
+          id: data.id || d.id,
+          pattern: data.pattern,
+          ruleType: data.ruleType || 'number',
+          reason: data.reason,
+          callerName: data.callerName,
+          isActive: data.isActive !== false,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt || new Date().toISOString(),
+        });
+      }
+    });
+    return list;
+  } catch (err) {
+    console.warn('Could not read blockedNumbers from Firestore:', err);
+    return [];
+  }
+}
+
+export async function saveScreenedCallToFirestore(call: any): Promise<void> {
+  if (!call) return;
+  const rawId = call.id || call.callId || `call_${(call.callerNumber || '').replace(/\D/g, '')}`;
+  const docId = sanitizeDocId(rawId, 'scr');
+  const rawStatus = String(call.status || '');
+  const isBlocked =
+    Boolean(call.isBlocked) ||
+    Boolean(call.manuallyBlocked) ||
+    rawStatus === 'SOLICITOR_BLOCKED' ||
+    rawStatus === 'BLOCKED' ||
+    String(call.verdict || '').toLowerCase().includes('block') ||
+    String(call.verdict || '').toLowerCase().includes('solicitor') ||
+    String(call.verdict || '').toLowerCase().includes('spam');
+
+  const validStatus: 'SCREENED_LEAD' | 'SOLICITOR_BLOCKED' | 'MISSED_VOICEMAIL' | 'BLOCKED' = isBlocked
+    ? 'SOLICITOR_BLOCKED'
+    : rawStatus === 'MISSED_VOICEMAIL'
+    ? 'MISSED_VOICEMAIL'
+    : 'SCREENED_LEAD';
+
+  const now = new Date().toISOString();
+  const payload: Record<string, unknown> = {
+    id: docId,
+    callerNumber: String(call.callerNumber || call.phone || 'Unknown').substring(0, 40),
+    callerName: String(call.callerName || call.customerName || 'Caller').substring(0, 150),
+    status: validStatus,
+    isBlocked,
+    manuallyBlocked: Boolean(call.manuallyBlocked || isBlocked),
+    updatedAt: now,
+    createdAt: String(call.createdAt || call.timestamp || now).substring(0, 60),
+  };
+
+  if (call.reason || call.verdict) {
+    payload.reason = String(call.reason || call.verdict).substring(0, 500);
+  }
+  if (call.aiSummary) {
+    payload.aiSummary = String(call.aiSummary).substring(0, 1500);
+  }
+  if (call.transcript) {
+    payload.transcript = String(call.transcript).substring(0, 3000);
+  }
+  if (call.serviceType) {
+    payload.serviceType = String(call.serviceType).substring(0, 150);
+  }
+  if (call.address) {
+    payload.address = String(call.address).substring(0, 300);
+  }
+  if (typeof call.quotedAmount === 'number' && call.quotedAmount >= 0) {
+    payload.quotedAmount = call.quotedAmount;
+  }
+
+  try {
+    const docRef = doc(db, 'screenedCalls', docId);
+    await setDoc(docRef, payload, { merge: true });
+  } catch (error) {
+    console.warn(`Firestore save error on screenedCalls/${docId}:`, error);
+  }
+}
+
+export async function fetchScreenedCallsFromFirestore(): Promise<any[]> {
+  try {
+    const snap = await getDocs(collection(db, 'screenedCalls'));
+    const list: any[] = [];
+    snap.forEach((d) => {
+      const data = d.data();
+      if (data && data.callerNumber) {
+        list.push({
+          ...data,
+          id: data.id || d.id,
+        });
+      }
+    });
+    return list;
+  } catch (err) {
+    console.warn('Could not read screenedCalls from Firestore:', err);
+    return [];
+  }
+}
+
+export async function saveBlockedNumberToFirestore(params: {
+  number: string;
+  type?: 'number' | 'prefix' | 'areacode' | 'country';
+  reason?: string;
+  callerName?: string;
+  source?: string;
+}): Promise<void> {
+  if (!params || !params.number) return;
+  return saveBlockedNumberRuleToFirestore(
+    params.number,
+    params.type || 'number',
+    params.reason,
+    params.callerName
+  );
+}
+
+export async function deleteBlockedNumberFromFirestore(
+  number: string,
+  type: 'number' | 'prefix' | 'areacode' | 'country' = 'number'
+): Promise<void> {
+  return deleteBlockedNumberRuleFromFirestore(number, type);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // BATCH FULL SYNC
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -369,6 +587,8 @@ export interface FullSyncResult {
   invoicesCount: number;
   vanOverridesCount: number;
   serviceCatalogCount?: number;
+  blockedNumbersCount?: number;
+  screenedCallsCount?: number;
   errors: string[];
 }
 
@@ -383,6 +603,10 @@ export async function syncAllToFirestore({
   invoices,
   technicians,
   serviceCatalog = [],
+  spamShieldConfig,
+  screenedCalls = [],
+  quoCallLogs = [],
+  blockedCallsHistory = [],
 }: {
   clients: ClientRecord[];
   scheduledVisits: ScheduledJobItem[];
@@ -391,6 +615,14 @@ export async function syncAllToFirestore({
   invoices: JobberInvoice[];
   technicians: Technician[];
   serviceCatalog?: any[];
+  spamShieldConfig?: {
+    blockedNumbers?: string[];
+    blockedPrefixes?: string[];
+    blockedCountryCodes?: string[];
+  };
+  screenedCalls?: any[];
+  quoCallLogs?: any[];
+  blockedCallsHistory?: any[];
 }): Promise<FullSyncResult> {
   const result: FullSyncResult = {
     clientsCount: 0,
@@ -400,6 +632,8 @@ export async function syncAllToFirestore({
     invoicesCount: 0,
     vanOverridesCount: 0,
     serviceCatalogCount: 0,
+    blockedNumbersCount: 0,
+    screenedCallsCount: 0,
     errors: [],
   };
 
@@ -466,5 +700,25 @@ export async function syncAllToFirestore({
     }
   }
 
+  if (spamShieldConfig) {
+    try {
+      result.blockedNumbersCount = await syncSpamShieldConfigToFirestore(spamShieldConfig);
+    } catch (e: any) {
+      result.errors.push(`SpamShield: ${e?.message || e}`);
+    }
+  }
+
+  const allScreenedRecords = [...screenedCalls, ...quoCallLogs, ...blockedCallsHistory];
+  for (const callItem of allScreenedRecords) {
+    try {
+      await saveScreenedCallToFirestore(callItem);
+      result.screenedCallsCount = (result.screenedCallsCount || 0) + 1;
+    } catch (e: any) {
+      result.errors.push(`ScreenedCall ${callItem?.id}: ${e?.message || e}`);
+    }
+  }
+
   return result;
 }
+
+

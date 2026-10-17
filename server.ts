@@ -2801,6 +2801,110 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
     }
   }
 
+  // 7. Reconcile & persist Spam Shield Blocked Numbers, Blocked Calls History, and Quo Screened Calls
+  if (!store.spamShieldConfig) {
+    store.spamShieldConfig = {
+      ...DEFAULT_SPAM_SHIELD_CONFIG,
+      blockedNumbers: [...DEFAULT_SPAM_SHIELD_CONFIG.blockedNumbers],
+      blockedPrefixes: [...DEFAULT_SPAM_SHIELD_CONFIG.blockedPrefixes],
+      blockedCountryCodes: [...DEFAULT_SPAM_SHIELD_CONFIG.blockedCountryCodes],
+      unblockedNumbers: [],
+    };
+    mutated = true;
+  } else {
+    if (!Array.isArray(store.spamShieldConfig.blockedNumbers)) {
+      store.spamShieldConfig.blockedNumbers = [...DEFAULT_SPAM_SHIELD_CONFIG.blockedNumbers];
+      mutated = true;
+    }
+    if (!Array.isArray(store.spamShieldConfig.blockedPrefixes)) {
+      store.spamShieldConfig.blockedPrefixes = [...DEFAULT_SPAM_SHIELD_CONFIG.blockedPrefixes];
+      mutated = true;
+    }
+    if (!Array.isArray(store.spamShieldConfig.blockedCountryCodes)) {
+      store.spamShieldConfig.blockedCountryCodes = [...DEFAULT_SPAM_SHIELD_CONFIG.blockedCountryCodes];
+      mutated = true;
+    }
+    if (!Array.isArray(store.spamShieldConfig.unblockedNumbers)) {
+      store.spamShieldConfig.unblockedNumbers = [];
+      mutated = true;
+    }
+  }
+
+  if (!Array.isArray(store.blockedCallsHistory)) {
+    store.blockedCallsHistory = [...INITIAL_BLOCKED_CALLS_HISTORY];
+    mutated = true;
+  }
+
+  const unblockedDigitsSet = new Set<string>(
+    (store.spamShieldConfig.unblockedNumbers || []).map((n: string) => normalizePhoneDigits(n)).filter(Boolean)
+  );
+  const blockedDigitsSet = new Set<string>(
+    (store.spamShieldConfig.blockedNumbers || []).map((n: string) => normalizePhoneDigits(n)).filter(Boolean)
+  );
+
+  if (Array.isArray(store.quoCallLogs)) {
+    for (const call of store.quoCallLogs) {
+      if (!call || !call.callerPhone) continue;
+      const cDigits = normalizePhoneDigits(call.callerPhone);
+      if (!cDigits || TIDYUPS_OWN_PHONE_DIGITS.has(cDigits)) continue;
+
+      const isExplicitlyUnblocked = unblockedDigitsSet.has(cDigits);
+      const isCleaningLead =
+        Boolean(call.hasCleaningIntent) ||
+        call.status === "CLEANING_LEAD" ||
+        call.status === "MATCHED_TO_JOB" ||
+        call.status === "MATCHED_TO_QUOTE" ||
+        call.status === "AUTO_CREATED_LEAD";
+
+      const isScreenedSpamOrSolicitor =
+        !isCleaningLead &&
+        (call.status === "SOLICITOR_BLOCKED" ||
+          Boolean(call.isBlocked) ||
+          Boolean(call.manuallyBlocked) ||
+          call.callCategory === "SALES_OR_MARKETING" ||
+          call.callCategory === "SHORT_HANGUP");
+
+      const ruleEval = evaluateSpamCallRule(call.callerPhone, store.spamShieldConfig);
+
+      if (!isExplicitlyUnblocked && (isScreenedSpamOrSolicitor || ruleEval.isBlocked)) {
+        const formattedE164 = cDigits.length === 10 ? `+1${cDigits}` : `+${cDigits}`;
+        if (!blockedDigitsSet.has(cDigits)) {
+          store.spamShieldConfig.blockedNumbers.unshift(formattedE164);
+          blockedDigitsSet.add(cDigits);
+          mutated = true;
+        }
+        if (call.status !== "SOLICITOR_BLOCKED" || !call.isBlocked) {
+          call.status = "SOLICITOR_BLOCKED";
+          call.isBlocked = true;
+          call.blockedReason =
+            call.blockedReason ||
+            ruleEval.reason ||
+            (call.callCategory === "SALES_OR_MARKETING"
+              ? `Screened Sales / Solicitor Call (${call.callerName || call.callerPhone})`
+              : `Screened Robocall / Short Hangup (${call.callerPhone})`);
+          mutated = true;
+        }
+        // Ensure it also appears in blockedCallsHistory so the Spam Shield log & Screened Call list match
+        const alreadyInHistory = store.blockedCallsHistory.some(
+          (h: any) => normalizePhoneDigits(h.callerNumber) === cDigits
+        );
+        if (!alreadyInHistory) {
+          store.blockedCallsHistory.unshift({
+            id: `blk-quo-${call.id || Date.now().toString(36)}`,
+            timestamp: call.timestamp || new Date().toISOString(),
+            callerNumber: call.callerPhone,
+            callerName: call.callerName || "Screened Solicitor / Spam",
+            countryCode: "+1",
+            reason:
+              call.blockedReason ||
+              (call.summary ? `Sonia AI Screened: ${String(call.summary).slice(0, 90)}` : "Screened Call Auto-Blocked"),
+          });
+          mutated = true;
+        }
+      }
+    }
+  }
+
   return mutated;
 }
 
@@ -3800,7 +3904,21 @@ app.get("/api/store", async (req, res) => {
 
 const handleSaveStore = (req: any, res: any) => {
   const projectId = getProjectId(req);
-  const { tickets, cleanerOverrides, scheduledVisits, unscheduledJobs, staffRoster, quotes, invoices, clients, serviceCatalog } = req.body || {};
+  const {
+    tickets,
+    cleanerOverrides,
+    scheduledVisits,
+    unscheduledJobs,
+    staffRoster,
+    quotes,
+    invoices,
+    clients,
+    serviceCatalog,
+    adLeads,
+    quoCallLogs,
+    spamShieldConfig,
+    blockedCallsHistory,
+  } = req.body || {};
   const current = loadStore(projectId) || {
     version: 1,
     lastSavedAt: new Date().toISOString(),
@@ -3828,10 +3946,21 @@ const handleSaveStore = (req: any, res: any) => {
     quotes: quotes || current.quotes,
     invoices: invoices || current.invoices,
     serviceCatalog: serviceCatalog || current.serviceCatalog,
+    adLeads: adLeads || current.adLeads,
+    quoCallLogs: quoCallLogs || current.quoCallLogs,
+    spamShieldConfig: spamShieldConfig || current.spamShieldConfig,
+    blockedCallsHistory: blockedCallsHistory || current.blockedCallsHistory,
   };
 
+  repairAndSyncStoreData(updated);
   const ok = saveStore(updated, projectId);
-  res.json({ success: ok, lastSavedAt: updated.lastSavedAt, activeProjectId: projectId });
+  res.json({
+    success: ok,
+    lastSavedAt: updated.lastSavedAt,
+    activeProjectId: projectId,
+    spamShieldConfig: updated.spamShieldConfig,
+    blockedCallsHistory: updated.blockedCallsHistory,
+  });
 };
 
 app.post("/api/store/save", handleSaveStore);
@@ -6657,6 +6786,37 @@ async function processQuoCallEvent(event: any) {
   const effectiveCallerName =
     analysis.extractedName || callerNameFromPayload || (matchedJob ? matchedJob.clientName : cleanCallerPhone);
 
+  // Check if caller is already blocked in Spam Shield or if Sonia AI screened this as a Solicitor / Short Hangup Robocall
+  if (!store.spamShieldConfig) {
+    store.spamShieldConfig = { ...DEFAULT_SPAM_SHIELD_CONFIG, unblockedNumbers: [] } as any;
+  }
+  if (!Array.isArray(store.blockedCallsHistory)) {
+    store.blockedCallsHistory = [...INITIAL_BLOCKED_CALLS_HISTORY];
+  }
+  const existingCallLog = (store.quoCallLogs || []).find((c: any) => c.callId === callId || c.id === callId);
+  const unblockedDigitsSet = new Set<string>(
+    ((store.spamShieldConfig as any).unblockedNumbers || []).map((n: string) => normalizePhoneDigits(n)).filter(Boolean)
+  );
+  const isExplicitlyUnblocked = callerDigits ? unblockedDigitsSet.has(callerDigits) : false;
+  const spamEval = evaluateSpamCallRule(cleanCallerPhone, store.spamShieldConfig);
+  const isAutoSolicitorOrSpam =
+    !matchedJob &&
+    !analysis.hasCleaningIntent &&
+    !isExplicitlyUnblocked &&
+    (spamEval.isBlocked ||
+      Boolean(existingCallLog?.isBlocked) ||
+      existingCallLog?.status === "SOLICITOR_BLOCKED" ||
+      analysis.callCategory === "SALES_OR_MARKETING" ||
+      analysis.callCategory === "SHORT_HANGUP");
+
+  const resolvedStatus = matchedJob
+    ? "MATCHED_TO_JOB"
+    : analysis.hasCleaningIntent
+    ? "CLEANING_LEAD"
+    : isAutoSolicitorOrSpam
+    ? "SOLICITOR_BLOCKED"
+    : "SCREENED_CALL";
+
   const callLogEntry: any = {
     id: callId,
     callId,
@@ -6678,8 +6838,43 @@ async function processQuoCallEvent(event: any) {
     timestamp,
     matchedJobId: matchedJob ? matchedJob.id : null,
     matchedJobTitle: matchedJob ? matchedJob.title : null,
-    status: matchedJob ? "MATCHED_TO_JOB" : analysis.hasCleaningIntent ? "CLEANING_LEAD" : "SCREENED_CALL",
+    status: resolvedStatus,
+    isBlocked: isAutoSolicitorOrSpam,
+    manuallyBlocked: Boolean(existingCallLog?.manuallyBlocked || spamEval.isBlocked),
+    blockedReason: isAutoSolicitorOrSpam
+      ? existingCallLog?.blockedReason ||
+        spamEval.reason ||
+        (analysis.callCategory === "SALES_OR_MARKETING"
+          ? `Screened Sales / Solicitor Call (${effectiveCallerName})`
+          : `Screened Robocall / Short Hangup (${cleanCallerPhone})`)
+      : undefined,
   };
+
+  // Automatically persist blocked solicitor/spam numbers into spamShieldConfig & blockedCallsHistory
+  if (isAutoSolicitorOrSpam && callerDigits && !TIDYUPS_OWN_PHONE_DIGITS.has(callerDigits)) {
+    const formattedE164 = callerDigits.length === 10 ? `+1${callerDigits}` : `+${callerDigits}`;
+    const alreadyInBlockedNumbers = (store.spamShieldConfig.blockedNumbers || []).some(
+      (b: string) => normalizePhoneDigits(b) === callerDigits
+    );
+    if (!alreadyInBlockedNumbers) {
+      store.spamShieldConfig.blockedNumbers.unshift(formattedE164);
+    }
+    const alreadyInHistory = (store.blockedCallsHistory || []).some(
+      (h: any) => normalizePhoneDigits(h.callerNumber) === callerDigits
+    );
+    if (!alreadyInHistory) {
+      store.blockedCallsHistory.unshift({
+        id: `blk-quo-${callId}`,
+        timestamp: timestamp || new Date().toISOString(),
+        callerNumber: cleanCallerPhone,
+        callerName: effectiveCallerName || "Screened Solicitor / Spam",
+        countryCode: "+1",
+        reason:
+          callLogEntry.blockedReason ||
+          (summary ? `Sonia AI Screened: ${String(summary).slice(0, 90)}` : "Screened Call Auto-Blocked"),
+      });
+    }
+  }
 
   // Upsert into Clean Google Sheet Hub (store.adLeads) if it matches an existing lead or has cleaning intent
   const syncedSheetLead = upsertCallLeadIntoCleanSheet(store, callLogEntry, analysis);
@@ -6983,7 +7178,7 @@ app.post("/api/sync-everything", async (req, res) => {
       console.warn("Jobber comprehensive sync note during sync-everything:", jobberErr?.message);
     }
 
-    // 3. Reconcile & repair Master Leads, Quotes, Visits, Invoices, and Clients
+    // 3. Reconcile & repair Master Leads, Quotes, Visits, Invoices, Clients, and Blocked/Screened Calls
     repairAndSyncStoreData(currentStore);
     currentStore.lastSavedAt = nowIso;
     saveStore(currentStore, projectId);
@@ -6995,6 +7190,8 @@ app.post("/api/sync-everything", async (req, res) => {
       visits: (currentStore.scheduledVisits || []).length,
       clients: (currentStore.clients || []).length,
       calls: (currentStore.quoCallLogs || []).length,
+      blockedNumbers: (currentStore.spamShieldConfig?.blockedNumbers || []).length,
+      blockedHistory: (currentStore.blockedCallsHistory || []).length,
     };
 
     res.json({
@@ -7008,6 +7205,8 @@ app.post("/api/sync-everything", async (req, res) => {
       unscheduledJobs: currentStore.unscheduledJobs || [],
       clients: currentStore.clients || [],
       calls: currentStore.quoCallLogs || [],
+      spamShieldConfig: currentStore.spamShieldConfig || DEFAULT_SPAM_SHIELD_CONFIG,
+      blockedCallsHistory: currentStore.blockedCallsHistory || INITIAL_BLOCKED_CALLS_HISTORY,
       tickets: currentStore.tickets || [],
       counts,
       jobberSummary,
@@ -7017,7 +7216,7 @@ app.post("/api/sync-everything", async (req, res) => {
       },
       sheetUrl: googleSheetsSyncState.sheetUrl,
       spreadsheetId: googleSheetsSyncState.spreadsheetId,
-      message: `✓ All 6 Modules Synced! Quotes (${counts.quotes}) • Invoices (${counts.invoices}) • Jobber Visits (${counts.visits}) • Clients (${counts.clients}) • Quo Calls (${counts.calls}) • Master Leads (${counts.leads})`,
+      message: `✓ All Modules Synced! Quotes (${counts.quotes}) • Invoices (${counts.invoices}) • Jobber Visits (${counts.visits}) • Clients (${counts.clients}) • Quo Calls (${counts.calls}) • Blocked Numbers (${counts.blockedNumbers}) • Master Leads (${counts.leads})`,
     });
   } catch (err: any) {
     console.error("Error in /api/sync-everything:", err);
@@ -7028,14 +7227,131 @@ app.post("/api/sync-everything", async (req, res) => {
   }
 });
 
-// GET all Quo call logs with synced transcripts
+// GET all Quo call logs with synced transcripts & blocked status
 app.get("/api/quo/calls", (_req, res) => {
   const store = loadStore();
+  if (store && repairAndSyncStoreData(store)) {
+    saveStore(store);
+  }
   const calls = store?.quoCallLogs || [];
   res.json({
     success: true,
     count: calls.length,
     calls,
+    spamShieldConfig: store?.spamShieldConfig || DEFAULT_SPAM_SHIELD_CONFIG,
+    blockedCallsHistory: store?.blockedCallsHistory || INITIAL_BLOCKED_CALLS_HISTORY,
+  });
+});
+
+// POST toggle block/unblock on a screened call & sync with Spam Shield + Database
+app.post("/api/quo/calls/toggle-block", (req, res) => {
+  const projectId = getProjectId(req);
+  const store = loadStore(projectId);
+  if (!store) return res.status(500).json({ error: "Store not loaded" });
+
+  const { callId, callerPhone, callerName, reason, block = true } = req.body || {};
+  if (!callerPhone && !callId) {
+    return res.status(400).json({ error: "callerPhone or callId is required" });
+  }
+
+  if (!store.spamShieldConfig) store.spamShieldConfig = { ...DEFAULT_SPAM_SHIELD_CONFIG, unblockedNumbers: [] } as any;
+  if (!Array.isArray((store.spamShieldConfig as any).unblockedNumbers)) {
+    (store.spamShieldConfig as any).unblockedNumbers = [];
+  }
+  if (!Array.isArray(store.blockedCallsHistory)) {
+    store.blockedCallsHistory = [...INITIAL_BLOCKED_CALLS_HISTORY];
+  }
+  if (!Array.isArray(store.quoCallLogs)) {
+    store.quoCallLogs = [];
+  }
+
+  const targetCall = store.quoCallLogs.find((c: any) => c.id === callId || c.callId === callId);
+  const rawPhone = callerPhone || targetCall?.callerPhone || "";
+  const digits = normalizePhoneDigits(rawPhone);
+  const formattedE164 = digits.length === 10 ? `+1${digits}` : digits ? `+${digits}` : rawPhone;
+
+  if (block) {
+    // Remove from unblockedNumbers if present
+    (store.spamShieldConfig as any).unblockedNumbers = ((store.spamShieldConfig as any).unblockedNumbers || []).filter(
+      (n: string) => normalizePhoneDigits(n) !== digits
+    );
+    // Add to blockedNumbers if not present
+    const existsInBlocked = (store.spamShieldConfig.blockedNumbers || []).some(
+      (n: string) => normalizePhoneDigits(n) === digits || n === rawPhone
+    );
+    if (!existsInBlocked) {
+      store.spamShieldConfig.blockedNumbers.unshift(formattedE164);
+    }
+
+    const blockReason =
+      reason ||
+      (targetCall?.summary
+        ? `Blocked Screened Caller (${targetCall.callerName || rawPhone}): ${String(targetCall.summary).slice(0, 80)}`
+        : `Blocked from Screened Call List (${callerName || rawPhone})`);
+
+    // Update all matching calls in quoCallLogs
+    store.quoCallLogs = store.quoCallLogs.map((c: any) => {
+      if (c.id === callId || c.callId === callId || (digits && normalizePhoneDigits(c.callerPhone) === digits)) {
+        return {
+          ...c,
+          status: "SOLICITOR_BLOCKED",
+          isBlocked: true,
+          manuallyBlocked: true,
+          blockedReason: blockReason,
+        };
+      }
+      return c;
+    });
+
+    // Add to blockedCallsHistory if not already present
+    const inHistory = store.blockedCallsHistory.some((h: any) => normalizePhoneDigits(h.callerNumber) === digits);
+    if (!inHistory) {
+      store.blockedCallsHistory.unshift({
+        id: `blk-quo-${callId || Date.now().toString(36)}`,
+        timestamp: new Date().toISOString(),
+        callerNumber: rawPhone || formattedE164,
+        callerName: callerName || targetCall?.callerName || "Screened Call Blocked",
+        countryCode: "+1",
+        reason: blockReason,
+      });
+    }
+  } else {
+    // Explicitly unblock
+    if (digits && !(store.spamShieldConfig as any).unblockedNumbers.some((n: string) => normalizePhoneDigits(n) === digits)) {
+      (store.spamShieldConfig as any).unblockedNumbers.push(formattedE164);
+    }
+    store.spamShieldConfig.blockedNumbers = (store.spamShieldConfig.blockedNumbers || []).filter(
+      (n: string) => normalizePhoneDigits(n) !== digits && n !== rawPhone
+    );
+    store.blockedCallsHistory = (store.blockedCallsHistory || []).filter(
+      (h: any) => normalizePhoneDigits(h.callerNumber) !== digits && h.callerNumber !== rawPhone
+    );
+    store.quoCallLogs = store.quoCallLogs.map((c: any) => {
+      if (c.id === callId || c.callId === callId || (digits && normalizePhoneDigits(c.callerPhone) === digits)) {
+        return {
+          ...c,
+          status: c.hasCleaningIntent ? "CLEANING_LEAD" : "SCREENED_CALL",
+          isBlocked: false,
+          manuallyBlocked: false,
+        };
+      }
+      return c;
+    });
+  }
+
+  store.lastSavedAt = new Date().toISOString();
+  saveStore({ ...store, explicitReplaceSpamShield: true }, projectId);
+
+  res.json({
+    success: true,
+    blocked: Boolean(block),
+    number: formattedE164,
+    message: block
+      ? `🚫 Blocked ${rawPhone || formattedE164} and saved permanently to your Spam Shield & Database!`
+      : `✅ Unblocked ${rawPhone || formattedE164} and updated your Database.`,
+    calls: store.quoCallLogs,
+    spamShieldConfig: store.spamShieldConfig,
+    blockedCallsHistory: store.blockedCallsHistory,
   });
 });
 
@@ -7780,19 +8096,27 @@ function evaluateSpamCallRule(fromRaw: string, config: any): { isBlocked: boolea
   return { isBlocked: false };
 }
 
-// GET spam shield settings, blocked history & recent inbound calls
+// GET spam shield settings, blocked history, Quo screened calls & recent inbound calls
 app.get("/api/twilio/spam-shield", (req, res) => {
   const projectId = getProjectId(req);
   const store = loadStore(projectId);
+  if (store && repairAndSyncStoreData(store)) {
+    saveStore(store, projectId);
+  }
   const config = store?.spamShieldConfig || DEFAULT_SPAM_SHIELD_CONFIG;
   const history = store?.blockedCallsHistory || INITIAL_BLOCKED_CALLS_HISTORY;
   const recentInboundCalls = store?.recentInboundCalls || [];
+  const quoScreenedCalls = (store?.quoCallLogs || []).filter(
+    (c: any) => !c.hasCleaningIntent || c.status === "SOLICITOR_BLOCKED" || c.status === "SCREENED_CALL" || c.isBlocked
+  );
   res.json({
     success: true,
     config,
     blockedCallsCount: history.length,
     history,
     recentInboundCalls,
+    quoScreenedCalls,
+    allQuoCalls: store?.quoCallLogs || [],
   });
 });
 
@@ -7877,6 +8201,30 @@ app.post("/api/twilio/block-number", (req, res) => {
     });
   }
 
+  // Also update matching calls in quoCallLogs so Screened Call List & Spam Shield stay 100% synced
+  if (Array.isArray(store.quoCallLogs) && type === "number") {
+    const targetDigits = normalizePhoneDigits(appliedRuleLabel);
+    if (targetDigits) {
+      if (Array.isArray((store.spamShieldConfig as any).unblockedNumbers)) {
+        (store.spamShieldConfig as any).unblockedNumbers = (store.spamShieldConfig as any).unblockedNumbers.filter(
+          (n: string) => normalizePhoneDigits(n) !== targetDigits
+        );
+      }
+      store.quoCallLogs = store.quoCallLogs.map((c: any) => {
+        if (normalizePhoneDigits(c.callerPhone) === targetDigits) {
+          return {
+            ...c,
+            status: "SOLICITOR_BLOCKED",
+            isBlocked: true,
+            manuallyBlocked: true,
+            blockedReason: reason || `Manually blocked (${appliedRuleLabel})`,
+          };
+        }
+        return c;
+      });
+    }
+  }
+
   // Also record a block log item
   store.blockedCallsHistory.unshift({
     id: `blk-${Date.now().toString(36)}`,
@@ -7893,10 +8241,11 @@ app.post("/api/twilio/block-number", (req, res) => {
   res.json({
     success: true,
     appliedRule: appliedRuleLabel,
-    message: `Successfully blocked ${appliedRuleLabel}! Future calls will be rejected automatically.`,
+    message: `Successfully blocked ${appliedRuleLabel}! Saved permanently to database & future calls will be rejected automatically.`,
     config: store.spamShieldConfig,
     history: store.blockedCallsHistory,
     recentInboundCalls: store.recentInboundCalls || [],
+    calls: store.quoCallLogs || [],
   });
 });
 
@@ -7908,22 +8257,49 @@ app.post("/api/twilio/unblock-number", (req, res) => {
 
   const { number, type = "number" } = req.body || {};
   if (!store.spamShieldConfig) store.spamShieldConfig = { ...DEFAULT_SPAM_SHIELD_CONFIG };
+  if (!Array.isArray((store.spamShieldConfig as any).unblockedNumbers)) {
+    (store.spamShieldConfig as any).unblockedNumbers = [];
+  }
+
+  const targetDigits = normalizePhoneDigits(String(number || ""));
 
   if (type === "prefix") {
     store.spamShieldConfig.blockedPrefixes = store.spamShieldConfig.blockedPrefixes.filter((p: string) => p !== number);
   } else if (type === "country") {
     store.spamShieldConfig.blockedCountryCodes = store.spamShieldConfig.blockedCountryCodes.filter((c: string) => c !== number);
   } else {
-    store.spamShieldConfig.blockedNumbers = store.spamShieldConfig.blockedNumbers.filter((n: string) => n !== number);
+    store.spamShieldConfig.blockedNumbers = store.spamShieldConfig.blockedNumbers.filter(
+      (n: string) => n !== number && (!targetDigits || normalizePhoneDigits(n) !== targetDigits)
+    );
+    if (targetDigits) {
+      const formattedE164 = targetDigits.length === 10 ? `+1${targetDigits}` : `+${targetDigits}`;
+      if (!(store.spamShieldConfig as any).unblockedNumbers.includes(formattedE164)) {
+        (store.spamShieldConfig as any).unblockedNumbers.push(formattedE164);
+      }
+      if (Array.isArray(store.quoCallLogs)) {
+        store.quoCallLogs = store.quoCallLogs.map((c: any) => {
+          if (normalizePhoneDigits(c.callerPhone) === targetDigits) {
+            return {
+              ...c,
+              status: c.hasCleaningIntent ? "CLEANING_LEAD" : "SCREENED_CALL",
+              isBlocked: false,
+              manuallyBlocked: false,
+            };
+          }
+          return c;
+        });
+      }
+    }
   }
 
   store.lastSavedAt = new Date().toISOString();
-  saveStore(store, projectId);
+  saveStore({ ...store, explicitReplaceSpamShield: true }, projectId);
 
   res.json({
     success: true,
-    message: `Unblocked ${number}.`,
+    message: `Unblocked ${number} and updated database.`,
     config: store.spamShieldConfig,
+    calls: store.quoCallLogs || [],
   });
 });
 

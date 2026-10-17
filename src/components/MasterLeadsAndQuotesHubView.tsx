@@ -57,6 +57,15 @@ interface MasterLeadsAndQuotesHubViewProps {
   unscheduledJobs: any[];
   clients: ClientRecord[];
   calls: any[];
+  spamShieldConfig?: any;
+  blockedCallsHistory?: any[];
+  onToggleBlockScreenedCall?: (params: {
+    callId?: string;
+    callerPhone: string;
+    callerName?: string;
+    reason?: string;
+    block: boolean;
+  }) => Promise<any>;
   technicians: Technician[];
   tickets: ServiceTicket[];
   projectId: 'dispatchgeeni' | 'tidyups';
@@ -260,6 +269,9 @@ export const MasterLeadsAndQuotesHubView: React.FC<MasterLeadsAndQuotesHubViewPr
   unscheduledJobs,
   clients,
   calls,
+  spamShieldConfig,
+  blockedCallsHistory = [],
+  onToggleBlockScreenedCall,
   technicians,
   projectId,
   focusBlock = 'ALL',
@@ -292,10 +304,26 @@ export const MasterLeadsAndQuotesHubView: React.FC<MasterLeadsAndQuotesHubViewPr
   const [activeCategory, setActiveCategory] = useState<MasterCategoryFilter>('ALL');
   const [masterSearchQuery, setMasterSearchQuery] = useState('');
   const [expandedTranscriptRowId, setExpandedTranscriptRowId] = useState<string | null>(null);
+  const [showScreenedCallsList, setShowScreenedCallsList] = useState<boolean>(true);
+  const [screenedCallFilter, setScreenedCallFilter] = useState<'ALL' | 'BLOCKED' | 'CLEANING'>('ALL');
+  const [togglingCallId, setTogglingCallId] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState(`https://docs.google.com/spreadsheets/d/${LEADS_SPREADSHEET_ID}/edit`);
   const [spreadsheetId, setSpreadsheetId] = useState(LEADS_SPREADSHEET_ID);
   const [isSyncingGoogleDriveSheet, setIsSyncingGoogleDriveSheet] = useState(false);
   const [localBanner, setLocalBanner] = useState<string | null>(null);
+
+  const isCallerPhoneBlocked = (rawPhone?: string, callObj?: any): boolean => {
+    if (callObj?.isBlocked || callObj?.status === 'SOLICITOR_BLOCKED') return true;
+    const digits = String(rawPhone || '').replace(/\D/g, '');
+    const norm = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+    if (!norm) return false;
+    const list: string[] = spamShieldConfig?.blockedNumbers || [];
+    return list.some((b) => {
+      const bDigits = String(b || '').replace(/\D/g, '');
+      const bNorm = bDigits.length === 11 && bDigits.startsWith('1') ? bDigits.slice(1) : bDigits;
+      return bNorm === norm;
+    });
+  };
 
   // Block 1: Paste Table states
   const [rawPasteInput, setRawPasteInput] = useState('');
@@ -1668,6 +1696,183 @@ export const MasterLeadsAndQuotesHubView: React.FC<MasterLeadsAndQuotesHubViewPr
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* SAVED BLOCKED & SCREENED CALL LIST (SONIA AI SCREENER + SPAM SHIELD DATABASE) */}
+          <div className="border-t-2 border-slate-200 bg-slate-900 text-slate-100 p-4 sm:p-5 space-y-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-lg shrink-0">
+                  🛡️
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-black text-white">
+                      Saved Blocked &amp; Screened Call List (Sonia AI Screener + Database Sync)
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full bg-rose-500/25 border border-rose-400/40 text-rose-200 text-[11px] font-mono font-black">
+                      {(spamShieldConfig?.blockedNumbers || []).length} Blocked Numbers Saved in DB
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-black">
+                      ✓ Synced with Cloud Firestore &amp; Local Store
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Every screened call and blocked number from yesterday &amp; today is permanently saved in your database. Soliciting/robocall numbers stay blocked across refreshes, logins, and live call syncs.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {(
+                  [
+                    { id: 'ALL', label: `All Screened Calls (${calls.length})` },
+                    {
+                      id: 'BLOCKED',
+                      label: `🚫 Blocked Solicitors & Spam (${
+                        calls.filter((c) => isCallerPhoneBlocked(c.callerPhone, c)).length
+                      })`,
+                    },
+                    {
+                      id: 'CLEANING',
+                      label: `✅ Cleaning Leads (${calls.filter((c) => c.hasCleaningIntent).length})`,
+                    },
+                  ] as const
+                ).map((pill) => (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => setScreenedCallFilter(pill.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                      screenedCallFilter === pill.id
+                        ? 'bg-rose-600 text-white shadow-sm'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => onOpenSpamShield()}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 text-xs font-black cursor-pointer"
+                >
+                  ⚙️ Manage Full Blocklist ({(spamShieldConfig?.blockedNumbers || []).length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowScreenedCallsList((v) => !v)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold cursor-pointer border border-slate-700"
+                >
+                  {showScreenedCallsList ? 'Hide List ▲' : 'Show List ▼'}
+                </button>
+              </div>
+            </div>
+
+            {showScreenedCallsList && (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 max-h-[340px] overflow-y-auto pr-1 pt-1">
+                {calls
+                  .filter((call) => {
+                    const blocked = isCallerPhoneBlocked(call.callerPhone, call);
+                    if (screenedCallFilter === 'BLOCKED') return blocked;
+                    if (screenedCallFilter === 'CLEANING') return Boolean(call.hasCleaningIntent);
+                    return true;
+                  })
+                  .slice(0, 18)
+                  .map((call) => {
+                    const blocked = isCallerPhoneBlocked(call.callerPhone, call);
+                    const isCleaning = Boolean(call.hasCleaningIntent);
+                    const isBusy = togglingCallId === call.id;
+                    return (
+                      <div
+                        key={call.id}
+                        className={`p-3 rounded-2xl border text-xs flex flex-col justify-between gap-2 transition-all ${
+                          blocked
+                            ? 'bg-rose-950/40 border-rose-500/50'
+                            : isCleaning
+                            ? 'bg-emerald-950/35 border-emerald-500/50'
+                            : 'bg-slate-800/80 border-slate-700'
+                        }`}
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="font-black text-white text-xs sm:text-sm flex items-center gap-1.5 flex-wrap">
+                                <span>{call.callerName || call.callerPhone}</span>
+                                {call.answeredByAi && (
+                                  <span className="px-1.5 py-0.5 rounded bg-purple-500/30 border border-purple-400/40 text-purple-200 text-[10px] font-bold">
+                                    🤖 Sonia AI
+                                  </span>
+                                )}
+                              </div>
+                              <div className="font-mono text-emerald-300 text-[11px] font-bold">
+                                {call.callerPhone} • {String(call.timestamp || '').slice(0, 16).replace('T', ' ')}
+                              </div>
+                            </div>
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-black shrink-0 ${
+                                blocked
+                                  ? 'bg-rose-600 text-white shadow-2xs'
+                                  : isCleaning
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-slate-700 text-slate-300'
+                              }`}
+                            >
+                              {blocked
+                                ? '🚫 BLOCKED IN DB'
+                                : isCleaning
+                                ? '✅ CLEANING LEAD'
+                                : '🛡️ SCREENED'}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-slate-200 bg-black/30 p-2 rounded-xl border border-white/10 line-clamp-2">
+                            {call.summary || call.blockedReason || 'Screened inbound call'}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/10">
+                          <span className="text-[10px] font-mono text-slate-400 truncate">
+                            {call.callCategory || (blocked ? 'SOLICITOR_BLOCKED' : 'SCREENED')}
+                          </span>
+                          {onToggleBlockScreenedCall && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={async () => {
+                                setTogglingCallId(call.id);
+                                await onToggleBlockScreenedCall({
+                                  callId: call.id,
+                                  callerPhone: call.callerPhone,
+                                  callerName: call.callerName,
+                                  reason: call.summary
+                                    ? `Screened Call (${call.callerName || call.callerPhone}): ${String(call.summary).slice(0, 80)}`
+                                    : undefined,
+                                  block: !blocked,
+                                });
+                                setTogglingCallId(null);
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-black cursor-pointer transition-all disabled:opacity-50 ${
+                                blocked
+                                  ? 'bg-slate-800 hover:bg-emerald-700 text-slate-200 border border-slate-600'
+                                  : 'bg-rose-600 hover:bg-rose-500 text-white shadow-2xs'
+                              }`}
+                            >
+                              {isBusy
+                                ? 'Saving...'
+                                : blocked
+                                ? '✓ Saved as Blocked (Click to Unblock)'
+                                : '🚫 Block & Save to DB'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         </section>
       )}

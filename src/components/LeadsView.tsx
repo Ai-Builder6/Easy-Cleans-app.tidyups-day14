@@ -59,6 +59,14 @@ interface LeadsViewProps {
   onOpenQuickQuote?: (lead?: AdLeadItem) => void;
   onOpenSpamShield?: (preFillNumber?: string) => void;
   calls?: any[];
+  spamShieldConfig?: any;
+  onToggleBlockScreenedCall?: (params: {
+    callId?: string;
+    callerPhone: string;
+    callerName?: string;
+    reason?: string;
+    block: boolean;
+  }) => Promise<any>;
   visits?: any[];
   clients?: any[];
   quotes?: JobberQuote[];
@@ -214,6 +222,9 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
   onLeadsUpdated,
   onOpenQuickQuote,
   onOpenSpamShield,
+  calls: propCalls,
+  spamShieldConfig,
+  onToggleBlockScreenedCall,
   quotes = [],
   onQuotesUpdated,
   onClientsUpdated,
@@ -261,14 +272,21 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
   const [confirmDriveSyncModal, setConfirmDriveSyncModal] = useState(false);
 
   // Quo / OpenPhone Missed Calls, Sonia AI Screener & Voicemail Transcripts State
-  const [quoCallsList, setQuoCallsList] = useState<any[]>([]);
+  const [quoCallsList, setQuoCallsList] = useState<any[]>(propCalls || []);
   const [isSyncingQuoCalls, setIsSyncingQuoCalls] = useState(false);
   const [showQuoCallsPanel, setShowQuoCallsPanel] = useState(true);
   const [expandedTranscriptId, setExpandedTranscriptId] = useState<string | null>(null);
+  const [togglingBlockId, setTogglingBlockId] = useState<string | null>(null);
 
   useEffect(() => {
     setLeadsList(initialLeads || []);
   }, [initialLeads]);
+
+  useEffect(() => {
+    if (Array.isArray(propCalls) && propCalls.length > 0) {
+      setQuoCallsList(propCalls);
+    }
+  }, [propCalls]);
 
   useEffect(() => {
     fetch(`/api/google-sheets/config?project=${projectId}`)
@@ -1301,13 +1319,26 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
                 {quoCallsList.slice(0, 12).map((call) => {
                   const isCleaning = Boolean(call.hasCleaningIntent) || call.status === 'CLEANING_LEAD' || call.status === 'MATCHED_TO_QUOTE';
+                  const callDigits = String(call.callerPhone || '').replace(/\D/g, '');
+                  const normCallDigits = callDigits.length === 11 && callDigits.startsWith('1') ? callDigits.slice(1) : callDigits;
+                  const isBlocked =
+                    Boolean(call.isBlocked) ||
+                    call.status === 'SOLICITOR_BLOCKED' ||
+                    (normCallDigits &&
+                      (spamShieldConfig?.blockedNumbers || []).some((b: string) => {
+                        const bd = String(b || '').replace(/\D/g, '');
+                        const nb = bd.length === 11 && bd.startsWith('1') ? bd.slice(1) : bd;
+                        return nb === normCallDigits;
+                      }));
                   const isExpanded = expandedTranscriptId === call.id;
                   const dateLabel = String(call.timestamp || '').replace('T', ' ').slice(0, 16);
                   return (
                     <div
                       key={call.id}
                       className={`p-3 rounded-xl border text-xs space-y-1.5 ${
-                        isCleaning
+                        isBlocked
+                          ? 'bg-rose-950/35 border-rose-500/50'
+                          : isCleaning
                           ? 'bg-purple-950/35 border-purple-500/50'
                           : 'bg-[#131724] border-slate-800/90'
                       }`}
@@ -1328,15 +1359,50 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                           </div>
                         </div>
 
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold shrink-0 ${
-                            isCleaning
-                              ? 'bg-emerald-500/25 border border-emerald-500/50 text-emerald-200'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
-                          }`}
-                        >
-                          {isCleaning ? '✅ Cleaning Lead → On Sheet' : '🛡️ Filtered (Non-Cleaning)'}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                              isBlocked
+                                ? 'bg-rose-600 text-white'
+                                : isCleaning
+                                ? 'bg-emerald-500/25 border border-emerald-500/50 text-emerald-200'
+                                : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            }`}
+                          >
+                            {isBlocked
+                              ? '🚫 Blocked in DB'
+                              : isCleaning
+                              ? '✅ Cleaning Lead → On Sheet'
+                              : '🛡️ Screened Call'}
+                          </span>
+                          {onToggleBlockScreenedCall && (
+                            <button
+                              type="button"
+                              disabled={togglingBlockId === call.id}
+                              onClick={async () => {
+                                setTogglingBlockId(call.id);
+                                const res = await onToggleBlockScreenedCall({
+                                  callId: call.id,
+                                  callerPhone: call.callerPhone,
+                                  callerName: call.callerName,
+                                  reason: call.summary
+                                    ? `Screened Call (${call.callerName || call.callerPhone}): ${String(call.summary).slice(0, 80)}`
+                                    : undefined,
+                                  block: !isBlocked,
+                                });
+                                if (res?.calls) setQuoCallsList(res.calls);
+                                setTogglingBlockId(null);
+                              }}
+                              className={`px-2 py-0.5 rounded text-[10px] font-extrabold cursor-pointer transition-all ${
+                                isBlocked
+                                  ? 'bg-slate-800 hover:bg-emerald-700 text-slate-200 border border-slate-600'
+                                  : 'bg-rose-600 hover:bg-rose-500 text-white'
+                              }`}
+                            >
+                              {togglingBlockId === call.id ? '...' : isBlocked ? 'Unblock' : '🚫 Block'}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <div className="text-[11px] text-slate-200 bg-black/30 p-2 rounded-lg border border-slate-800/80">

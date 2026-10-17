@@ -29,6 +29,10 @@ import {
   ArrowRight,
   TrendingDown
 } from 'lucide-react';
+import {
+  saveBlockedNumberToFirestore,
+  deleteBlockedNumberFromFirestore,
+} from '../services/firestoreSyncService';
 
 interface SpamShieldConfig {
   enabled: boolean;
@@ -210,7 +214,7 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
     }
   };
 
-  // Block item (number, prefix, areacode, country)
+  // Block item (number, prefix, areacode, country) & sync to Firestore
   const handleBlockItem = async (number: string, type: 'number' | 'prefix' | 'areacode' | 'country', reason?: string) => {
     if (!number.trim()) return;
     try {
@@ -224,7 +228,13 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
         setConfig(data.config);
         if (data.history) setHistory(data.history);
         if (data.recentInboundCalls) setRecentCalls(data.recentInboundCalls);
-        setStatusNotice(data.message || `Blocked: ${data.appliedRule || number.trim()}`);
+        saveBlockedNumberToFirestore({
+          number: data.appliedRule || number.trim(),
+          type,
+          reason: reason || `Blocked via Spam Shield Modal (${type})`,
+          source: 'TwilioSpamShieldModal',
+        }).catch(() => {});
+        setStatusNotice(data.message || `Blocked & saved to Database: ${data.appliedRule || number.trim()}`);
         setTimeout(() => setStatusNotice(null), 4000);
         if (type === 'prefix' || type === 'areacode') setNewPrefixInput('');
         if (type === 'country') setNewCountryInput('');
@@ -236,7 +246,7 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
     }
   };
 
-  // Unblock item
+  // Unblock item & sync to Firestore
   const handleUnblockItem = async (number: string, type: 'number' | 'prefix' | 'country') => {
     try {
       const res = await fetch(`/api/twilio/unblock-number?project=${projectId}`, {
@@ -247,7 +257,8 @@ export const TwilioSpamShieldModal: React.FC<TwilioSpamShieldModalProps> = ({
       const data = await res.json();
       if (data.success) {
         setConfig(data.config);
-        setStatusNotice(`Unblocked: ${number}`);
+        deleteBlockedNumberFromFirestore(number).catch(() => {});
+        setStatusNotice(`Unblocked & updated in Database: ${number}`);
         setTimeout(() => setStatusNotice(null), 3000);
       }
     } catch {

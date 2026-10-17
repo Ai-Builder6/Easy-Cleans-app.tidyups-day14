@@ -25,6 +25,11 @@ import {
   X
 } from 'lucide-react';
 import { SpamShieldConfig, BlockedCallHistoryItem } from '../types/dispatch';
+import {
+  saveBlockedNumberToFirestore,
+  deleteBlockedNumberFromFirestore,
+  saveScreenedCallToFirestore,
+} from '../services/firestoreSyncService';
 
 interface SpamShieldViewProps {
   projectId?: 'dispatchgeeni' | 'tidyups';
@@ -79,6 +84,7 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
   });
   const [history, setHistory] = useState<BlockedCallHistoryItem[]>([]);
   const [recentCalls, setRecentCalls] = useState<any[]>([]);
+  const [quoScreenedCalls, setQuoScreenedCalls] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
@@ -119,6 +125,7 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
         }
         if (data.history) setHistory(data.history);
         if (data.recentInboundCalls) setRecentCalls(data.recentInboundCalls);
+        if (data.quoScreenedCalls) setQuoScreenedCalls(data.quoScreenedCalls);
       }
     } catch (e) {
       console.warn('Failed to fetch spam shield config:', e);
@@ -166,7 +173,7 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
     }
   };
 
-  // Block item (number, prefix, areacode, country)
+  // Block item (number, prefix, areacode, country) & sync to Firestore
   const handleBlockItem = async (number: string, type: 'number' | 'prefix' | 'areacode' | 'country', reason?: string) => {
     if (!number.trim()) return;
     try {
@@ -180,7 +187,20 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
         setConfig(data.config);
         if (data.history) setHistory(data.history);
         if (data.recentInboundCalls) setRecentCalls(data.recentInboundCalls);
-        setStatusNotice(data.message || `Blocked: ${data.appliedRule || number.trim()}`);
+        if (data.calls) {
+          setQuoScreenedCalls(
+            data.calls.filter(
+              (c: any) => !c.hasCleaningIntent || c.status === 'SOLICITOR_BLOCKED' || c.status === 'SCREENED_CALL' || c.isBlocked
+            )
+          );
+        }
+        saveBlockedNumberToFirestore({
+          number: data.appliedRule || number.trim(),
+          type,
+          reason: reason || `Blocked via Spam Shield (${type})`,
+          source: 'SpamShieldView',
+        }).catch(() => {});
+        setStatusNotice(data.message || `Blocked & saved to Database: ${data.appliedRule || number.trim()}`);
         setTimeout(() => setStatusNotice(null), 4000);
         if (type === 'prefix' || type === 'areacode') setNewPrefixInput('');
         if (type === 'country') setNewCountryInput('');
@@ -192,7 +212,7 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
     }
   };
 
-  // Unblock item
+  // Unblock item & sync to Firestore
   const handleUnblockItem = async (number: string, type: 'number' | 'prefix' | 'country') => {
     try {
       const res = await fetch(`/api/twilio/unblock-number?project=${projectId}`, {
@@ -203,11 +223,65 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
       const data = await res.json();
       if (data.success) {
         setConfig(data.config);
-        setStatusNotice(`Unblocked: ${number}`);
+        if (data.calls) {
+          setQuoScreenedCalls(
+            data.calls.filter(
+              (c: any) => !c.hasCleaningIntent || c.status === 'SOLICITOR_BLOCKED' || c.status === 'SCREENED_CALL' || c.isBlocked
+            )
+          );
+        }
+        deleteBlockedNumberFromFirestore(number).catch(() => {});
+        setStatusNotice(`Unblocked & updated in Database: ${number}`);
         setTimeout(() => setStatusNotice(null), 3000);
       }
     } catch {
       setStatusNotice('Error unblocking rule.');
+    }
+  };
+
+  // Toggle block on a Quo / Sonia AI screened call directly
+  const handleToggleScreenedCallBlock = async (call: any, shouldBlock: boolean) => {
+    try {
+      const res = await fetch(`/api/quo/calls/toggle-block?project=${projectId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callId: call.id,
+          callerPhone: call.callerPhone,
+          callerName: call.callerName,
+          reason: call.summary ? `Sonia AI Screened (${call.callerName || call.callerPhone}): ${String(call.summary).slice(0, 80)}` : undefined,
+          block: shouldBlock,
+        }),
+      });
+      const data = await res.json();
+      if (data?.success) {
+        if (data.spamShieldConfig) setConfig(data.spamShieldConfig);
+        if (data.blockedCallsHistory) setHistory(data.blockedCallsHistory);
+        if (Array.isArray(data.calls)) {
+          setQuoScreenedCalls(
+            data.calls.filter(
+              (c: any) => !c.hasCleaningIntent || c.status === 'SOLICITOR_BLOCKED' || c.status === 'SCREENED_CALL' || c.isBlocked
+            )
+          );
+          const updated = data.calls.find((c: any) => c.id === call.id);
+          if (updated) saveScreenedCallToFirestore(updated).catch(() => {});
+        }
+        if (shouldBlock) {
+          saveBlockedNumberToFirestore({
+            number: data.number || call.callerPhone,
+            type: 'number',
+            reason: call.summary || 'Blocked from Screened Call List',
+            callerName: call.callerName,
+            source: 'Sonia AI Screener',
+          }).catch(() => {});
+        } else {
+          deleteBlockedNumberFromFirestore(data.number || call.callerPhone).catch(() => {});
+        }
+        setStatusNotice(data.message);
+        setTimeout(() => setStatusNotice(null), 4000);
+      }
+    } catch {
+      setStatusNotice('Error updating screened call block status.');
     }
   };
 
@@ -715,9 +789,14 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
           </div>
 
           <div className="p-5 rounded-2xl bg-[#131722] border border-slate-800 space-y-3">
-            <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-              Blocked Numbers List ({(config.blockedNumbers || []).length})
-            </h4>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                Saved Blocked Numbers in Database ({(config.blockedNumbers || []).length})
+              </h4>
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-black">
+                ✓ Persisted in Local Store &amp; Cloud Firestore
+              </span>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {(config.blockedNumbers || []).map((num) => (
                 <div
@@ -732,6 +811,7 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
                     type="button"
                     onClick={() => handleUnblockItem(num, 'number')}
                     className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/80 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                    title="Unblock number"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -739,6 +819,67 @@ export const SpamShieldView: React.FC<SpamShieldViewProps> = ({
               ))}
             </div>
           </div>
+
+          {/* Sonia AI Screened Calls List (Yesterday & Today) */}
+          {quoScreenedCalls.length > 0 && (
+            <div className="p-5 rounded-2xl bg-[#131722] border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h4 className="text-sm font-extrabold text-white">
+                    🤖 Sonia AI Screened Call List ({quoScreenedCalls.length})
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Solicitors, sales reps, and short-hangup robocalls screened by Sonia AI are automatically saved &amp; blocked in your database.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {quoScreenedCalls.map((call) => {
+                  const callDigits = String(call.callerPhone || '').replace(/\D/g, '');
+                  const normCall = callDigits.length === 11 && callDigits.startsWith('1') ? callDigits.slice(1) : callDigits;
+                  const isBlocked =
+                    Boolean(call.isBlocked) ||
+                    call.status === 'SOLICITOR_BLOCKED' ||
+                    (config.blockedNumbers || []).some((b) => {
+                      const bd = String(b || '').replace(/\D/g, '');
+                      const nb = bd.length === 11 && bd.startsWith('1') ? bd.slice(1) : bd;
+                      return Boolean(normCall && nb === normCall);
+                    });
+                  return (
+                    <div
+                      key={call.id}
+                      className={`p-3 rounded-xl border text-xs flex flex-col justify-between gap-2 ${
+                        isBlocked ? 'bg-rose-950/35 border-rose-500/50' : 'bg-slate-900/80 border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-black text-white">{call.callerName || call.callerPhone}</div>
+                          <div className="font-mono text-emerald-300 text-[11px]">
+                            {call.callerPhone} • {String(call.timestamp || '').slice(0, 16).replace('T', ' ')}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleScreenedCallBlock(call, !isBlocked)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-black cursor-pointer ${
+                            isBlocked
+                              ? 'bg-rose-600 hover:bg-emerald-700 text-white'
+                              : 'bg-slate-800 hover:bg-rose-600 text-slate-200 border border-slate-700'
+                          }`}
+                        >
+                          {isBlocked ? '🚫 Blocked in DB (Unblock)' : '+ Block Number'}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-300 bg-black/30 p-2 rounded-lg border border-slate-800/80 line-clamp-2">
+                        {call.summary || call.blockedReason || 'Screened inbound call'}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

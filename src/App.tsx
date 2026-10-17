@@ -66,6 +66,9 @@ import {
   saveQuoteToFirestore, 
   saveInvoiceToFirestore, 
   saveVanOverrideToFirestore, 
+  saveBlockedNumberToFirestore,
+  deleteBlockedNumberFromFirestore,
+  saveScreenedCallToFirestore,
   syncAllToFirestore,
   FIRESTORE_DATABASE_ID
 } from './services/firestoreSyncService';
@@ -398,6 +401,12 @@ export function App() {
   const [quoCallsList, setQuoCallsList] = useState<any[]>(() => {
     return storedData?.quoCallLogs || [];
   });
+  const [spamShieldConfig, setSpamShieldConfig] = useState<any>(() => {
+    return storedData?.spamShieldConfig || null;
+  });
+  const [blockedCallsHistory, setBlockedCallsHistory] = useState<any[]>(() => {
+    return storedData?.blockedCallsHistory || [];
+  });
   const [isSyncingFirestore, setIsSyncingFirestore] = useState<boolean>(false);
   const [firestoreSyncStatus, setFirestoreSyncStatus] = useState<string | null>(null);
 
@@ -574,7 +583,7 @@ export function App() {
       .catch(() => {});
   };
 
-  // Full Firestore synchronization
+  // Full Firestore synchronization (including Blocked Numbers & Screened Call List)
   const handleSyncFirestore = useCallback(async () => {
     setIsSyncingFirestore(true);
     setFirestoreSyncStatus(null);
@@ -587,9 +596,12 @@ export function App() {
         invoices: invoicesList,
         technicians,
         serviceCatalog,
+        spamShieldConfig,
+        blockedCallsHistory,
+        quoCallLogs: quoCallsList,
       });
       setFirestoreSyncStatus(
-        `Synced ${res.clientsCount} clients, ${res.scheduledVisitsCount} visits, ${res.quotesCount} quotes, ${res.invoicesCount} invoices, ${res.serviceCatalogCount || 0} price list items, and ${res.vanOverridesCount} van hubs to Firestore!`
+        `Synced ${res.clientsCount} clients, ${res.scheduledVisitsCount} visits, ${res.quotesCount} quotes, ${res.invoicesCount} invoices, ${res.blockedNumbersCount || 0} blocked numbers, ${res.screenedCallsCount || 0} screened calls, and ${res.serviceCatalogCount || 0} price list items to Firestore!`
       );
       setTimeout(() => setFirestoreSyncStatus(null), 6000);
     } catch (e: any) {
@@ -599,14 +611,60 @@ export function App() {
     } finally {
       setIsSyncingFirestore(false);
     }
-  }, [clientsList, scheduledJobsList, unscheduledJobsList, quotesList, invoicesList, technicians, serviceCatalog]);
+  }, [clientsList, scheduledJobsList, unscheduledJobsList, quotesList, invoicesList, technicians, serviceCatalog, spamShieldConfig, blockedCallsHistory, quoCallsList]);
 
-  // Unified 1-Button & Auto-Login Sync: Syncs Jobber Quotes, Invoices, Visits, Clients, Outbound Push, Quo/Sona AI Calls, and Master Leads Table
+  // Toggle block/unblock on any screened call or phone number and persist across Backend Store + LocalStorage + Cloud Firestore
+  const handleToggleBlockScreenedCall = useCallback(
+    async (params: { callId?: string; callerPhone: string; callerName?: string; reason?: string; block: boolean }) => {
+      try {
+        const res = await fetch(`/api/quo/calls/toggle-block?project=${activeProjectId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-project-id': activeProjectId },
+          body: JSON.stringify(params),
+        });
+        const data = await res.json();
+        if (data?.success) {
+          if (Array.isArray(data.calls)) {
+            setQuoCallsList(data.calls);
+            const updatedCall = data.calls.find(
+              (c: any) => c.id === params.callId || c.callerPhone === params.callerPhone
+            );
+            if (updatedCall) {
+              saveScreenedCallToFirestore(updatedCall).catch(() => {});
+            }
+          }
+          if (data.spamShieldConfig) setSpamShieldConfig(data.spamShieldConfig);
+          if (Array.isArray(data.blockedCallsHistory)) setBlockedCallsHistory(data.blockedCallsHistory);
+
+          if (params.block) {
+            saveBlockedNumberToFirestore({
+              number: data.number || params.callerPhone,
+              type: 'number',
+              reason: params.reason || `Blocked from Screened Call List (${params.callerName || params.callerPhone})`,
+              callerName: params.callerName || 'Screened Caller',
+              source: 'Sonia AI Screener',
+            }).catch(() => {});
+          } else {
+            deleteBlockedNumberFromFirestore(data.number || params.callerPhone).catch(() => {});
+          }
+          setSyncAllStatusMessage(data.message || (params.block ? '🚫 Caller blocked & saved to database!' : '✅ Caller unblocked & saved to database!'));
+          setTimeout(() => setSyncAllStatusMessage(null), 4500);
+        }
+        return data;
+      } catch (err) {
+        console.warn('Toggle block screened call error:', err);
+        return null;
+      }
+    },
+    [activeProjectId]
+  );
+
+  // Unified 1-Button & Auto-Login Sync: Syncs Jobber Quotes, Invoices, Visits, Clients, Outbound Push, Quo/Sona AI Calls, Blocked Numbers & Master Leads Table
   const handleSyncEverything = useCallback(
     async (silent = false) => {
       setIsSyncingEverything(true);
       if (!silent) {
-        setSyncAllStatusMessage('Syncing Quotes, Invoices, Jobber Calendar, Clients, Quo Calls & Master Leads Sheet...');
+        setSyncAllStatusMessage('Syncing Quotes, Invoices, Jobber Calendar, Clients, Quo Screened Calls, Blocked Numbers & Master Leads Sheet...');
       }
       try {
         const res = await fetch(`/api/sync-everything?project=${activeProjectId}`, {
@@ -637,11 +695,28 @@ export function App() {
           }
           if (Array.isArray(data.clients) && data.clients.length > 0) setClientsList(data.clients);
           if (Array.isArray(data.calls) && data.calls.length > 0) setQuoCallsList(data.calls);
+          if (data.spamShieldConfig) setSpamShieldConfig(data.spamShieldConfig);
+          if (Array.isArray(data.blockedCallsHistory)) setBlockedCallsHistory(data.blockedCallsHistory);
           setLastSyncedAllAt(data.lastSyncedAt || new Date().toISOString());
+
+          // Also push blocked numbers & screened calls to Firestore in background so Cloud DB is always up to date
+          syncAllToFirestore({
+            clients: data.clients || clientsList,
+            scheduledVisits: data.scheduledVisits || scheduledJobsList,
+            unscheduledJobs: data.unscheduledJobs || unscheduledJobsList,
+            quotes: data.quotes || quotesList,
+            invoices: data.invoices || invoicesList,
+            technicians,
+            serviceCatalog,
+            spamShieldConfig: data.spamShieldConfig || spamShieldConfig,
+            blockedCallsHistory: data.blockedCallsHistory || blockedCallsHistory,
+            quoCallLogs: data.calls || quoCallsList,
+          }).catch(() => {});
+
           if (!silent) {
             setSyncAllStatusMessage(
               data.message ||
-                '✓ Synced Everything: Quotes, Invoices, Jobber Calendar & Clients, Quo Calls, and Master Leads Table!'
+                '✓ Synced Everything: Quotes, Invoices, Jobber Calendar & Clients, Quo Screened Calls, Blocked Numbers, and Master Leads Table!'
             );
             setTimeout(() => setSyncAllStatusMessage(null), 6500);
           }
@@ -656,7 +731,7 @@ export function App() {
         setIsSyncingEverything(false);
       }
     },
-    [activeProjectId]
+    [activeProjectId, clientsList, scheduledJobsList, unscheduledJobsList, quotesList, invoicesList, technicians, serviceCatalog, spamShieldConfig, blockedCallsHistory, quoCallsList]
   );
 
   // Automatic Background Sync on Login / Initial App Load so user never has to manually sync every time they log in
@@ -1062,6 +1137,8 @@ export function App() {
           if (data.quotes && data.quotes.length > 0) setQuotesList(data.quotes.filter((q: any) => !isFakeSimulationItem(q)));
           if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices.filter((inv: any) => !isFakeSimulationItem(inv)));
           if (data.quoCallLogs && data.quoCallLogs.length > 0) setQuoCallsList(data.quoCallLogs);
+          if (data.spamShieldConfig) setSpamShieldConfig(data.spamShieldConfig);
+          if (data.blockedCallsHistory && data.blockedCallsHistory.length > 0) setBlockedCallsHistory(data.blockedCallsHistory);
           if (data.adLeads && data.adLeads.length > 0) setLeadsList(data.adLeads);
           if (data.serviceCatalog && data.serviceCatalog.length > 0) setServiceCatalog(data.serviceCatalog);
         }
@@ -1069,7 +1146,7 @@ export function App() {
       .catch((err) => console.warn('Could not load persistent store:', err));
   }, [activeProjectId]);
 
-  // Unified persistent auto-save: preserves all user entries, clients, quotes, invoices, serviceCatalog, and jobs across refreshes per project
+  // Unified persistent auto-save: preserves all user entries, clients, quotes, invoices, serviceCatalog, blocked numbers, screened calls, and jobs across refreshes per project
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -1082,6 +1159,10 @@ export function App() {
           quotes: quotesList,
           invoices: invoicesList,
           serviceCatalog,
+          quoCallLogs: quoCallsList,
+          spamShieldConfig,
+          blockedCallsHistory,
+          adLeads: leadsList,
           lastSavedAt: new Date().toISOString(),
         };
         localStorage.setItem(`${activeProjectId}_dispatch_data`, JSON.stringify(payload));
@@ -1090,7 +1171,7 @@ export function App() {
     } catch (err) {
       console.warn('Auto-save error:', err);
     }
-  }, [activeProjectId, tickets, technicians, scheduledJobsList, unscheduledJobsList, clientsList, quotesList, invoicesList, serviceCatalog]);
+  }, [activeProjectId, tickets, technicians, scheduledJobsList, unscheduledJobsList, clientsList, quotesList, invoicesList, serviceCatalog, quoCallsList, spamShieldConfig, blockedCallsHistory, leadsList]);
 
   // Save tickets to local persistent database whenever updated
   const saveStateToStore = useCallback((updatedTickets: ServiceTicket[]) => {
@@ -2379,6 +2460,9 @@ export function App() {
             unscheduledJobs={unscheduledJobsList}
             clients={clientsList}
             calls={quoCallsList}
+            spamShieldConfig={spamShieldConfig}
+            blockedCallsHistory={blockedCallsHistory}
+            onToggleBlockScreenedCall={handleToggleBlockScreenedCall}
             technicians={technicians}
             tickets={tickets}
             projectId={activeProjectId}
@@ -2529,6 +2613,8 @@ export function App() {
             }}
             onOpenSpamShield={handleOpenSpamShield}
             calls={quoCallsList}
+            spamShieldConfig={spamShieldConfig}
+            onToggleBlockScreenedCall={handleToggleBlockScreenedCall}
             visits={scheduledJobsList}
             clients={clientsList}
             quotes={quotesList}
