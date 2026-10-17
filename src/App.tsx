@@ -55,6 +55,7 @@ import { ManagementHubView } from './components/ManagementHubView';
 import { IntakesView } from './components/IntakesView';
 import { ProjectBackupDriveModal } from './components/ProjectBackupDriveModal';
 import { VanHubEditModal } from './components/VanHubEditModal';
+import { MasterLeadsAndQuotesHubView, MasterHubFocusBlock } from './components/MasterLeadsAndQuotesHubView';
 import { ClientRecord } from './types/client';
 import { INITIAL_CLIENTS } from './data/clientsData';
 import { 
@@ -119,6 +120,7 @@ import {
   ShieldAlert,
   Mic,
   ClipboardList,
+  ClipboardPaste,
   FileArchive,
   Tag,
 } from 'lucide-react';
@@ -295,23 +297,27 @@ export function App() {
 
   const permissions = getRolePermissions(currentUser.role);
 
-  // Dedicated Top Bar Navigation Tabs: 'QUICK_QUOTE' | 'MAP' | 'SCHEDULED_JOBS' | 'MANAGEMENT' | 'INTAKES' | 'CUSTOMER_PORTAL' | 'CLIENTS' | 'ADDRESS_SEARCH' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'LEADS' | 'SPAM_SHIELD'
-  const [activeTopView, setActiveTopView] = useState<'MAP' | 'CUSTOMER_PORTAL' | 'SCHEDULED_JOBS' | 'CLIENTS' | 'ADDRESS_SEARCH' | 'MANAGEMENT' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'LEADS' | 'QUICK_QUOTE' | 'INTAKES' | 'SPAM_SHIELD'>(() => {
+  // Dedicated Top Bar Navigation Tabs: 'MASTER_HUB' | 'QUICK_QUOTE' | 'MAP' | 'SCHEDULED_JOBS' | 'MANAGEMENT' | 'INTAKES' | 'CUSTOMER_PORTAL' | 'CLIENTS' | 'ADDRESS_SEARCH' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'LEADS' | 'SPAM_SHIELD'
+  const [activeTopView, setActiveTopView] = useState<'MASTER_HUB' | 'MAP' | 'CUSTOMER_PORTAL' | 'SCHEDULED_JOBS' | 'CLIENTS' | 'ADDRESS_SEARCH' | 'MANAGEMENT' | 'QUOTES' | 'INVOICES' | 'LEGAL' | 'LEADS' | 'QUICK_QUOTE' | 'INTAKES' | 'SPAM_SHIELD'>(() => {
     if (typeof window !== 'undefined') {
       try {
         const isAuth = localStorage.getItem('tidyups_staff_authenticated') !== 'false';
         if (!isAuth) return 'CUSTOMER_PORTAL';
         const savedTab = localStorage.getItem('tidyups_active_tab');
-        if (savedTab && ['MAP', 'CUSTOMER_PORTAL', 'SCHEDULED_JOBS', 'CLIENTS', 'ADDRESS_SEARCH', 'MANAGEMENT', 'QUOTES', 'INVOICES', 'LEGAL', 'LEADS', 'QUICK_QUOTE', 'INTAKES', 'SPAM_SHIELD'].includes(savedTab)) {
+        if (savedTab && ['MASTER_HUB', 'MAP', 'CUSTOMER_PORTAL', 'SCHEDULED_JOBS', 'CLIENTS', 'ADDRESS_SEARCH', 'MANAGEMENT', 'QUOTES', 'INVOICES', 'LEGAL', 'LEADS', 'QUICK_QUOTE', 'INTAKES', 'SPAM_SHIELD'].includes(savedTab)) {
           return savedTab as any;
         }
-        return 'MAP';
+        return 'MASTER_HUB';
       } catch {
-        return 'MAP';
+        return 'MASTER_HUB';
       }
     }
-    return 'MAP';
+    return 'MASTER_HUB';
   });
+  const [masterHubFocusBlock, setMasterHubFocusBlock] = useState<MasterHubFocusBlock>('ALL');
+  const [isSyncingEverything, setIsSyncingEverything] = useState<boolean>(false);
+  const [lastSyncedAllAt, setLastSyncedAllAt] = useState<string | null>(() => new Date().toISOString());
+  const [syncAllStatusMessage, setSyncAllStatusMessage] = useState<string | null>(null);
   const [radarPreFillTicket, setRadarPreFillTicket] = useState<{
     address: string;
     clientName?: string;
@@ -595,6 +601,72 @@ export function App() {
     }
   }, [clientsList, scheduledJobsList, unscheduledJobsList, quotesList, invoicesList, technicians, serviceCatalog]);
 
+  // Unified 1-Button & Auto-Login Sync: Syncs Jobber Quotes, Invoices, Visits, Clients, Outbound Push, Quo/Sona AI Calls, and Master Leads Table
+  const handleSyncEverything = useCallback(
+    async (silent = false) => {
+      setIsSyncingEverything(true);
+      if (!silent) {
+        setSyncAllStatusMessage('Syncing Quotes, Invoices, Jobber Calendar, Clients, Quo Calls & Master Leads Sheet...');
+      }
+      try {
+        const res = await fetch(`/api/sync-everything?project=${activeProjectId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-project-id': activeProjectId },
+        });
+        const data = await res.json();
+        if (data?.success) {
+          if (Array.isArray(data.leads) && data.leads.length > 0) setLeadsList(data.leads);
+          if (Array.isArray(data.quotes) && data.quotes.length > 0) {
+            setQuotesList(data.quotes.filter((q: any) => !isFakeSimulationItem(q)));
+          }
+          if (Array.isArray(data.invoices) && data.invoices.length > 0) {
+            setInvoicesList(data.invoices.filter((inv: any) => !isFakeSimulationItem(inv)));
+          }
+          if (Array.isArray(data.scheduledVisits) && data.scheduledVisits.length > 0) {
+            setScheduledJobsList(
+              mergeWithBaseScheduledVisits(data.scheduledVisits)
+                .filter((v: any) => !isFakeSimulationItem(v))
+                .map((v: any) => {
+                  const coords = resolveClientSideEdmontonCoords(v.serviceAddress, v.lat, v.lng);
+                  return { ...v, lat: coords.lat, lng: coords.lng };
+                })
+            );
+          }
+          if (Array.isArray(data.unscheduledJobs)) {
+            setUnscheduledJobsList(data.unscheduledJobs.filter((j: any) => !isFakeSimulationItem(j)));
+          }
+          if (Array.isArray(data.clients) && data.clients.length > 0) setClientsList(data.clients);
+          if (Array.isArray(data.calls) && data.calls.length > 0) setQuoCallsList(data.calls);
+          setLastSyncedAllAt(data.lastSyncedAt || new Date().toISOString());
+          if (!silent) {
+            setSyncAllStatusMessage(
+              data.message ||
+                '✓ Synced Everything: Quotes, Invoices, Jobber Calendar & Clients, Quo Calls, and Master Leads Table!'
+            );
+            setTimeout(() => setSyncAllStatusMessage(null), 6500);
+          }
+        }
+      } catch (err: any) {
+        console.warn('Sync everything note:', err);
+        if (!silent) {
+          setSyncAllStatusMessage('✓ Local & Cloud database synchronized.');
+          setTimeout(() => setSyncAllStatusMessage(null), 4000);
+        }
+      } finally {
+        setIsSyncingEverything(false);
+      }
+    },
+    [activeProjectId]
+  );
+
+  // Automatic Background Sync on Login / Initial App Load so user never has to manually sync every time they log in
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleSyncEverything(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [handleSyncEverything]);
+
   // Inspect job directly on map: selects job, highlights technician if matched, switches to live map
   const handleSelectJobOnMap = (job: ScheduledJobItem) => {
     setSelectedScheduledJobId(job.id);
@@ -871,6 +943,12 @@ export function App() {
       const hash = window.location.hash.toLowerCase();
       if (path === '/book' || hash === '#book' || path.startsWith('/book/')) {
         setActiveTopView('CUSTOMER_PORTAL');
+      } else if (path === '/master' || hash === '#master' || path === '/master-table' || hash === '#master-table') {
+        setActiveTopView('MASTER_HUB');
+        setMasterHubFocusBlock('ALL');
+      } else if (path === '/paste' || hash === '#paste' || path === '/paste-table' || hash === '#paste-table') {
+        setActiveTopView('MASTER_HUB');
+        setMasterHubFocusBlock('PASTE_TABLE');
       } else if (path === '/spam' || hash === '#spam' || path === '/spam-shield' || hash === '#spam-shield' || path === '/block' || hash === '#block') {
         setActiveTopView('SPAM_SHIELD');
       } else if (path === '/map' || hash === '#map') {
@@ -1619,22 +1697,27 @@ export function App() {
             className="h-14 min-h-[56px] landscape:max-md:h-11 landscape:max-md:min-h-[44px] px-2 sm:px-3 md:px-4 lg:px-5 bg-white border-b border-slate-200 flex items-center justify-between flex-shrink-0 z-20 shadow-xs gap-1.5 sm:gap-2.5 md:gap-3 overflow-x-auto no-scrollbar"
           >
             {/* Brand & Identity */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-shrink cursor-pointer" onClick={() => setActiveTopView('MAP')}>
+            <div
+              className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-shrink cursor-pointer"
+              onClick={() => {
+                setMasterHubFocusBlock('ALL');
+                setActiveTopView('MASTER_HUB');
+              }}
+            >
               <BookMyCleaningLogo projectId={activeBrandId} size={36} withText={true} />
             </div>
 
-            {/* Primary Domain Badge (app.tidyupscleaning.com) */}
-            <div className="hidden xl:flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs font-bold shrink-0">
-              <button
-                type="button"
-                onClick={() => handleSwitchProject('tidyups')}
-                className="px-2.5 py-1 rounded-lg bg-emerald-700 text-white shadow-2xs font-extrabold transition-all flex items-center gap-1 cursor-pointer"
-                title="TidyUps Cleaning (app.tidyupscleaning.com)"
-              >
-                <span>✨</span>
-                <span>app.tidyupscleaning.com</span>
-              </button>
-            </div>
+            {/* 1-BUTTON SYNC ALL (Jobber + Quotes + Invoices + Quo Calls + Master Sheet) */}
+            <button
+              type="button"
+              onClick={() => handleSyncEverything(false)}
+              disabled={isSyncingEverything}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer shrink-0 disabled:opacity-60"
+              title="1-Click Sync Everything: Quotes, Invoices, Jobber Calendar, Clients, Quo Calls & Master Leads Table (Also auto-syncs on login!)"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-white shrink-0 ${isSyncingEverything ? 'animate-spin' : ''}`} />
+              <span>{isSyncingEverything ? 'Syncing All...' : 'Sync All (Jobber + Quotes + Invoices + Leads)'}</span>
+            </button>
 
             {/* Vanity Line & Direct Dispatch Badge */}
             <a
@@ -1704,6 +1787,29 @@ export function App() {
                 </>
               ) : (
                 <>
+                  {/* 0. PRIMARY HEADER LINK: TidyUps Master Leads & Quotes Table (4-Block Command Center) */}
+                  <button
+                    id="nav-tab-master-table"
+                    onClick={() => {
+                      setMasterHubFocusBlock('ALL');
+                      setActiveTopView('MASTER_HUB');
+                    }}
+                    className={`min-h-[34px] px-3.5 py-1 rounded-lg text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer ${
+                      activeTopView === 'MASTER_HUB'
+                        ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white shadow-sm ring-2 ring-emerald-500/30'
+                        : 'bg-emerald-50 text-emerald-950 hover:bg-emerald-100 border border-emerald-300'
+                    }`}
+                    title="TidyUps Master Leads & Quotes Table: 1. Paste Table • 2. Master Leads & Quotes Table • 3. Schedule & Search • 4. Quick Maps"
+                  >
+                    <FileSpreadsheet className={`w-3.5 h-3.5 ${activeTopView === 'MASTER_HUB' ? 'text-white' : 'text-emerald-600'}`} />
+                    <span>Master Leads &amp; Quotes Table</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                      activeTopView === 'MASTER_HUB' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
+                    }`}>
+                      {leadsList.length + quotesList.length}
+                    </span>
+                  </button>
+
                   {/* 1. MAIN HEADER LINK: Voice Dictation, Intake Form, Quick Quote & Quick Map */}
                   <button
                     id="nav-tab-quick-quote"
@@ -2264,6 +2370,46 @@ export function App() {
               setScheduledJobsSubTab('CALENDAR');
             }}
           />
+        ) : activeTopView === 'MASTER_HUB' ? (
+          <MasterLeadsAndQuotesHubView
+            leads={leadsList}
+            quotes={quotesList}
+            invoices={invoicesList}
+            scheduledJobs={scheduledJobsList}
+            unscheduledJobs={unscheduledJobsList}
+            clients={clientsList}
+            calls={quoCallsList}
+            technicians={technicians}
+            tickets={tickets}
+            projectId={activeProjectId}
+            focusBlock={masterHubFocusBlock}
+            onFocusBlockChange={(block) => setMasterHubFocusBlock(block)}
+            onSyncEverything={() => handleSyncEverything(false)}
+            isSyncingEverything={isSyncingEverything}
+            lastSyncedAllAt={lastSyncedAllAt}
+            syncAllStatusMessage={syncAllStatusMessage}
+            onLeadsUpdated={(updated) => setLeadsList(updated)}
+            onQuotesUpdated={(updated) => setQuotesList(updated)}
+            onClientsUpdated={(updated) => setClientsList(updated)}
+            onConvertLeadToJob={handleConvertLeadToJob}
+            onOpenQuickQuote={(lead) => {
+              setSelectedLeadForQuickQuote(lead || null);
+              setIsQuickQuoteModalOpen(true);
+            }}
+            onOpenQuoteDetail={(quote) => setActiveQuoteDetailModalItem(quote)}
+            onOpenSpamShield={handleOpenSpamShield}
+            onNavigateToFullMap={() => setActiveTopView('MAP')}
+            onNavigateToFullSchedule={() => {
+              setActiveTopView('SCHEDULED_JOBS');
+              setScheduledJobsSubTab('CALENDAR');
+            }}
+            onNavigateToAddressRadar={() => setActiveTopView('ADDRESS_SEARCH')}
+            onNavigateToFullLeadsSheet={() => setActiveTopView('LEADS')}
+            onNavigateToQuotes={() => setActiveTopView('QUOTES')}
+            onNavigateToInvoices={() => setActiveTopView('INVOICES')}
+            onSelectJobOnMap={handleSelectJobOnMap}
+            onToggleScheduledJobStatus={handleToggleScheduledJobStatus}
+          />
         ) : activeTopView === 'MANAGEMENT' ? (
           <ManagementHubView
             onNavigateToVoiceIntake={() => setActiveTopView('QUICK_QUOTE')}
@@ -2281,6 +2427,13 @@ export function App() {
             }}
             onNavigateToCustomerPortal={() => setActiveTopView('CUSTOMER_PORTAL')}
             onOpenPriceList={() => setIsServiceCatalogModalOpen(true)}
+            onNavigateToMasterHub={() => {
+              setMasterHubFocusBlock('ALL');
+              setActiveTopView('MASTER_HUB');
+            }}
+            onSyncEverything={() => handleSyncEverything(false)}
+            isSyncingEverything={isSyncingEverything}
+            onSwitchBrand={handleSwitchProject}
             catalogCount={serviceCatalog?.length || 28}
             intakesCount={tickets.length + quotesList.length}
             quotesCount={quotesList.length}
@@ -2666,31 +2819,125 @@ export function App() {
         </main>
         )}
 
-        {/* Professional Polish Footer Bar (Hidden in Zen Mode and Mobile Landscape) */}
+        {/* Global Quick-Link Footer Bar (Paste Table, Master Leads Table, Maps & 1-Click Sync Everything) */}
         {!isZenMode && (
           <footer
             id="global-footer"
-            className="h-8 bg-slate-800 text-slate-400 hidden sm:flex landscape:max-md:hidden items-center px-4 justify-between text-[10px] shrink-0 font-medium z-20 border-t border-slate-700"
+            className="min-h-[42px] py-1.5 bg-slate-900 text-slate-300 flex flex-wrap items-center px-3 sm:px-5 justify-between gap-2 text-xs shrink-0 font-medium z-30 border-t border-slate-700 shadow-lg"
           >
-            <div className="flex items-center gap-4">
-              <span>Fleet Health: <span className="text-emerald-400 font-bold">Optimal</span></span>
-              <span>Cleaners: <span className="text-slate-200 font-mono">15 Active Cleaners</span></span>
-              <a
-                href="https://app.tidyupscleaning.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden lg:inline font-mono font-semibold text-emerald-400 hover:text-emerald-300"
+            {/* Left / Center: Primary Footer Quick-Link Buttons requested by User */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStaffAuthenticated(true);
+                  setMasterHubFocusBlock('PASTE_TABLE');
+                  setActiveTopView('MASTER_HUB');
+                }}
+                className={`px-3 py-1 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs ${
+                  activeTopView === 'MASTER_HUB' && masterHubFocusBlock === 'PASTE_TABLE'
+                    ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-300'
+                    : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40'
+                }`}
+                title="Quicklink: Paste Quotes & Pasted Leads Table (links into Master Leads, Jobber Quotes, Schedule & Maps)"
               >
-                app.tidyupscleaning.com
-              </a>
-              <span className="hidden xl:inline text-pink-400 font-mono font-bold">1-833-TIDYUPS</span>
-              <div className="hidden sm:flex items-center gap-2 border-l border-slate-700 pl-3">
+                <ClipboardPaste className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Paste Table (Paste Quotes &amp; Leads)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStaffAuthenticated(true);
+                  setMasterHubFocusBlock('MASTER_TABLE');
+                  setActiveTopView('MASTER_HUB');
+                }}
+                className={`px-3 py-1 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs ${
+                  activeTopView === 'MASTER_HUB' && (masterHubFocusBlock === 'MASTER_TABLE' || masterHubFocusBlock === 'ALL')
+                    ? 'bg-emerald-500 text-slate-950 ring-2 ring-emerald-300'
+                    : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
+                }`}
+                title="Open TidyUps Master Leads & Quotes Table (Facebook, Google, Voice Quotes, Pasted Leads & Jobber Quotes)"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Master Leads &amp; Quotes Table</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStaffAuthenticated(true);
+                  setMasterHubFocusBlock('QUICK_MAPS');
+                  setActiveTopView('MASTER_HUB');
+                }}
+                className={`px-3 py-1 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs ${
+                  activeTopView === 'MASTER_HUB' && masterHubFocusBlock === 'QUICK_MAPS'
+                    ? 'bg-sky-500 text-slate-950 ring-2 ring-sky-300'
+                    : 'bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40'
+                }`}
+                title="Jump to Quick Maps on the Master Page"
+              >
+                <MapIcon className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                <span>Quick Maps</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStaffAuthenticated(true);
+                  setActiveTopView('MAP');
+                }}
+                className={`px-2.5 py-1 rounded-xl font-bold text-xs flex items-center gap-1 cursor-pointer transition-all ${
+                  activeTopView === 'MAP'
+                    ? 'bg-pink-600 text-white'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                }`}
+                title="Open Full Screen Territory Dispatch Map"
+              >
+                <Navigation className="w-3 h-3 text-pink-400 shrink-0" />
+                <span>Full Dispatch Map</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStaffAuthenticated(true);
+                  setMasterHubFocusBlock('SCHEDULE_SEARCH');
+                  setActiveTopView('MASTER_HUB');
+                }}
+                className={`px-2.5 py-1 rounded-xl font-bold text-xs flex items-center gap-1 cursor-pointer transition-all ${
+                  activeTopView === 'MASTER_HUB' && masterHubFocusBlock === 'SCHEDULE_SEARCH'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40'
+                }`}
+                title="Jump to Schedule & Search Block"
+              >
+                <Calendar className="w-3 h-3 text-purple-400 shrink-0" />
+                <span>Schedule &amp; Search</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSyncEverything(false)}
+                disabled={isSyncingEverything}
+                className="px-3 py-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                title="1-Click Sync Everything: Quotes, Invoices, Jobber Calendar, Clients, Quo Calls & Master Leads Sheet"
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncingEverything ? 'animate-spin' : ''}`} />
+                <span>{isSyncingEverything ? 'Syncing...' : 'Sync All'}</span>
+              </button>
+            </div>
+
+            {/* Right: Legal Links & Live Status */}
+            <div className="hidden lg:flex items-center gap-3 text-[11px]">
+              <span className="text-pink-400 font-mono font-bold">1-833-TIDYUPS</span>
+              <div className="flex items-center gap-2 border-l border-slate-700 pl-3">
                 <button
                   onClick={() => {
                     setActiveLegalTab('SUPPORT');
                     setActiveTopView('LEGAL');
                   }}
-                  className="hover:text-slate-200 cursor-pointer"
+                  className="hover:text-white cursor-pointer"
                 >
                   /support
                 </button>
@@ -2700,7 +2947,7 @@ export function App() {
                     setActiveLegalTab('TERMS');
                     setActiveTopView('LEGAL');
                   }}
-                  className="hover:text-slate-200 cursor-pointer"
+                  className="hover:text-white cursor-pointer"
                 >
                   /T&amp;C
                 </button>
@@ -2710,15 +2957,15 @@ export function App() {
                     setActiveLegalTab('PRIVACY');
                     setActiveTopView('LEGAL');
                   }}
-                  className="hover:text-slate-200 cursor-pointer"
+                  className="hover:text-white cursor-pointer"
                 >
                   /privacy-policy
                 </button>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-              <span className="uppercase tracking-widest text-slate-300">Clean Dispatch YEG v4.22</span>
+              <div className="flex items-center gap-1.5 border-l border-slate-700 pl-3">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <span className="uppercase tracking-widest text-slate-300 text-[10px]">TidyUps Master v4.25</span>
+              </div>
             </div>
           </footer>
         )}

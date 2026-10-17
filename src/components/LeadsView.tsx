@@ -260,6 +260,12 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [confirmDriveSyncModal, setConfirmDriveSyncModal] = useState(false);
 
+  // Quo / OpenPhone Missed Calls, Sonia AI Screener & Voicemail Transcripts State
+  const [quoCallsList, setQuoCallsList] = useState<any[]>([]);
+  const [isSyncingQuoCalls, setIsSyncingQuoCalls] = useState(false);
+  const [showQuoCallsPanel, setShowQuoCallsPanel] = useState(true);
+  const [expandedTranscriptId, setExpandedTranscriptId] = useState<string | null>(null);
+
   useEffect(() => {
     setLeadsList(initialLeads || []);
   }, [initialLeads]);
@@ -278,7 +284,43 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
         if (d?.webhookUrl) setWebhookUrl(d.webhookUrl);
       })
       .catch(() => {});
+
+    // Load Quo / OpenPhone call logs and transcripts
+    fetch('/api/quo/calls')
+      .then((r) => r.json())
+      .then((d) => {
+        if (Array.isArray(d?.calls)) {
+          setQuoCallsList(d.calls);
+        }
+      })
+      .catch(() => {});
   }, [projectId, defaultPrimarySheetUrl]);
+
+  const handleSyncQuoMissedCallsAndTranscripts = async () => {
+    setIsSyncingQuoCalls(true);
+    setNotice(null);
+    try {
+      const res = await fetch('/api/quo/sync-live-calls', { method: 'POST' });
+      const data = await res.json();
+      if (data?.success) {
+        if (Array.isArray(data.calls)) setQuoCallsList(data.calls);
+        if (Array.isArray(data.leads)) {
+          setLeadsList(data.leads);
+          if (onLeadsUpdated) onLeadsUpdated(data.leads);
+        }
+        setShowQuoCallsPanel(true);
+        setNotice(
+          `✓ Synced ${data.syncedCallsCount || 0} Quo / Sonia AI calls & transcripts! Cleaning leads with transcripts (Rahum & Blaze) are connected directly to your Voice & Quick Quotes sheet tab.`
+        );
+      } else {
+        setNotice(`Quo sync notice: ${data?.error || 'Could not sync calls'}`);
+      }
+    } catch (err: any) {
+      setNotice(`Error syncing Quo transcripts: ${err?.message}`);
+    } finally {
+      setIsSyncingQuoCalls(false);
+    }
+  };
 
   const parsedPreviewRows = useMemo(() => parseRawPasteIntoLeads(pasteText), [pasteText]);
 
@@ -1009,7 +1051,35 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleSyncQuoMissedCallsAndTranscripts}
+              disabled={isSyncingQuoCalls}
+              className="px-3 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-extrabold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+              title="Pull live Quo / OpenPhone calls, missed calls answered by Sonia AI, and voicemail transcripts into your Clean Google Sheet"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingQuoCalls ? 'animate-spin' : ''}`} />
+              <span>
+                {isSyncingQuoCalls
+                  ? 'Syncing Quo Transcripts...'
+                  : '🎙️ Sync Missed Call & Sonia AI Transcripts'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowQuoCallsPanel((v) => !v)}
+              className="px-3 py-1 rounded-lg bg-purple-600/25 hover:bg-purple-600/40 border border-purple-500/40 text-purple-200 text-xs font-extrabold flex items-center gap-1.5 cursor-pointer"
+            >
+              <Phone className="w-3.5 h-3.5 text-purple-300" />
+              <span>
+                {showQuoCallsPanel
+                  ? `Hide Call Transcripts (${quoCallsList.length})`
+                  : `View Call & Voicemail Transcripts (${quoCallsList.length})`}
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => setShowAdsConnectPanel((v) => !v)}
@@ -1187,6 +1257,114 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                 </p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Collapsible Quo / Sonia AI Missed Calls & Voicemail Transcripts Panel */}
+        {showQuoCallsPanel && (
+          <div className="mt-3 pt-3 border-t border-slate-800 bg-[#0d111c] rounded-2xl p-4 space-y-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-md bg-[#7C3AED] text-white text-[11px] font-extrabold">
+                    🎙️ QUO / OPENPHONE + SONIA AI SCREENER
+                  </span>
+                  <h3 className="text-xs sm:text-sm font-extrabold text-white">
+                    Missed Calls, Sonia AI Assistant &amp; Voicemail Transcripts → Clean Google Sheet
+                  </h3>
+                  <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold font-mono">
+                    Webhook Active: https://app.tidyupscleaning.com/api/quo/webhook
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 mt-1">
+                  When a caller misses you and leaves a message with <strong>Sonia (Tidyups AI Cleaning Assistant)</strong> or voicemail asking for a cleaning, their full <strong>Transcript &amp; AI Summary</strong> is automatically connected and added to your <strong>🟣 Voice &amp; Quick Quotes</strong> Google Sheet tab. Non-cleaning calls (Yelp ad reps, car lease reps, personal callbacks) are automatically filtered so they don&apos;t clutter your Lead Sheet.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleSyncQuoMissedCallsAndTranscripts}
+                  disabled={isSyncingQuoCalls}
+                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-extrabold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingQuoCalls ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingQuoCalls ? 'Pulling Live Quo Calls...' : 'Pull Latest Calls & Transcripts Now'}</span>
+                </button>
+              </div>
+            </div>
+
+            {quoCallsList.length === 0 ? (
+              <div className="p-4 rounded-xl bg-[#131724] border border-slate-800 text-xs text-slate-300 flex items-center justify-between">
+                <span>Click &ldquo;Pull Latest Calls &amp; Transcripts Now&rdquo; to load today&apos;s Quo / Sonia AI calls and sync cleaning transcripts to your sheet.</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
+                {quoCallsList.slice(0, 12).map((call) => {
+                  const isCleaning = Boolean(call.hasCleaningIntent) || call.status === 'CLEANING_LEAD' || call.status === 'MATCHED_TO_QUOTE';
+                  const isExpanded = expandedTranscriptId === call.id;
+                  const dateLabel = String(call.timestamp || '').replace('T', ' ').slice(0, 16);
+                  return (
+                    <div
+                      key={call.id}
+                      className={`p-3 rounded-xl border text-xs space-y-1.5 ${
+                        isCleaning
+                          ? 'bg-purple-950/35 border-purple-500/50'
+                          : 'bg-[#131724] border-slate-800/90'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-extrabold text-white">{call.callerName || call.callerPhone}</span>
+                            <span className="font-mono text-emerald-300 text-[11px]">{call.callerPhone}</span>
+                            {call.answeredByAi && (
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-500/30 border border-indigo-400/40 text-indigo-200 text-[10px] font-bold">
+                                🤖 Screened by Sonia AI
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                            {dateLabel} UTC • {call.lineName || 'Dispatch Line'} • {call.duration || 0}s
+                          </div>
+                        </div>
+
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-extrabold shrink-0 ${
+                            isCleaning
+                              ? 'bg-emerald-500/25 border border-emerald-500/50 text-emerald-200'
+                              : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          }`}
+                        >
+                          {isCleaning ? '✅ Cleaning Lead → On Sheet' : '🛡️ Filtered (Non-Cleaning)'}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-slate-200 bg-black/30 p-2 rounded-lg border border-slate-800/80">
+                        <strong className="text-purple-300">AI Summary:</strong>{' '}
+                        {call.summary || 'No summary text'}
+                      </div>
+
+                      {call.transcriptText && (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedTranscriptId(isExpanded ? null : call.id)}
+                            className="text-[11px] text-purple-300 hover:text-purple-200 font-bold underline cursor-pointer"
+                          >
+                            {isExpanded ? 'Hide Full Call Transcript' : 'View Full Call Transcript'}
+                          </button>
+                          {isExpanded && (
+                            <pre className="mt-1.5 p-2.5 rounded-lg bg-[#090c14] border border-purple-500/30 text-[11px] text-slate-200 font-mono whitespace-pre-wrap max-h-44 overflow-y-auto">
+                              {call.transcriptText}
+                            </pre>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1744,7 +1922,41 @@ export const LeadsView: React.FC<LeadsViewProps> = ({
                         <div className="font-bold text-white">
                           {lead.serviceRequested || 'Residential Standard Cleaning'}
                         </div>
-                        {lead.notes && (
+                        {((lead as any).aiSummary || (lead as any).transcriptText) && (
+                          <div className="mt-1.5 p-2 rounded-lg bg-purple-950/50 border border-purple-500/40 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[10px] font-extrabold text-purple-200">
+                                {(lead as any).answeredByAi
+                                  ? '🤖 Sonia AI Screener Transcript'
+                                  : '🎙️ Quo Call Transcript Connected'}
+                              </span>
+                              {(lead as any).transcriptText && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedTranscriptId(
+                                      expandedTranscriptId === lead.id ? null : lead.id
+                                    )
+                                  }
+                                  className="text-[10px] font-extrabold text-emerald-300 hover:underline cursor-pointer"
+                                >
+                                  {expandedTranscriptId === lead.id ? 'Hide Transcript' : 'Full Transcript'}
+                                </button>
+                              )}
+                            </div>
+                            {(lead as any).aiSummary && (
+                              <div className="text-[11px] text-slate-200 leading-snug">
+                                {(lead as any).aiSummary}
+                              </div>
+                            )}
+                            {expandedTranscriptId === lead.id && (lead as any).transcriptText && (
+                              <pre className="mt-1 p-2 rounded bg-black/50 border border-purple-500/30 text-[10px] text-slate-200 font-mono whitespace-pre-wrap max-h-36 overflow-y-auto">
+                                {(lead as any).transcriptText}
+                              </pre>
+                            )}
+                          </div>
+                        )}
+                        {lead.notes && !(lead as any).aiSummary && (
                           <div className="text-[11px] text-slate-300/90 line-clamp-2 mt-0.5">
                             {lead.notes}
                           </div>

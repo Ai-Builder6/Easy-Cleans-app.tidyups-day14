@@ -51,6 +51,10 @@ interface ManagementHubViewProps {
   onNavigateToLegal: (tab: 'SUPPORT' | 'TERMS' | 'PRIVACY') => void;
   onNavigateToCustomerPortal: () => void;
   onOpenPriceList?: () => void;
+  onNavigateToMasterHub?: () => void;
+  onSyncEverything?: () => void;
+  isSyncingEverything?: boolean;
+  onSwitchBrand?: (brand: 'dispatchgeeni' | 'tidyups' | 'easycleans') => void;
   catalogCount?: number;
   intakesCount?: number;
   quotesCount?: number;
@@ -77,6 +81,10 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
   onNavigateToLegal,
   onNavigateToCustomerPortal,
   onOpenPriceList,
+  onNavigateToMasterHub,
+  onSyncEverything,
+  isSyncingEverything = false,
+  onSwitchBrand,
   catalogCount = 28,
   intakesCount = 0,
   quotesCount = 0,
@@ -120,11 +128,21 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
       {/* Header */}
       <div className="border-b border-slate-800 pb-5 flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center font-bold">
               <SlidersHorizontal className="w-5 h-5" />
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Management &amp; Operations</h1>
+            {/* Relocated Compact Domain Button inside Management Section */}
+            <button
+              type="button"
+              onClick={() => onSwitchBrand?.('tidyups')}
+              className="px-2.5 py-1 rounded-lg bg-emerald-700/90 hover:bg-emerald-600 text-white border border-emerald-500/40 text-[11px] font-extrabold transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+              title="Active Domain: TidyUps Cleaning (app.tidyupscleaning.com)"
+            >
+              <span>✨</span>
+              <span>app.tidyupscleaning.com</span>
+            </button>
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Centralized hub for quotes, invoices, mobile fleet and van hubs, staff roster, policies, and Jobber CRM sync.
@@ -132,6 +150,28 @@ export const ManagementHubView: React.FC<ManagementHubViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onSyncEverything && (
+            <button
+              type="button"
+              onClick={onSyncEverything}
+              disabled={isSyncingEverything}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50"
+              title="1-Click Sync Everything: Quotes, Invoices, Jobber Visits, Clients, Quo Calls & Master Leads Sheet"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingEverything ? 'animate-spin' : ''}`} />
+              <span>{isSyncingEverything ? 'Syncing All...' : 'Sync Everything (6-in-1)'}</span>
+            </button>
+          )}
+          {onNavigateToMasterHub && (
+            <button
+              type="button"
+              onClick={onNavigateToMasterHub}
+              className="px-3.5 py-2 rounded-xl bg-emerald-900/80 hover:bg-emerald-800 text-emerald-100 border border-emerald-500/40 text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Master Leads &amp; Quotes Table</span>
+            </button>
+          )}
           <button
             onClick={handleOneClickDriveUpload}
             disabled={isUploadingProjectDrive}
