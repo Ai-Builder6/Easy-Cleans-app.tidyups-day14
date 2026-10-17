@@ -9,7 +9,7 @@ import {
   User,
   Unsubscribe
 } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 export const app = initializeApp(firebaseConfig);
@@ -41,7 +41,14 @@ SCOPES.forEach((scope) => {
   googleAuthProvider.addScope(scope);
 });
 
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || '(default)');
+const targetDatabaseId = (firebaseConfig as any).firestoreDatabaseId || '(default)';
+export const db = (() => {
+  try {
+    return initializeFirestore(app, { ignoreUndefinedProperties: true }, targetDatabaseId);
+  } catch {
+    return getFirestore(app, targetDatabaseId);
+  }
+})();
 
 // In-memory access token cache (never stored in localStorage/sessionStorage per security guidelines)
 let isSigningIn = false;

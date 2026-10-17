@@ -659,9 +659,53 @@ export function App() {
     [activeProjectId]
   );
 
+  // Keep a ref to latest lists so handleSyncEverything never recreates on state updates (preventing infinite sync loops)
+  const syncStateRef = useRef({
+    clientsList,
+    scheduledJobsList,
+    unscheduledJobsList,
+    quotesList,
+    invoicesList,
+    technicians,
+    serviceCatalog,
+    spamShieldConfig,
+    blockedCallsHistory,
+    quoCallsList,
+  });
+  useEffect(() => {
+    syncStateRef.current = {
+      clientsList,
+      scheduledJobsList,
+      unscheduledJobsList,
+      quotesList,
+      invoicesList,
+      technicians,
+      serviceCatalog,
+      spamShieldConfig,
+      blockedCallsHistory,
+      quoCallsList,
+    };
+  }, [
+    clientsList,
+    scheduledJobsList,
+    unscheduledJobsList,
+    quotesList,
+    invoicesList,
+    technicians,
+    serviceCatalog,
+    spamShieldConfig,
+    blockedCallsHistory,
+    quoCallsList,
+  ]);
+
+  const isSyncingEverythingRef = useRef<boolean>(false);
+  const hasAutoSyncedProjectRef = useRef<string | null>(null);
+
   // Unified 1-Button & Auto-Login Sync: Syncs Jobber Quotes, Invoices, Visits, Clients, Outbound Push, Quo/Sona AI Calls, Blocked Numbers & Master Leads Table
   const handleSyncEverything = useCallback(
     async (silent = false) => {
+      if (isSyncingEverythingRef.current) return;
+      isSyncingEverythingRef.current = true;
       setIsSyncingEverything(true);
       if (!silent) {
         setSyncAllStatusMessage('Syncing Quotes, Invoices, Jobber Calendar, Clients, Quo Screened Calls, Blocked Numbers & Master Leads Sheet...');
@@ -699,18 +743,19 @@ export function App() {
           if (Array.isArray(data.blockedCallsHistory)) setBlockedCallsHistory(data.blockedCallsHistory);
           setLastSyncedAllAt(data.lastSyncedAt || new Date().toISOString());
 
-          // Also push blocked numbers & screened calls to Firestore in background so Cloud DB is always up to date
+          const snap = syncStateRef.current;
+          // Push operational state to Firestore in background without triggering a state re-render loop
           syncAllToFirestore({
-            clients: data.clients || clientsList,
-            scheduledVisits: data.scheduledVisits || scheduledJobsList,
-            unscheduledJobs: data.unscheduledJobs || unscheduledJobsList,
-            quotes: data.quotes || quotesList,
-            invoices: data.invoices || invoicesList,
-            technicians,
-            serviceCatalog,
-            spamShieldConfig: data.spamShieldConfig || spamShieldConfig,
-            blockedCallsHistory: data.blockedCallsHistory || blockedCallsHistory,
-            quoCallLogs: data.calls || quoCallsList,
+            clients: data.clients || snap.clientsList,
+            scheduledVisits: data.scheduledVisits || snap.scheduledJobsList,
+            unscheduledJobs: data.unscheduledJobs || snap.unscheduledJobsList,
+            quotes: data.quotes || snap.quotesList,
+            invoices: data.invoices || snap.invoicesList,
+            technicians: snap.technicians,
+            serviceCatalog: snap.serviceCatalog,
+            spamShieldConfig: data.spamShieldConfig || snap.spamShieldConfig,
+            blockedCallsHistory: data.blockedCallsHistory || snap.blockedCallsHistory,
+            quoCallLogs: data.calls || snap.quoCallsList,
           }).catch(() => {});
 
           if (!silent) {
@@ -728,19 +773,22 @@ export function App() {
           setTimeout(() => setSyncAllStatusMessage(null), 4000);
         }
       } finally {
+        isSyncingEverythingRef.current = false;
         setIsSyncingEverything(false);
       }
     },
-    [activeProjectId, clientsList, scheduledJobsList, unscheduledJobsList, quotesList, invoicesList, technicians, serviceCatalog, spamShieldConfig, blockedCallsHistory, quoCallsList]
+    [activeProjectId]
   );
 
-  // Automatic Background Sync on Login / Initial App Load so user never has to manually sync every time they log in
+  // Automatic Background Sync ONCE on Initial App Load so it never loops endlessly
   useEffect(() => {
+    if (hasAutoSyncedProjectRef.current === activeProjectId) return;
+    hasAutoSyncedProjectRef.current = activeProjectId;
     const timer = setTimeout(() => {
       handleSyncEverything(true);
     }, 600);
     return () => clearTimeout(timer);
-  }, [handleSyncEverything]);
+  }, [activeProjectId, handleSyncEverything]);
 
   // Inspect job directly on map: selects job, highlights technician if matched, switches to live map
   const handleSelectJobOnMap = (job: ScheduledJobItem) => {

@@ -1255,11 +1255,29 @@ export function getProjectId(_req: express.Request): "tidyups" {
 }
 
 // Jobber Developer App & GraphQL Integration Endpoints (https://developer.getjobber.com/docs)
-// Initialize from persistent store if available, then fallback to environment variables
+// Initialize from persistent store & AI Studio Secrets environment variables
+function resolveEnvJobberAccessToken(): string {
+  const candidates = [
+    process.env.JOBBER_ACCESS_TOKEN,
+    process.env.JOBBER_BEARER_TOKEN,
+    process.env.JOBBER_TOKEN,
+    // Also detect if user pasted 'Bearer eyJ...' into APP_BASE_URL in AI Studio Secrets
+    (process.env.APP_BASE_URL || "").trim().match(/^(Bearer\s+)?eyJ/i) ? process.env.APP_BASE_URL : "",
+  ];
+  for (const raw of candidates) {
+    const cleaned = (raw || "").trim().replace(/^Bearer\s+/i, "").trim();
+    if (cleaned && !cleaned.includes("...") && cleaned.length > 20) {
+      return cleaned;
+    }
+  }
+  return "";
+}
+
 const initialStored = loadStore();
-const rawEnvToken = (process.env.JOBBER_ACCESS_TOKEN || process.env.JOBBER_BEARER_TOKEN || "").trim().replace(/^Bearer\s+/i, "");
-const storedToken = (initialStored?.jobberConfig?.accessToken || "").trim().replace(/^Bearer\s+/i, "") || rawEnvToken;
-const isValidTokenFormat = Boolean(storedToken && !storedToken.includes("...") && storedToken.length > 20);
+const rawEnvToken = resolveEnvJobberAccessToken();
+const storedToken = (initialStored?.jobberConfig?.accessToken || "").trim().replace(/^Bearer\s+/i, "");
+const activeInitialToken = rawEnvToken || storedToken;
+const isValidTokenFormat = Boolean(activeInitialToken && !activeInitialToken.includes("...") && activeInitialToken.length > 20);
 
 const envClientId = (process.env.JOBBER_CLIENT_ID || "").trim();
 const envClientSecret = (process.env.JOBBER_CLIENT_SECRET || "").trim();
@@ -1282,8 +1300,8 @@ let jobberConfig = {
   accountName: initialStored?.jobberConfig?.accountName || "Tidyups Cleaning Service Inc",
   clientId: resolvedInitialClientId,
   clientSecret: resolvedInitialClientSecret,
-  accessToken: isValidTokenFormat ? storedToken : "",
-  refreshToken: initialStored?.jobberConfig?.refreshToken || process.env.JOBBER_REFRESH_TOKEN || "fb6cc6a384c3c9811ef1925325e00043",
+  accessToken: isValidTokenFormat ? activeInitialToken : "",
+  refreshToken: initialStored?.jobberConfig?.refreshToken || process.env.JOBBER_REFRESH_TOKEN || "e4a82e2215f2d855ea987a33e21d2092",
   lastSyncedAt: initialStored?.jobberConfig?.lastSyncedAt || new Date().toISOString(),
   environment: "Jobber GraphQL API (v2025-04-16)",
 };
@@ -1347,64 +1365,54 @@ setJobberTokenRefreshListener((tokens) => {
 // Wire expired token cleanup so expired tokens that cannot be refreshed do not trigger repeated 401 errors
 setJobberTokenExpiredListener((expiredToken) => {
   if (jobberConfig.accessToken === expiredToken) {
-    jobberConfig.accessToken = "";
-    jobberConfig.isConnected = false;
+    const envReplacement = resolveEnvJobberAccessToken();
+    if (envReplacement && envReplacement !== expiredToken) {
+      jobberConfig.accessToken = envReplacement;
+      jobberConfig.isConnected = true;
+    } else {
+      jobberConfig.accessToken = "";
+      jobberConfig.isConnected = false;
+    }
     persistJobberConfigToDisk();
   }
 });
 
-// Auto-activate or refresh live Jobber connection if refresh token exists on boot
-if (jobberConfig.refreshToken && jobberConfig.clientId && jobberConfig.clientSecret) {
-  refreshJobberAccessToken(jobberConfig.clientId, jobberConfig.clientSecret, jobberConfig.refreshToken)
-    .then(async (newAccessToken) => {
+// Verify existing non-rotating Bearer token first on boot; only attempt refresh if token is missing or expired
+(async () => {
+  try {
+    if (jobberConfig.accessToken) {
+      const check = await verifyJobberConnection(jobberConfig.accessToken);
+      if (check.isValid) {
+        jobberConfig.isConnected = true;
+        jobberConfig.accountName = check.accountName || "Tidyups Cleaning Service Inc";
+        jobberConfig.lastSyncedAt = new Date().toISOString();
+        persistJobberConfigToDisk();
+        return;
+      }
+    }
+
+    if (jobberConfig.refreshToken && jobberConfig.clientId && jobberConfig.clientSecret) {
+      const newAccessToken = await refreshJobberAccessToken(
+        jobberConfig.clientId,
+        jobberConfig.clientSecret,
+        jobberConfig.refreshToken
+      );
       if (newAccessToken) {
         jobberConfig.accessToken = newAccessToken;
         jobberConfig.isConnected = true;
         jobberConfig.accountName = "Tidyups Cleaning Service Inc";
         jobberConfig.lastSyncedAt = new Date().toISOString();
         persistJobberConfigToDisk();
-
-        // Automatically pull September and October 2026 data
-        try {
-          const calData = await syncJobberCalendar(newAccessToken, getJobberCreds());
-          const cur = loadStore();
-          if (calData.visits && calData.visits.length > 0 && cur) {
-            cur.scheduledVisits = calData.visits;
-            saveStore(cur);
-          }
-          const quoteData = await syncJobberQuotes(newAccessToken, getJobberCreds());
-          if (quoteData.quotes && quoteData.quotes.length > 0) {
-            const cur2 = loadStore();
-            if (cur2) {
-              cur2.quotes = quoteData.quotes;
-              saveStore(cur2);
-            }
-          }
-          const invData = await syncJobberInvoices(newAccessToken, getJobberCreds());
-          if (invData.invoices && invData.invoices.length > 0) {
-            const cur3 = loadStore();
-            if (cur3) {
-              cur3.invoices = invData.invoices;
-              saveStore(cur3);
-            }
-          }
-        } catch {
-          // Non-blocking startup sync
-        }
       } else if (jobberConfig.accessToken) {
-        // Verify if stored accessToken is still valid; if expired, clear it so syncs use local database cleanly without 401 errors
-        const check = await verifyJobberConnection(jobberConfig.accessToken, getJobberCreds());
-        if (!check.isValid) {
-          jobberConfig.accessToken = "";
-          jobberConfig.isConnected = false;
-          persistJobberConfigToDisk();
-        }
+        jobberConfig.accessToken = "";
+        jobberConfig.isConnected = false;
+        persistJobberConfigToDisk();
       }
-    })
-    .catch(() => {
-      // Non-blocking startup check
-    });
-}
+    }
+  } catch {
+    // Non-blocking startup check
+  }
+})();
 
 function getJobberCreds() {
   return {
@@ -1425,19 +1433,21 @@ function persistJobberConfigToDisk(_projectId?: string) {
     lastSyncedAt: jobberConfig.lastSyncedAt,
   };
 
-  try {
-    const pStore = loadStore("tidyups") || {
-      version: 1,
-      lastSavedAt: new Date().toISOString(),
-      tickets: INITIAL_TICKETS,
-      cleanerOverrides: {},
-      scheduledVisits: [],
-      quotes: [],
-      invoices: [],
-    };
-    saveStore({ ...pStore, jobberConfig: cfg }, "tidyups");
-  } catch {
-    // Non-blocking
+  for (const proj of ["tidyups", "dispatchgeeni"] as const) {
+    try {
+      const pStore = loadStore(proj) || {
+        version: 1,
+        lastSavedAt: new Date().toISOString(),
+        tickets: INITIAL_TICKETS,
+        cleanerOverrides: {},
+        scheduledVisits: [],
+        quotes: [],
+        invoices: [],
+      };
+      saveStore({ ...pStore, jobberConfig: cfg }, proj);
+    } catch {
+      // Non-blocking
+    }
   }
 
   // Also sync to Cloud SQL PostgreSQL database asynchronously

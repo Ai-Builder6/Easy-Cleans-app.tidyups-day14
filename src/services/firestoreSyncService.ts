@@ -26,6 +26,23 @@ export function sanitizeDocId(id: string, fallbackPrefix = 'id'): string {
   return cleaned.length > 0 ? cleaned : `${fallbackPrefix}-${Date.now()}`;
 }
 
+/**
+ * Removes any keys with undefined values so Firestore setDoc() never throws
+ * "Unsupported field value: undefined"
+ */
+export function stripUndefinedFields<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) continue;
+    if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+      cleaned[key] = stripUndefinedFields(value as Record<string, unknown>);
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIENTS SYNC
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,19 +53,26 @@ export function toFirestoreClient(client: ClientRecord): Record<string, unknown>
     ? (client.verdict as string) 
     : 'Client';
 
-  return {
+  const email = (client.email || '').trim().substring(0, 200);
+  const secondaryPhone = (client.secondaryPhone || '').trim().substring(0, 30);
+  const notes = (client.notes || '').trim().substring(0, 1000);
+
+  const payload: Record<string, unknown> = {
     id: cleanId,
     name: (client.name || 'Anonymous Client').substring(0, 150),
     phone: (client.phone || '(780) 555-0100').substring(0, 30),
-    email: (client.email || '').substring(0, 200) || undefined,
-    secondaryPhone: (client.secondaryPhone || '').substring(0, 30) || undefined,
     address: (client.address || 'Edmonton, AB').substring(0, 300),
     status: validStatus,
     tags: Array.isArray(client.tags) ? client.tags.slice(0, 20).map((t) => String(t).substring(0, 50)) : [],
-    notes: (client.notes || '').substring(0, 1000) || undefined,
     createdAt: client.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+
+  if (email) payload.email = email;
+  if (secondaryPhone) payload.secondaryPhone = secondaryPhone;
+  if (notes) payload.notes = notes;
+
+  return stripUndefinedFields(payload);
 }
 
 export async function saveClientToFirestore(client: ClientRecord): Promise<void> {
@@ -117,23 +141,28 @@ export function toFirestoreScheduledVisit(visit: ScheduledJobItem): Record<strin
     COMPLETED: 'Completed',
   };
   const status = statusMap[rawStatus] || 'Scheduled';
+  const secondaryPhone = (visit.secondaryPhone || '').trim().substring(0, 30);
+  const notes = (visit.notes || '').trim().substring(0, 1000);
 
-  return {
+  const payload: Record<string, unknown> = {
     id: cleanId,
     clientName: (visit.clientName || 'Jobber Client').substring(0, 150),
     phone: (visit.clientPhone || '(780) 555-0100').substring(0, 30),
-    secondaryPhone: (visit.secondaryPhone || '').substring(0, 30) || undefined,
     address: (visit.serviceAddress || 'Edmonton, AB').substring(0, 300),
-    vanId: sanitizeDocId(cleaner, 'van'),
+    vanId: sanitizeDocId(cleaner, 'van').substring(0, 50),
     cleanerName: cleaner.substring(0, 100),
     scheduledTime: (visit.startAt || new Date().toISOString()).substring(0, 100),
     durationMinutes: 120,
     status,
     serviceType: (visit.serviceType || 'Standard Cleaning').substring(0, 100),
-    notes: (visit.notes || '').substring(0, 1000) || undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+
+  if (secondaryPhone) payload.secondaryPhone = secondaryPhone;
+  if (notes) payload.notes = notes;
+
+  return stripUndefinedFields(payload);
 }
 
 export async function saveScheduledVisitToFirestore(visit: ScheduledJobItem): Promise<void> {
@@ -153,7 +182,7 @@ export async function saveScheduledVisitToFirestore(visit: ScheduledJobItem): Pr
 
 export function toFirestoreUnscheduledJob(job: UnscheduledJobItem): Record<string, unknown> {
   const cleanId = sanitizeDocId(job.id, 'ujob');
-  return {
+  return stripUndefinedFields({
     id: cleanId,
     clientName: (job.clientName || 'Jobber Client').substring(0, 150),
     phone: (job.clientPhone || '(780) 555-0100').substring(0, 30),
@@ -163,7 +192,7 @@ export function toFirestoreUnscheduledJob(job: UnscheduledJobItem): Record<strin
     estimatedHours: 2,
     createdAt: job.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  };
+  });
 }
 
 export async function saveUnscheduledJobToFirestore(job: UnscheduledJobItem): Promise<void> {
@@ -192,7 +221,7 @@ export function toFirestoreQuote(quote: JobberQuote): Record<string, unknown> {
   };
   const status = statusMap[quote.quoteStatus] || 'Sent';
 
-  return {
+  return stripUndefinedFields({
     id: cleanId,
     quoteNumber: (quote.quoteNumber || 'Q-100').substring(0, 50),
     clientName: (quote.clientName || 'Client').substring(0, 150),
@@ -201,7 +230,7 @@ export function toFirestoreQuote(quote: JobberQuote): Record<string, unknown> {
     issueDate: quote.createdAt || new Date().toISOString(),
     createdAt: quote.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  };
+  });
 }
 
 export async function saveQuoteToFirestore(quote: JobberQuote): Promise<void> {
@@ -227,7 +256,7 @@ export function toFirestoreInvoice(invoice: JobberInvoice): Record<string, unkno
   };
   const status = statusMap[invoice.invoiceStatus] || 'Awaiting Payment';
 
-  return {
+  return stripUndefinedFields({
     id: cleanId,
     invoiceNumber: (invoice.invoiceNumber || 'INV-100').substring(0, 50),
     clientName: (invoice.clientName || 'Client').substring(0, 150),
@@ -237,7 +266,7 @@ export function toFirestoreInvoice(invoice: JobberInvoice): Record<string, unkno
     dueDate: invoice.dueDate || new Date().toISOString(),
     createdAt: invoice.issuedDate || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  };
+  });
 }
 
 export async function saveInvoiceToFirestore(invoice: JobberInvoice): Promise<void> {
@@ -256,21 +285,21 @@ export async function saveInvoiceToFirestore(invoice: JobberInvoice): Promise<vo
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function toFirestoreVanOverride(tech: Technician): Record<string, unknown> {
-  const vanId = sanitizeDocId(tech.id, 'van');
-  return {
+  const vanId = sanitizeDocId(tech.id, 'van').substring(0, 50);
+  return stripUndefinedFields({
     vanId,
     customVanName: (tech.vanNumber || tech.name).substring(0, 100),
     cleanerName: (tech.name || '').substring(0, 100),
     phone: (tech.phone || '').substring(0, 30),
-    hubId: sanitizeDocId(tech.depotLocation?.name || 'hub_default', 'hub'),
+    hubId: sanitizeDocId(tech.depotLocation?.name || 'hub_default', 'hub').substring(0, 50),
     customHubName: (tech.depotLocation?.name || `${tech.name} Hub`).substring(0, 100),
     color: (tech.color || '#2563EB').substring(0, 20),
     updatedAt: new Date().toISOString(),
-  };
+  });
 }
 
 export async function saveVanOverrideToFirestore(tech: Technician): Promise<void> {
-  const vanId = sanitizeDocId(tech.id, 'van');
+  const vanId = sanitizeDocId(tech.id, 'van').substring(0, 50);
   const payload = toFirestoreVanOverride(tech);
   try {
     const docRef = doc(db, 'vanOverrides', vanId);
