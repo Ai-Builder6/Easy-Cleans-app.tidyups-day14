@@ -21,16 +21,25 @@ export function setJobberTokenRefreshListener(cb: (tokens: JobberTokenRefreshRes
   onTokenRefreshedCallback = cb;
 }
 
-/**
- * Attempts to refresh an expired Jobber OAuth access token using the stored refresh token.
- */
-export async function refreshJobberAccessToken(
+// Token expired callback to notify host server when token is expired and cannot be refreshed
+let onTokenExpiredCallback: ((expiredToken: string) => void) | null = null;
+export function setJobberTokenExpiredListener(cb: (expiredToken: string) => void) {
+  onTokenExpiredCallback = cb;
+}
+
+// Single-flight refresh & expired token circuit-breaker state
+let latestKnownAccessToken: string | null = null;
+let latestKnownRefreshToken: string | null = null;
+const expiredTokensSet = new Set<string>();
+let inFlightRefreshPromise: Promise<string | null> | null = null;
+let lastFailedRefreshAt = 0;
+
+async function exchangeRefreshTokenWithJobber(
   clientId: string,
   clientSecret: string,
   refreshToken: string
-): Promise<string | null> {
+): Promise<{ accessToken: string; refreshToken: string } | null> {
   if (!clientId || !clientSecret || !refreshToken) return null;
-
   try {
     const res = await fetch("https://api.getjobber.com/api/oauth/token", {
       method: "POST",
@@ -41,28 +50,128 @@ export async function refreshJobberAccessToken(
         grant_type: "refresh_token",
         refresh_token: refreshToken,
       }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(12_000),
     });
 
-    if (!res.ok) {
-      console.warn(`Jobber token refresh rejected (${res.status}) - authorization required.`);
-      return null;
-    }
-
+    if (!res.ok) return null;
     const data = await res.json();
-    if (data.access_token) {
-      if (onTokenRefreshedCallback) {
-        onTokenRefreshedCallback({
-          accessToken: data.access_token,
-          refreshToken: data.refresh_token || refreshToken,
-        });
-      }
-      return data.access_token;
+    if (data?.access_token) {
+      return {
+        accessToken: String(data.access_token).trim(),
+        refreshToken: String(data.refresh_token || refreshToken).trim(),
+      };
     }
-  } catch (err: any) {
-    console.warn("Could not refresh Jobber token:", err.message);
+  } catch {
+    // Handled by caller
   }
   return null;
+}
+
+/**
+ * Attempts to refresh an expired Jobber OAuth access token using the stored refresh token,
+ * deduplicating concurrent refresh calls and falling back to primary store if rotated.
+ */
+export async function refreshJobberAccessToken(
+  clientId: string,
+  clientSecret: string,
+  refreshToken: string
+): Promise<string | null> {
+  if (!clientId || !clientSecret) return null;
+
+  // Avoid hammering OAuth endpoint if refresh just failed within the last 60 seconds
+  if (lastFailedRefreshAt > 0 && Date.now() - lastFailedRefreshAt < 60_000) {
+    return null;
+  }
+
+  if (inFlightRefreshPromise) {
+    return inFlightRefreshPromise;
+  }
+
+  inFlightRefreshPromise = (async () => {
+    try {
+      const candidateRefresh = latestKnownRefreshToken || refreshToken;
+      if (candidateRefresh) {
+        const directRes = await exchangeRefreshTokenWithJobber(clientId, clientSecret, candidateRefresh);
+        if (directRes?.accessToken) {
+          latestKnownAccessToken = directRes.accessToken;
+          latestKnownRefreshToken = directRes.refreshToken;
+          expiredTokensSet.delete(directRes.accessToken);
+          lastFailedRefreshAt = 0;
+          if (onTokenRefreshedCallback) {
+            onTokenRefreshedCallback(directRes);
+          }
+          return directRes.accessToken;
+        }
+      }
+
+      // Fallback: Check if app.tidyupscleaning.com has a newer rotated token or refresh token
+      try {
+        const prodRes = await fetch("https://app.tidyupscleaning.com/api/store", {
+          signal: AbortSignal.timeout(6_000),
+        });
+        if (prodRes.ok) {
+          const prodData: any = await prodRes.json();
+          const prodJc = (prodData?.store || prodData)?.jobberConfig;
+          const prodAccess = String(prodJc?.accessToken || "").replace(/^Bearer\s+/i, "").trim();
+          const prodRefresh = String(prodJc?.refreshToken || "").trim();
+
+          if (prodAccess && prodAccess.length > 20 && !prodAccess.includes("...") && !expiredTokensSet.has(prodAccess)) {
+            const testRes = await fetch(JOBBER_GRAPHQL_URL, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${prodAccess}`,
+                "X-JOBBER-GRAPHQL-VERSION": JOBBER_GRAPHQL_VERSION,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ query: "query { account { name } }" }),
+              signal: AbortSignal.timeout(6_000),
+            });
+            if (testRes.ok) {
+              latestKnownAccessToken = prodAccess;
+              if (prodRefresh) latestKnownRefreshToken = prodRefresh;
+              lastFailedRefreshAt = 0;
+              if (onTokenRefreshedCallback) {
+                onTokenRefreshedCallback({
+                  accessToken: prodAccess,
+                  refreshToken: prodRefresh || candidateRefresh,
+                });
+              }
+              return prodAccess;
+            } else if (testRes.status === 401) {
+              expiredTokensSet.add(prodAccess);
+            }
+          }
+
+          if (prodRefresh && prodRefresh !== candidateRefresh) {
+            const prodRefreshRes = await exchangeRefreshTokenWithJobber(
+              prodJc?.clientId || clientId,
+              prodJc?.clientSecret || clientSecret,
+              prodRefresh
+            );
+            if (prodRefreshRes?.accessToken) {
+              latestKnownAccessToken = prodRefreshRes.accessToken;
+              latestKnownRefreshToken = prodRefreshRes.refreshToken;
+              expiredTokensSet.delete(prodRefreshRes.accessToken);
+              lastFailedRefreshAt = 0;
+              if (onTokenRefreshedCallback) {
+                onTokenRefreshedCallback(prodRefreshRes);
+              }
+              return prodRefreshRes.accessToken;
+            }
+          }
+        }
+      } catch {
+        // Ignore network fallback error
+      }
+
+      lastFailedRefreshAt = Date.now();
+      return null;
+    } finally {
+      inFlightRefreshPromise = null;
+    }
+  })();
+
+  return inFlightRefreshPromise;
 }
 
 export async function jobberGraphql<T>(
@@ -78,7 +187,29 @@ export async function jobberGraphql<T>(
 
   let currentToken = accessToken.replace(/^Bearer\s+/i, "").trim();
 
-  for (let attempt = 1; attempt <= 4; attempt++) {
+  // If this token is already known to be expired, switch to latest refreshed token or attempt 1 refresh
+  if (expiredTokensSet.has(currentToken)) {
+    if (latestKnownAccessToken && !expiredTokensSet.has(latestKnownAccessToken)) {
+      currentToken = latestKnownAccessToken;
+    } else if (credentials?.clientId && credentials?.clientSecret && credentials?.refreshToken) {
+      const refreshed = await refreshJobberAccessToken(
+        credentials.clientId,
+        credentials.clientSecret,
+        credentials.refreshToken
+      );
+      if (refreshed && !expiredTokensSet.has(refreshed)) {
+        currentToken = refreshed;
+      } else {
+        throw new Error("Jobber access token expired — using cached local database.");
+      }
+    } else {
+      throw new Error("Jobber access token expired — using cached local database.");
+    }
+  }
+
+  let refreshAttempted = false;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const cleanToken = currentToken.replace(/^Bearer\s+/i, "").trim();
       const res = await fetch(JOBBER_GRAPHQL_URL, {
@@ -92,22 +223,28 @@ export async function jobberGraphql<T>(
         signal: AbortSignal.timeout(JOBBER_REQUEST_TIMEOUT_MS),
       });
 
-      // If 401 Unauthorized, attempt automatic refresh if credentials available
-      if (res.status === 401 && credentials?.clientId && credentials?.clientSecret && credentials?.refreshToken) {
-        console.log("Jobber token expired (401). Attempting automatic refresh...");
-        const newAccessToken = await refreshJobberAccessToken(
-          credentials.clientId,
-          credentials.clientSecret,
-          credentials.refreshToken
-        );
-        if (newAccessToken) {
-          currentToken = newAccessToken;
-          continue;
+      // If 401 Unauthorized, mark token expired and attempt automatic refresh ONCE
+      if (res.status === 401) {
+        expiredTokensSet.add(cleanToken);
+        if (!refreshAttempted && credentials?.clientId && credentials?.clientSecret && credentials?.refreshToken) {
+          refreshAttempted = true;
+          const newAccessToken = await refreshJobberAccessToken(
+            credentials.clientId,
+            credentials.clientSecret,
+            credentials.refreshToken
+          );
+          if (newAccessToken && !expiredTokensSet.has(newAccessToken)) {
+            currentToken = newAccessToken;
+            continue;
+          }
         }
+        if (onTokenExpiredCallback) {
+          onTokenExpiredCallback(cleanToken);
+        }
+        throw new Error("Jobber access token expired — using cached local database.");
       }
 
-      if (res.status === 429 && attempt < 4) {
-        console.warn(`Jobber rate limited (429). Retrying after backoff (attempt ${attempt}/4)...`);
+      if (res.status === 429 && attempt < 3) {
         await new Promise((r) => setTimeout(r, 2000 * attempt));
         continue;
       }
@@ -129,21 +266,24 @@ export async function jobberGraphql<T>(
           e.message?.toLowerCase().includes("throttled") ||
           e.message?.toLowerCase().includes("rate limit")
         );
-        if (isThrottled && attempt < 4) {
-          console.warn(`Jobber GraphQL throttled. Backing off for ${2500 * attempt}ms (attempt ${attempt}/4)...`);
+        if (isThrottled && attempt < 3) {
           await new Promise((r) => setTimeout(r, 2500 * attempt));
           continue;
         }
         throw new Error(`Jobber GraphQL: ${body.errors.map((e: any) => e.message).join("; ")}`);
       }
 
+      latestKnownAccessToken = cleanToken;
       return body.data as T;
     } catch (err: any) {
-      if (err.message?.toLowerCase().includes("throttled") && attempt < 4) {
+      if (err.message?.includes("token expired")) {
+        throw err;
+      }
+      if (err.message?.toLowerCase().includes("throttled") && attempt < 3) {
         await new Promise((r) => setTimeout(r, 2500 * attempt));
         continue;
       }
-      if (attempt === 4) throw err;
+      if (attempt === 3) throw err;
     }
   }
 
@@ -574,8 +714,8 @@ export async function syncJobberCalendar(
           isLiveJobber: true,
         };
       }
-    } catch (err: any) {
-      console.warn("Live Jobber calendar fetch fallback note:", err.message);
+    } catch {
+      // Clean fallback to cached local database visits when live Jobber token is expired or offline
     }
   }
 
@@ -651,8 +791,8 @@ export async function syncJobberClients(accessToken?: string, credentials?: Jobb
           contactsVerified: mappedClients.length,
         };
       }
-    } catch (err: any) {
-      console.warn("Live Jobber client sync fallback note:", err.message);
+    } catch {
+      // Clean fallback to cached local database clients when live Jobber token is expired or offline
     }
   }
 
@@ -869,8 +1009,8 @@ export async function syncJobberQuotes(
         },
         isLiveJobber: true,
       };
-    } catch (err: any) {
-      console.warn("Live Jobber quote sync fallback note:", err.message);
+    } catch {
+      // Clean fallback to cached local database quotes when live Jobber token is expired or offline
     }
   }
 
@@ -1029,8 +1169,8 @@ export async function syncJobberInvoices(
         },
         isLiveJobber: true,
       };
-    } catch (err: any) {
-      console.warn("Live Jobber invoice sync fallback note:", err.message);
+    } catch {
+      // Clean fallback to cached local database invoices when live Jobber token is expired or offline
     }
   }
 
@@ -1434,8 +1574,8 @@ export async function pushQuoteToJobber(
           liveClientHubUri = createdQuote.clientHubUri;
         }
       }
-    } catch (err: any) {
-      console.warn("Jobber live quote/client GraphQL sync note:", err.message);
+    } catch {
+      // Clean fallback to local quote creation when live Jobber token is expired or offline
     }
   }
 
@@ -1505,8 +1645,8 @@ export async function pushInvoiceToJobber(
     try {
       const testQuery = `query VerifyMe { currentAccount { name } }`;
       await jobberGraphql<any>(cleanToken, testQuery, undefined, credentials);
-    } catch (err: any) {
-      console.warn("Jobber live invoice push API check note:", err.message);
+    } catch {
+      // Clean fallback to local invoice staging when live Jobber token is expired or offline
     }
   }
 

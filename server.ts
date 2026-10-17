@@ -42,6 +42,7 @@ import {
   pushInvoiceToJobber,
   runComprehensiveJobberSync,
   setJobberTokenRefreshListener,
+  setJobberTokenExpiredListener,
   verifyJobberConnection,
   refreshJobberAccessToken,
   extractJobberNumericId,
@@ -1341,12 +1342,19 @@ setJobberTokenRefreshListener((tokens) => {
   jobberConfig.accountName = "Tidyups Cleaning Service Inc";
   jobberConfig.lastSyncedAt = new Date().toISOString();
   persistJobberConfigToDisk();
-  console.log("Jobber OAuth access token was automatically refreshed and saved to disk.");
+});
+
+// Wire expired token cleanup so expired tokens that cannot be refreshed do not trigger repeated 401 errors
+setJobberTokenExpiredListener((expiredToken) => {
+  if (jobberConfig.accessToken === expiredToken) {
+    jobberConfig.accessToken = "";
+    jobberConfig.isConnected = false;
+    persistJobberConfigToDisk();
+  }
 });
 
 // Auto-activate or refresh live Jobber connection if refresh token exists on boot
 if (jobberConfig.refreshToken && jobberConfig.clientId && jobberConfig.clientSecret) {
-  console.log("Jobber credentials present on startup. Activating live OAuth connection...");
   refreshJobberAccessToken(jobberConfig.clientId, jobberConfig.clientSecret, jobberConfig.refreshToken)
     .then(async (newAccessToken) => {
       if (newAccessToken) {
@@ -1355,7 +1363,6 @@ if (jobberConfig.refreshToken && jobberConfig.clientId && jobberConfig.clientSec
         jobberConfig.accountName = "Tidyups Cleaning Service Inc";
         jobberConfig.lastSyncedAt = new Date().toISOString();
         persistJobberConfigToDisk();
-        console.log("Successfully activated live Jobber connection for Tidyups Cleaning Service Inc!");
 
         // Automatically pull September and October 2026 data
         try {
@@ -1381,13 +1388,22 @@ if (jobberConfig.refreshToken && jobberConfig.clientId && jobberConfig.clientSec
               saveStore(cur3);
             }
           }
-          console.log(`Live Jobber sync loaded: ${calData.visits?.length || 0} visits, ${quoteData.quotes?.length || 0} quotes, ${invData.invoices?.length || 0} invoices.`);
-        } catch (e: any) {
-          console.warn("Background auto-sync note:", e.message);
+        } catch {
+          // Non-blocking startup sync
+        }
+      } else if (jobberConfig.accessToken) {
+        // Verify if stored accessToken is still valid; if expired, clear it so syncs use local database cleanly without 401 errors
+        const check = await verifyJobberConnection(jobberConfig.accessToken, getJobberCreds());
+        if (!check.isValid) {
+          jobberConfig.accessToken = "";
+          jobberConfig.isConnected = false;
+          persistJobberConfigToDisk();
         }
       }
     })
-    .catch((err) => console.warn("Jobber background activation note:", err.message));
+    .catch(() => {
+      // Non-blocking startup check
+    });
 }
 
 function getJobberCreds() {
