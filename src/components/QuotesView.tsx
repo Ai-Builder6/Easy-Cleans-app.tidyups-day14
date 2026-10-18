@@ -133,7 +133,21 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
     setSyncFeedback(`Applied line item: ${item.name} (${qty} @ $${unitPrice.toFixed(2)} = $${total.toFixed(2)} CAD)`);
   };
 
-  const filteredQuotes = quotes.filter((q) => {
+  const uniqueQuotes = React.useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenNums = new Set<string>();
+    return quotes.filter((q) => {
+      if (!q) return false;
+      const id = String(q.id || '').trim();
+      const num = String(q.quoteNumber || '').trim();
+      if ((id && seenIds.has(id)) || (num && seenNums.has(num))) return false;
+      if (id) seenIds.add(id);
+      if (num) seenNums.add(num);
+      return true;
+    });
+  }, [quotes]);
+
+  const filteredQuotes = uniqueQuotes.filter((q) => {
     const qStr = `${q.clientName} ${q.quoteNumber} ${q.service || ''} ${q.serviceAddress || ''} ${q.clientPhone || ''} ${q.bedrooms || ''} ${q.bathrooms || ''}`.toLowerCase();
     const matchesSearch = !search.trim() || qStr.includes(search.toLowerCase());
 
@@ -149,14 +163,14 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   const totalValue = filteredQuotes.reduce((acc, q) => acc + (Number(q.total) || 0), 0);
 
   const statusCounts = {
-    ALL: quotes.length,
-    DRAFT: quotes.filter((q) => q.quoteStatus === 'DRAFT').length,
-    AWAITING_RESPONSE: quotes.filter(
+    ALL: uniqueQuotes.length,
+    DRAFT: uniqueQuotes.filter((q) => q.quoteStatus === 'DRAFT').length,
+    AWAITING_RESPONSE: uniqueQuotes.filter(
       (q) => q.quoteStatus === 'AWAITING_RESPONSE' || q.quoteStatus === 'CHANGES_REQUESTED'
     ).length,
-    APPROVED: quotes.filter((q) => q.quoteStatus === 'APPROVED').length,
-    CONVERTED: quotes.filter((q) => q.quoteStatus === 'CONVERTED').length,
-    ARCHIVED: quotes.filter((q) => q.quoteStatus === 'ARCHIVED').length,
+    APPROVED: uniqueQuotes.filter((q) => q.quoteStatus === 'APPROVED').length,
+    CONVERTED: uniqueQuotes.filter((q) => q.quoteStatus === 'CONVERTED').length,
+    ARCHIVED: uniqueQuotes.filter((q) => q.quoteStatus === 'ARCHIVED').length,
   };
 
   const getStatusBadge = (status: string) => {

@@ -2575,14 +2575,33 @@ function repairAndSyncStoreData(store: AppPersistentStore): boolean {
     }));
     mutated = true;
   } else {
-    const fakeQuoteIds = new Set(["qt_4331", "QT-4331", "qt-devon-clarke-2410", "qt-2090", "qt-2093", "qt-2099"]);
+    const fakeQuoteIds = new Set([
+      "qt_4331",
+      "QT-4331",
+      "qt-devon-clarke-2410",
+      "qt-2090",
+      "qt-2093",
+      "qt-2099",
+      "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3NDY2MjY2",
+      "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3NDY2Mjcx",
+      "Z2lkOi8vSm9iYmVyL1F1b3RlLzY3NDY2Mjcy",
+      "QT-4378",
+      "QT-4380",
+      "QT-4381",
+    ]);
+    const seenIds = new Set<string>();
+    const seenNums = new Set<string>();
     const cleanedQuotes = store.quotes.filter((q: any) => {
-      const qid = String(q.id || "");
-      const qnum = String(q.quoteNumber || "");
+      if (!q) return false;
+      const qid = String(q.id || "").trim();
+      const qnum = String(q.quoteNumber || "").trim();
       const cname = String(q.clientName || "").toLowerCase();
       if (fakeQuoteIds.has(qid) || fakeQuoteIds.has(qnum)) return false;
       if (qid.startsWith("qt-2026-")) return false;
       if (cname.includes("devon clark") || cname.includes("test customer edmonton")) return false;
+      if ((qid && seenIds.has(qid)) || (qnum && seenNums.has(qnum))) return false;
+      if (qid) seenIds.add(qid);
+      if (qnum) seenNums.add(qnum);
       return true;
     });
     if (cleanedQuotes.length !== store.quotes.length) {

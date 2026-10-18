@@ -360,13 +360,22 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
     });
   }, [jobs, searchQuery, selectedCleanerFilter, statusFilter, serviceFilter, financialFilter]);
 
-  // Filter quotes based on search and financial filter
+  // Filter quotes based on search and financial filter (deduplicated by id/quoteNumber)
   const filteredQuotes = useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenNums = new Set<string>();
     return quotes.filter((q) => {
+      if (!q) return false;
+      const id = String(q.id || '').trim();
+      const num = String(q.quoteNumber || '').trim();
+      if ((id && seenIds.has(id)) || (num && seenNums.has(num))) return false;
+      if (id) seenIds.add(id);
+      if (num) seenNums.add(num);
+
       const matchesSearch =
-        q.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        q.quoteNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        q.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (q.clientName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (q.quoteNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (q.service || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (q.serviceAddress && q.serviceAddress.toLowerCase().includes(searchQuery.toLowerCase()));
 
       let matchesFinancial = true;
@@ -377,12 +386,21 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
     });
   }, [quotes, searchQuery, financialFilter]);
 
-  // Filter invoices based on search and financial filter
+  // Filter invoices based on search and financial filter (deduplicated by id/invoiceNumber)
   const filteredInvoices = useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenNums = new Set<string>();
     return invoices.filter((inv) => {
+      if (!inv) return false;
+      const id = String(inv.id || '').trim();
+      const num = String(inv.invoiceNumber || '').trim();
+      if ((id && seenIds.has(id)) || (num && seenNums.has(num))) return false;
+      if (id) seenIds.add(id);
+      if (num) seenNums.add(num);
+
       const matchesSearch =
-        inv.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        inv.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (inv.clientName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (inv.invoiceNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (inv.service && inv.service.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (inv.serviceAddress && inv.serviceAddress.toLowerCase().includes(searchQuery.toLowerCase()));
 
@@ -3106,8 +3124,8 @@ export const ScheduledJobsView: React.FC<ScheduledJobsViewProps> = ({
             )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {quotes.map((q) => (
-              <div key={q.id} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+            {filteredQuotes.map((q) => (
+              <div key={q.id || q.quoteNumber} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-2">
                 <div className="flex justify-between font-bold text-xs">
                   <span className="text-purple-700">{q.quoteNumber}</span>
                   <span className="text-emerald-700">${q.total}</span>

@@ -495,39 +495,44 @@ export const MasterLeadsAndQuotesHubView: React.FC<MasterLeadsAndQuotesHubViewPr
       );
     };
 
-    const fbLeads = leads.filter(
-      (l) =>
-        (l.sourceTab === 'FB Leads' ||
-          String(l.source || '').toLowerCase().includes('fb') ||
-          String(l.source || '').toLowerCase().includes('facebook')) &&
-        filterLead(l)
-    );
+    const seenLeadIds = new Set<string>();
+    const uniqueLeads = leads.filter((l) => {
+      if (!l || !l.id) return false;
+      if (seenLeadIds.has(l.id)) return false;
+      seenLeadIds.add(l.id);
+      return filterLead(l);
+    });
 
-    const googleLeads = leads.filter(
-      (l) =>
-        (l.sourceTab === 'Google Leads' ||
-          String(l.source || '').toLowerCase().includes('google')) &&
-        filterLead(l)
-    );
+    const fbLeads: AdLeadItem[] = [];
+    const googleLeads: AdLeadItem[] = [];
+    const pastedLeads: AdLeadItem[] = [];
+    const voiceLeads: AdLeadItem[] = [];
 
-    const voiceLeads = leads.filter(
-      (l) =>
-        (l.sourceTab === 'Voice & Quick Quotes' ||
-          (!l.sourceTab &&
-            !String(l.source || '').toLowerCase().includes('fb') &&
-            !String(l.source || '').toLowerCase().includes('google') &&
-            !String(l.source || '').toLowerCase().includes('paste'))) &&
-        filterLead(l)
-    );
+    for (const l of uniqueLeads) {
+      const tab = String(l.sourceTab || '');
+      const src = String(l.source || '').toLowerCase();
+      if (tab === 'FB Leads' || (!tab && (src.includes('fb') || src.includes('facebook')))) {
+        fbLeads.push(l);
+      } else if (tab === 'Google Leads' || (!tab && src.includes('google'))) {
+        googleLeads.push(l);
+      } else if (tab === 'Pasted Leads' || (!tab && src.includes('paste'))) {
+        pastedLeads.push(l);
+      } else {
+        voiceLeads.push(l);
+      }
+    }
 
-    const pastedLeads = leads.filter(
-      (l) =>
-        (l.sourceTab === 'Pasted Leads' ||
-          String(l.source || '').toLowerCase().includes('paste')) &&
-        filterLead(l)
-    );
-
-    const jobberQuotesFiltered = quotes.filter(filterQuote);
+    const seenQuoteIds = new Set<string>();
+    const seenQuoteNumbers = new Set<string>();
+    const jobberQuotesFiltered = quotes.filter((q) => {
+      if (!q) return false;
+      const id = String(q.id || '').trim();
+      const num = String(q.quoteNumber || '').trim();
+      if ((id && seenQuoteIds.has(id)) || (num && seenQuoteNumbers.has(num))) return false;
+      if (id) seenQuoteIds.add(id);
+      if (num) seenQuoteNumbers.add(num);
+      return filterQuote(q);
+    });
 
     return {
       fbLeads,
@@ -698,7 +703,7 @@ export const MasterLeadsAndQuotesHubView: React.FC<MasterLeadsAndQuotesHubViewPr
     const isExpanded = expandedTranscriptRowId === lead.id;
 
     return (
-      <React.Fragment key={lead.id}>
+      <React.Fragment key={`lead-row-${lead.id}`}>
         <tr className={`border-b border-slate-200/80 transition-colors ${theme.rowBg}`}>
           <td className="px-3 py-2.5 whitespace-nowrap">
             <button
@@ -888,7 +893,7 @@ export const MasterLeadsAndQuotesHubView: React.FC<MasterLeadsAndQuotesHubViewPr
         : 'https://secure.getjobber.com/quotes';
 
     return (
-      <tr key={quote.id} className="border-b border-sky-200/70 bg-sky-50/55 hover:bg-sky-100/70 transition-colors">
+      <tr key={`quote-row-${quote.id || quote.quoteNumber}`} className="border-b border-sky-200/70 bg-sky-50/55 hover:bg-sky-100/70 transition-colors">
         <td className="px-3 py-2.5 whitespace-nowrap">
           <button
             type="button"
@@ -2212,9 +2217,9 @@ export const MasterLeadsAndQuotesHubView: React.FC<MasterLeadsAndQuotesHubViewPr
                   </span>
                 </div>
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  {leads.slice(0, 6).map((l) => (
+                  {leads.slice(0, 6).map((l, idx) => (
                     <button
-                      key={l.id}
+                      key={`map-lead-${l.id || idx}`}
                       type="button"
                       onClick={() =>
                         handlePinItemOnQuickMap({
@@ -2236,9 +2241,9 @@ export const MasterLeadsAndQuotesHubView: React.FC<MasterLeadsAndQuotesHubViewPr
                       <div className="text-[10px] opacity-80 truncate max-w-[140px]">{l.address}</div>
                     </button>
                   ))}
-                  {quotes.slice(0, 5).map((q) => (
+                  {categorizedMasterData.jobberQuotes.slice(0, 5).map((q, idx) => (
                     <button
-                      key={q.id}
+                      key={`map-quote-${q.id || q.quoteNumber || idx}`}
                       type="button"
                       onClick={() =>
                         handlePinItemOnQuickMap({

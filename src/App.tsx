@@ -232,6 +232,36 @@ function resolveClientSideEdmontonCoords(address?: string, existingLat?: number,
   };
 }
 
+const SUPERSEDED_DUPLICATE_QUOTE_IDS = new Set([
+  'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3NDY2MjY2',
+  'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3NDY2Mjcx',
+  'Z2lkOi8vSm9iYmVyL1F1b3RlLzY3NDY2Mjcy',
+  'QT-4378',
+  'QT-4380',
+  'QT-4381',
+]);
+
+function dedupeQuotesList(rawQuotes: any[]): JobberQuote[] {
+  if (!Array.isArray(rawQuotes)) return [];
+  const seenIds = new Set<string>();
+  const seenNumbers = new Set<string>();
+  const uniqueByKey: JobberQuote[] = [];
+
+  for (const q of rawQuotes) {
+    if (!q || isFakeSimulationItem(q)) continue;
+    const id = String(q.id || '').trim();
+    const num = String(q.quoteNumber || '').trim();
+    if (!id && !num) continue;
+    if (SUPERSEDED_DUPLICATE_QUOTE_IDS.has(id) || SUPERSEDED_DUPLICATE_QUOTE_IDS.has(num)) continue;
+    if ((id && seenIds.has(id)) || (num && seenNumbers.has(num))) continue;
+    if (id) seenIds.add(id);
+    if (num) seenNumbers.add(num);
+    uniqueByKey.push(q);
+  }
+
+  return uniqueByKey;
+}
+
 export function App() {
   const [apiKey, setApiKey] = useState<string>(
     import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyC4kxdVgVTNm5ppd8IuK7rqq-Rz_EV31Ns'
@@ -391,7 +421,7 @@ export function App() {
   const [scheduledJobsSubTab, setScheduledJobsSubTab] = useState<'CALENDAR' | 'LIST' | 'UNSCHEDULED'>('CALENDAR');
   const [quotesList, setQuotesList] = useState<JobberQuote[]>(() => {
     const base = (storedData?.quotes && storedData.quotes.length > 0) ? storedData.quotes : INITIAL_JOBBER_QUOTES;
-    return base.filter((q: any) => !isFakeSimulationItem(q));
+    return dedupeQuotesList(base);
   });
   const [invoicesList, setInvoicesList] = useState<JobberInvoice[]>(() => {
     const base = (storedData?.invoices && storedData.invoices.length > 0) ? storedData.invoices : INITIAL_JOBBER_INVOICES;
@@ -464,7 +494,7 @@ export function App() {
         }
         if (data.unscheduledJobs && data.unscheduledJobs.length > 0) setUnscheduledJobsList(data.unscheduledJobs);
         if (data.clients && data.clients.length > 0) setClientsList(data.clients);
-        if (data.quotes && data.quotes.length > 0) setQuotesList(data.quotes);
+        if (data.quotes && data.quotes.length > 0) setQuotesList(dedupeQuotesList(data.quotes));
         if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices);
         if (data.quoCallLogs && data.quoCallLogs.length > 0) setQuoCallsList(data.quoCallLogs);
         if (data.adLeads && data.adLeads.length > 0) setLeadsList(data.adLeads);
@@ -719,7 +749,7 @@ export function App() {
         if (data?.success) {
           if (Array.isArray(data.leads) && data.leads.length > 0) setLeadsList(data.leads);
           if (Array.isArray(data.quotes) && data.quotes.length > 0) {
-            setQuotesList(data.quotes.filter((q: any) => !isFakeSimulationItem(q)));
+            setQuotesList(dedupeQuotesList(data.quotes));
           }
           if (Array.isArray(data.invoices) && data.invoices.length > 0) {
             setInvoicesList(data.invoices.filter((inv: any) => !isFakeSimulationItem(inv)));
@@ -1182,7 +1212,7 @@ export function App() {
               })
             );
           }
-          if (data.quotes && data.quotes.length > 0) setQuotesList(data.quotes.filter((q: any) => !isFakeSimulationItem(q)));
+          if (data.quotes && data.quotes.length > 0) setQuotesList(dedupeQuotesList(data.quotes));
           if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices.filter((inv: any) => !isFakeSimulationItem(inv)));
           if (data.quoCallLogs && data.quoCallLogs.length > 0) setQuoCallsList(data.quoCallLogs);
           if (data.spamShieldConfig) setSpamShieldConfig(data.spamShieldConfig);
@@ -2485,7 +2515,7 @@ export function App() {
             calls={quoCallsList}
             visits={scheduledJobsList}
             quotes={quotesList}
-            onQuotesUpdated={(updated) => setQuotesList(updated)}
+            onQuotesUpdated={(updated) => setQuotesList(dedupeQuotesList(updated))}
             projectId={activeProjectId}
             onUpdateClient={handleUpdateClient}
             onAddClient={handleAddClient}
@@ -2521,7 +2551,7 @@ export function App() {
             lastSyncedAllAt={lastSyncedAllAt}
             syncAllStatusMessage={syncAllStatusMessage}
             onLeadsUpdated={(updated) => setLeadsList(updated)}
-            onQuotesUpdated={(updated) => setQuotesList(updated)}
+            onQuotesUpdated={(updated) => setQuotesList(dedupeQuotesList(updated))}
             onClientsUpdated={(updated) => setClientsList(updated)}
             onConvertLeadToJob={handleConvertLeadToJob}
             onOpenQuickQuote={(lead) => {
@@ -2613,7 +2643,7 @@ export function App() {
             projectId={activeProjectId}
             serviceCatalog={serviceCatalog}
             onCatalogUpdated={(newCat) => setServiceCatalog(newCat)}
-            onQuotesUpdated={(updated) => setQuotesList(updated)}
+            onQuotesUpdated={(updated) => setQuotesList(dedupeQuotesList(updated))}
             onVisitCreated={(newVisit) => {
               setScheduledJobsList((prev) => [newVisit, ...prev]);
             }}
@@ -2624,7 +2654,7 @@ export function App() {
               })
                 .then((r) => r.json())
                 .then((data) => {
-                  if (data.quotes) setQuotesList(data.quotes);
+                  if (data.quotes) setQuotesList(dedupeQuotesList(data.quotes));
                 });
             }}
             onBackToManagement={() => setActiveTopView('MANAGEMENT')}
@@ -2666,7 +2696,7 @@ export function App() {
             visits={scheduledJobsList}
             clients={clientsList}
             quotes={quotesList}
-            onQuotesUpdated={(updated) => setQuotesList(updated)}
+            onQuotesUpdated={(updated) => setQuotesList(dedupeQuotesList(updated))}
             onClientsUpdated={(updated) => setClientsList(updated)}
             onOpenJobberModal={() => setIsJobberModalOpen(true)}
             projectId={activeProjectId}
@@ -2693,7 +2723,7 @@ export function App() {
                   }
                   return true;
                 });
-                return [newQuote, ...filtered];
+                return dedupeQuotesList([newQuote, ...filtered]);
               });
             }}
             onBookingSubmitted={(ticket) => {
@@ -3173,7 +3203,7 @@ export function App() {
                   );
                 }
                 if (data.unscheduledJobs) setUnscheduledJobsList(data.unscheduledJobs.filter((j: any) => !isFakeSimulationItem(j)));
-                if (data.quotes && data.quotes.length > 0) setQuotesList(data.quotes.filter((q: any) => !isFakeSimulationItem(q)));
+                if (data.quotes && data.quotes.length > 0) setQuotesList(dedupeQuotesList(data.quotes));
                 if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices.filter((inv: any) => !isFakeSimulationItem(inv)));
                 if (data.clients && data.clients.length > 0) setClientsList(data.clients);
               })
@@ -3197,7 +3227,7 @@ export function App() {
                   );
                 }
                 if (data.unscheduledJobs) setUnscheduledJobsList(data.unscheduledJobs.filter((j: any) => !isFakeSimulationItem(j)));
-                if (data.quotes && data.quotes.length > 0) setQuotesList(data.quotes.filter((q: any) => !isFakeSimulationItem(q)));
+                if (data.quotes && data.quotes.length > 0) setQuotesList(dedupeQuotesList(data.quotes));
                 if (data.invoices && data.invoices.length > 0) setInvoicesList(data.invoices.filter((inv: any) => !isFakeSimulationItem(inv)));
                 if (data.clients && data.clients.length > 0) setClientsList(data.clients);
               })
@@ -3228,10 +3258,7 @@ export function App() {
             setScheduledJobsList((prev) => [newVisit, ...prev]);
           }}
           onCreateJobberQuote={(newQuote, fullResponse) => {
-            setQuotesList((prev) => {
-              const exists = prev.some((q) => q.id === newQuote.id || q.quoteNumber === newQuote.quoteNumber);
-              return exists ? prev.map((q) => (q.id === newQuote.id ? newQuote : q)) : [newQuote, ...prev];
-            });
+            setQuotesList((prev) => dedupeQuotesList([newQuote, ...prev]));
             if (fullResponse?.client) {
               setClientsList((prev) => {
                 const exists = prev.some((c) => c.id === fullResponse.client.id);
@@ -3260,7 +3287,7 @@ export function App() {
           projectId={activeProjectId}
           onQuoteUpdated={(updatedQuote) => {
             setActiveQuoteDetailModalItem(updatedQuote);
-            setQuotesList((prev) => prev.map((q) => (q.id === updatedQuote.id ? updatedQuote : q)));
+            setQuotesList((prev) => dedupeQuotesList(prev.map((q) => (q.id === updatedQuote.id ? updatedQuote : q))));
           }}
         />
 
@@ -3279,7 +3306,7 @@ export function App() {
               .then((r) => r.json())
               .then((data) => {
                 if (data.scheduledVisits) setScheduledJobsList(data.scheduledVisits);
-                if (data.quotes) setQuotesList(data.quotes);
+                if (data.quotes) setQuotesList(dedupeQuotesList(data.quotes));
                 if (data.clients) setClientsList(data.clients);
                 if (data.quoCallLogs) setQuoCallsList(data.quoCallLogs);
               })
